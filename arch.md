@@ -97,6 +97,7 @@
 
 - POST /api/shares
 	- 특정 사용자 이름(username)으로 암호화된 폴더 키 전송 (서버 공유 큐에 적재)
+	- 사용자끼리 공유 비밀값을 지정해 서버 개입 차단
 	- 요청: {targetUsername: string, encFk: bytes}
 - GET /api/shares/pending
 	- 서버 로그인 시 자신을 타겟으로 한 대기 중인 공유 큐 내용 모두 받아오기
