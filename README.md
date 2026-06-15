@@ -7,7 +7,7 @@ project WHY(Web Hub Yard): Media Hub
 ## Usage
 
 - Make your folder and upload files. You can share your folder with others.
-- MediaHub supports editing text, watching pdf, image, and video.
+- MediaHub supports views of text, pdf, image, and video.
 - File bigger than 500MB is hard to process. Consider cutting media before uploading with ffmpeg.
 
 ## Architecture
