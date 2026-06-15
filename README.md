@@ -12,10 +12,10 @@ project WHY(Web Hub Yard): Media Hub
 
 ## Architecture
 
-- All cryptographic works on client browser memory.
+- All cryptographic works on client browser memory, based on project USAG.
 - Server holds userdata, filenames, thumbnails, media encrypted.
-- userdata is Map<folderName>folderKey, and Hash(folderKey)[0:16] is Physical ID.
-- filenames is Map<fileName>fileKey, and Hash(fileKey)[0:16] is Physical ID.
+- userdata is Map[folderName]folderKey, and Hash(folderKey)[0:16] is Physical ID.
+- filenames is Map[fileName]fileKey, and Hash(fileKey)[0:16] is Physical ID.
 - userdata is encrypted with userKey. filenames is encrypted with folderKey. Thumbnails and media are encrypted with fileKey.
 
 ```python
