@@ -15,7 +15,7 @@ async function makeKeys() {
     if (!username || !password) { alert("⚠️ Fill in all fields"); return null; }
 
     const pwBytes = NormPW(password);
-    const saltBytes = new TextEncoder().encode(username + SECRET_PEPPER);
+    const saltBytes = SHA3256(new TextEncoder().encode(username + SECRET_PEPPER));
     const hm = new HashMaster("arg2", 32, 44);
     const [storeKey, userKey] = await hm.KDF(pwBytes, saltBytes);
     const masked = mask.XOR(userKey); userKey.fill(0);
