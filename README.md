@@ -10,7 +10,7 @@ project WHY(Web Hub Yard): Media Hub
 - MediaHub supports views of text, pdf, image, and video.
 - File bigger than 500MB is hard to process. Consider cutting media before uploading with ffmpeg.
 - System does not care about concurrency: Each user must upload after other user's session is cleared.
-- Forcus of MediaHub is lightweight media share/watch. Making your own backup drive with other service is recommended.
+- Focus of MediaHub is lightweight media share/watch. Making your own backup drive with other service is recommended.
 
 ## Architecture
 
