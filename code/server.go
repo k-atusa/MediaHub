@@ -25,6 +25,7 @@ type Config struct {
 	Port       string `json:"port"`
 	CertFile   string `json:"cert"`
 	KeyFile    string `json:"key"`
+	Notice     string `json:"notice"`
 }
 
 var cfg Config
@@ -38,22 +39,23 @@ func initEnv() {
 		Port:       "443",
 		CertFile:   "./cert.pem",
 		KeyFile:    "./key.pem",
+		Notice:     "",
 	}
 
 	// load config, make new if not exists
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		file, _ := json.MarshalIndent(cfg, "", "  ")
-		_ = os.WriteFile(configPath, file, 0644)
-		log.Println("config.json file not existing, created")
+		os.WriteFile(configPath, file, 0644)
+		log.Println("config.json file not exists, created")
 	} else {
 		file, _ := os.ReadFile(configPath)
-		_ = json.Unmarshal(file, &cfg)
+		json.Unmarshal(file, &cfg)
 	}
 
 	// make directories
-	_ = os.MkdirAll(filepath.Join(cfg.StorageDir, "users"), 0755)
-	_ = os.MkdirAll(filepath.Join(cfg.StorageDir, "data"), 0755)
-	_ = os.MkdirAll("./public", 0755)
+	os.MkdirAll(filepath.Join(cfg.StorageDir, "users"), 0755)
+	os.MkdirAll(filepath.Join(cfg.StorageDir, "data"), 0755)
+	os.MkdirAll("./public", 0755)
 
 	// make certificate if not exists
 	if _, err := os.Stat(cfg.CertFile); os.IsNotExist(err) {
@@ -71,15 +73,15 @@ func serveUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	path := filepath.Join(cfg.StorageDir, "users", filepath.Clean(userHash), "userdata")
+	path := filepath.Join(cfg.StorageDir, "users", filepath.Clean(userHash))
 	switch r.Method {
 	case http.MethodGet: // read userdata
 		http.ServeFile(w, r, path)
 	case http.MethodPost: // create/update userdata
-		_ = os.MkdirAll(filepath.Dir(path), 0755)
+		os.MkdirAll(filepath.Dir(path), 0700)
 		save(w, r, path)
 	case http.MethodDelete: // delete userdata
-		_ = os.RemoveAll(filepath.Dir(path))
+		os.Remove(path)
 		w.WriteHeader(http.StatusOK)
 	default:
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
@@ -106,10 +108,10 @@ func serveMeta(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet: // read metadata
 		http.ServeFile(w, r, path)
 	case http.MethodPost: // create/update metadata
-		_ = os.MkdirAll(filepath.Dir(path), 0755)
+		os.MkdirAll(filepath.Dir(path), 0755)
 		save(w, r, path)
 	case http.MethodDelete: // delete metadata
-		_ = os.RemoveAll(filepath.Dir(path))
+		os.RemoveAll(filepath.Dir(path))
 		w.WriteHeader(http.StatusOK)
 	default:
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
@@ -141,14 +143,24 @@ func serveMedia(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Accept-Ranges", "bytes")
 		http.ServeFile(w, r, path)
 	case http.MethodPost: // create/update media file
-		_ = os.MkdirAll(filepath.Dir(path), 0755)
+		os.MkdirAll(filepath.Dir(path), 0755)
 		save(w, r, path)
 	case http.MethodDelete: // delete media file
-		_ = os.Remove(path)
+		os.Remove(path)
 		w.WriteHeader(http.StatusOK)
 	default:
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+// handles notice fetch
+func serveNotice(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"notice": cfg.Notice})
 }
 
 // overwrite file
@@ -165,7 +177,7 @@ func save(w http.ResponseWriter, r *http.Request, path string) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte("Success"))
+	w.Write([]byte("Success"))
 }
 
 // cross platform optimization middleware filter
@@ -219,13 +231,13 @@ func makeCert(certOut string, keyOut string) {
 	// write certificate
 	cFile, _ := os.Create(certOut)
 	defer cFile.Close()
-	_ = pem.Encode(cFile, &pem.Block{Type: "CERTIFICATE", Bytes: der})
+	pem.Encode(cFile, &pem.Block{Type: "CERTIFICATE", Bytes: der})
 
 	// write private key
 	kFile, _ := os.OpenFile(keyOut, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	defer kFile.Close()
 	b, _ := x509.MarshalECPrivateKey(priv)
-	_ = pem.Encode(kFile, &pem.Block{Type: "EC PRIVATE KEY", Bytes: b})
+	pem.Encode(kFile, &pem.Block{Type: "EC PRIVATE KEY", Bytes: b})
 }
 
 func main() {
@@ -236,6 +248,7 @@ func main() {
 	mux.HandleFunc("/api/userdata/", serveUser)
 	mux.HandleFunc("/api/storage/", serveMeta)
 	mux.HandleFunc("/api/media/", serveMedia)
+	mux.HandleFunc("/api/notice", serveNotice)
 	mux.Handle("/", http.FileServer(http.Dir("./public")))
 
 	// start server with TLS

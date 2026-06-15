@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediaHub - Storage</title>
+    <link rel="icon" type="image/png" href="./favicon.png">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/dark.css">
+    <style>
+        .hidden {
+            display: none !important;
+        }
+
+        body {
+            max-width: 1200px !important;
+            width: 100% !important;
+            margin: 0 auto !important;
+            box-sizing: border-box;
+        }
+
+        .media-grid {
+            display: grid;
+            margin-top: 10px;
+        }
+
+        .media-card {
+            background: #222;
+            border-radius: 6px;
+            border: 1px solid #333;
+            text-align: center;
+            cursor: pointer;
+        }
+
+        .thumb-img {
+            width: 100%;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+
+        .file-title {
+            color: #bbb;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .pid-text {
+            color: #666;
+            font-family: monospace;
+        }
+
+        /* Mobile (<600px) */
+        @media (max-width: 599px) {
+            body {
+                font-size: 13px !important;
+                padding: 10px !important;
+            }
+
+            button,
+            input,
+            select,
+            textarea {
+                font-size: 13px !important;
+                padding: 6px 10px !important;
+            }
+
+            .media-grid {
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 8px !important;
+            }
+
+            .media-card {
+                padding: 8px !important;
+            }
+
+            .thumb-img {
+                height: 90px !important;
+            }
+
+            .file-title {
+                font-size: 10px !important;
+                margin-top: 4px !important;
+            }
+
+            .pid-text {
+                display: none !important;
+            }
+        }
+
+        /* Desktop (>=600px) */
+        @media (min-width: 600px) {
+            body {
+                font-size: 17px !important;
+            }
+
+            button,
+            input,
+            select,
+            textarea {
+                font-size: 16px !important;
+                padding: 10px 16px !important;
+            }
+
+            .media-grid {
+                grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)) !important;
+                gap: 12px !important;
+            }
+
+            .media-card {
+                padding: 12px !important;
+            }
+
+            .thumb-img {
+                height: 120px !important;
+            }
+
+            .file-title {
+                font-size: 12px !important;
+                margin-top: 6px !important;
+            }
+
+            .pid-text {
+                font-size: 12px !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main style="padding: 10px; max-width: 1200px; width: 100%; margin: 0 auto; box-sizing: border-box;">
+        <div
+            style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
+            <div style="display: flex; align-items: baseline; gap: 6px;">
+                <h3 style="margin: 0; font-size: 20px;">MediaHub 📂</h3>
+                <span class="pid-text">PID: <span id="lblUserHash"
+                        style="color: #007acc;"></span></span>
+            </div>
+            <div style="display: flex; gap: 4px;">
+                <button id="btnRefresh" title="Sync" style="margin: 0; padding: 4px 8px; font-size: 12px;">🔄
+                    Sync</button>
+                <button id="btnExport" title="Export share token"
+                    style="margin: 0; padding: 4px 8px; font-size: 12px;">📤 Export</button>
+                <button id="btnImport" title="Import share token"
+                    style="margin: 0; padding: 4px 8px; font-size: 12px;">📥 Import</button>
+            </div>
+        </div>
+
+        <section style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 10px;">
+            <select id="folderSelect" style="margin: 0; flex: 2; min-width: 100px; padding: 6px; font-size: 13px;">
+                <option value="">-- Folder --</option>
+            </select>
+            <button id="btnDeleteFolder" class="btn-danger hidden" title="Delete folder"
+                style="margin: 0; padding: 6px 10px;">🗑️</button>
+            <input type="text" id="newFolderName" placeholder="New folder"
+                style="margin: 0; flex: 2; min-width: 80px; padding: 6px; font-size: 13px;">
+            <button id="btnCreateFolder" title="Create folder" style="margin: 0; padding: 6px 10px;">➕</button>
+        </section>
+
+        <section id="uploadContainer" class="hidden"
+            style="border: 1px solid #333; padding: 8px; border-radius: 6px; margin-bottom: 10px;">
+            <div style="display: flex; gap: 6px; align-items: center;">
+                <input type="file" id="fileInput" style="margin: 0; flex: 1; padding: 4px; font-size: 12px;" multiple>
+                <button id="btnUpload" style="margin: 0; white-space: nowrap; padding: 6px 12px; font-size: 13px;">🚀
+                    Upload</button>
+            </div>
+        </section>
+
+        <section id="mediaContainer" class="hidden">
+            <div id="mediaGrid" class="media-grid"></div>
+            <div style="display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 15px;">
+                <button id="btnPrevPage" style="margin: 0; padding: 4px 10px;">◀</button>
+                <span id="pageIndicator"
+                    style="font-size: 11px; font-weight: bold; min-width: 50px; text-align: center;">1 / 1</span>
+                <button id="btnNextPage" style="margin: 0; padding: 4px 10px;">▶</button>
+            </div>
+        </section>
+    </main>
+    <script type="module" src="./folder.js"></script>
+</body>
+
+</html>

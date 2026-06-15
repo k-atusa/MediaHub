@@ -1,5 +1,5 @@
 // test794b : USAG-Lib opsec
-const BencryptURL = 'https://cdn.jsdelivr.net/gh/k-atusa/USAG-Lib/Bencrypt/Bencrypt.js';
+const BencryptURL = './Bencrypt.js'; // changed from CDN to local
 const { Random, HashMaster, SymMaster, AsymMaster } = await import(BencryptURL);
 
 // Helper: Fill zeros to buffer
