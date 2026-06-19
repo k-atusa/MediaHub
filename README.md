@@ -38,6 +38,8 @@ public/
 - It takes time to download and decrypt whole file and show. (Except for videos)
 - For video, it uses real-time streaming. Still, buffering can take time up to 1 minute.
 - With private TLS certificate, you cannot use streaming in Chrome. Streaming is disabled for all WebKit browsers due to its limitation.
+- Uploading with browser limits file size to 2GiB. Use python client to large-scale upload.
+- Python client requires USAG-Lib and OpenCV dependency.
 
 ## Build Executable
 
