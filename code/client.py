@@ -166,15 +166,7 @@ def main():
         return
 
     fld_map = {}
-    if res.status_code == 404:
-        reg = input("User does not exist. Register? (y/n): ").strip().lower()
-        if reg.lower() == 'y':
-            requests.post(url_user, data=b"", verify=False)
-            print("Registration Success! New userspace created.")
-        else:
-            print("Program terminated.")
-            return
-    elif res.status_code == 200:
+    if res.status_code == 200:
         if len(res.content) > 0:
             try:
                 sm = Bencrypt.SymMaster("gcm1", user_key)

@@ -1,6 +1,7 @@
 // MediaHub Folder Module
-import { SHA3256, SymMaster, Random, Masker } from './Bencrypt.js';
+import { SHA3256, SymMaster, Random, Masker, HashMaster } from './Bencrypt.js';
 import { EncodeCfg, DecodeCfg, EncodeInt, PadLen } from './Opsec.js';
+import { NormPW } from './Bencode.js';
 import { makeImg, makeVid } from './media.js';
 import { makeToken, loadToken } from './storage.js';
 
@@ -13,6 +14,8 @@ const mask = new Masker();
 const maskMap = (m) => { for (const k of Object.keys(m)) { const r = m[k]; m[k] = mask.XOR(r); r.fill(0); } };
 const rawMap = (m) => { const c = {}; for (const [k, v] of Object.entries(m)) c[k] = mask.XOR(v); return c; };
 const wipeMap = (m) => { for (const v of Object.values(m)) if (v?.fill) v.fill(0); };
+
+const SECRET_PEPPER = "_PROJECT_WHY_MEDIAHUB_PEPPER_2026_!@#$";
 
 // Load session.
 let usrHsh = sessionStorage.getItem("userHash");
@@ -306,6 +309,72 @@ document.getElementById("btnPrevPage").addEventListener("click", () => { if (sta
 document.getElementById("btnNextPage").addEventListener("click", () => { if (state.page < Math.ceil(Object.keys(state.flsMap).length / state.limit)) { state.page++; showFls(); } });
 document.getElementById("btnRefresh").addEventListener("click", () => { sessionStorage.removeItem("oldFold"); loadUsr(); });
 document.getElementById("lblUserHash").textContent = usrHsh;
+
+// Change Password
+document.getElementById("btnConfirmPw").addEventListener("click", async () => {
+    // get username and password
+    const newPw = document.getElementById("newPassword").value;
+    const confirmPw = document.getElementById("newPasswordConfirm").value;
+    if (!newPw) return alert("⚠️ Enter new password");
+    if (newPw !== confirmPw) return alert("⚠️ Passwords do not match");
+    const username = sessionStorage.getItem("username");
+    if (!username) return alert("⚠️ Session invalid (no username). Please login again.");
+
+    const pwBytes = NormPW(newPw);
+    const saltBytes = SHA3256(new TextEncoder().encode(username + SECRET_PEPPER));
+    const hm = new HashMaster("arg2", 32, 44);
+    const [storeKey, newUserKeyRaw] = await hm.KDF(pwBytes, saltBytes);
+
+    const newHash = getPid(storeKey);
+    const maskedNewKey = mask.XOR(newUserKeyRaw);
+    newUserKeyRaw.fill(0);
+    if (newHash === usrHsh) {
+        return alert("⚠️ New password must be different");
+    }
+
+    const check = await fetch(`${SERVER}/api/userdata/${newHash}`);
+    if (check.status !== 404) return alert("❌ User already exists with this password");
+
+    // encrypt old folder
+    const rawUK = mask.XOR(maskedNewKey);
+    const sm = new SymMaster("gcm1", rawUK);
+    rawUK.fill(0);
+    const um = rawMap(state.fldMap);
+    const encoded = EncodeCfg(um);
+    wipeMap(um);
+
+    const saveRes = await fetch(`${SERVER}/api/userdata/${newHash}`, {
+        method: "POST",
+        headers: { "X-Old-Hash": usrHsh },
+        body: await sm.EnBin(encoded)
+    });
+    encoded.fill(0);
+    if (!saveRes.ok) {
+        return alert("❌ Failed to create new user");
+    }
+
+    await fetch(`${SERVER}/api/userdata/${usrHsh}`, { method: "DELETE" });
+
+    // update session
+    sessionStorage.setItem("userHash", newHash);
+    sessionStorage.setItem("userKey", toHex(mask.XOR(maskedNewKey)));
+    usrHsh = newHash;
+    if (usrKey) mask.XOR(usrKey).fill(0);
+    usrKey = maskedNewKey;
+
+    document.getElementById("pwModal").close();
+    document.getElementById("lblUserHash").textContent = usrHsh;
+    alert("✅ Password changed successfully");
+});
+
+document.getElementById("btnCancelPw").addEventListener("click", () => {
+    document.getElementById("pwModal").close();
+});
+document.getElementById("btnChangePassword").addEventListener("click", () => {
+    document.getElementById("newPassword").value = "";
+    document.getElementById("newPasswordConfirm").value = "";
+    document.getElementById("pwModal").showModal();
+});
 
 // Restore session.
 async function boot() {

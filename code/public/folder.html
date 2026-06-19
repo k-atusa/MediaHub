@@ -133,8 +133,7 @@
             style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
             <div style="display: flex; align-items: baseline; gap: 6px;">
                 <h3 style="margin: 0; font-size: 20px;">MediaHub 📂</h3>
-                <span class="pid-text">PID: <span id="lblUserHash"
-                        style="color: #007acc;"></span></span>
+                <span class="pid-text">PID: <span id="lblUserHash" style="color: #007acc;"></span></span>
             </div>
             <div style="display: flex; gap: 4px;">
                 <button id="btnRefresh" title="Sync" style="margin: 0; padding: 4px 8px; font-size: 12px;">🔄
@@ -143,6 +142,8 @@
                     style="margin: 0; padding: 4px 8px; font-size: 12px;">📤 Export</button>
                 <button id="btnImport" title="Import share token"
                     style="margin: 0; padding: 4px 8px; font-size: 12px;">📥 Import</button>
+                <button id="btnChangePassword" title="Change Password"
+                    style="margin: 0; padding: 4px 8px; font-size: 12px;">🔑 Reset</button>
             </div>
         </div>
 
@@ -176,6 +177,20 @@
             </div>
         </section>
     </main>
+
+    <!-- Change Password Dialog -->
+    <dialog id="pwModal" style="padding: 20px; max-width: 480px;">
+        <h3 style="margin-top: 0;">🔑 Change Password</h3>
+        <input type="password" id="newPassword" placeholder="New Password"
+            style="width: 100%; box-sizing: border-box; margin-bottom: 10px;">
+        <input type="password" id="newPasswordConfirm" placeholder="Confirm Password"
+            style="width: 100%; box-sizing: border-box; margin-bottom: 10px;">
+        <div style="text-align: right; display: flex; gap: 8px; justify-content: flex-end;">
+            <button id="btnCancelPw" style="margin: 0; background: #555;">Cancel</button>
+            <button id="btnConfirmPw" style="margin: 0;">Change</button>
+        </div>
+    </dialog>
+
     <script type="module" src="./folder.js"></script>
 </body>
 

@@ -25,6 +25,7 @@ type Config struct {
 	Port       string `json:"port"`
 	CertFile   string `json:"cert"`
 	KeyFile    string `json:"key"`
+	InviteCode string `json:"invite"`
 	Notice     string `json:"notice"`
 }
 
@@ -32,6 +33,11 @@ var cfg Config
 
 // init environment
 func initEnv() {
+	// move to executable path
+	exePath, _ := os.Executable()
+	realPath, _ := filepath.EvalSymlinks(exePath)
+	os.Chdir(filepath.Dir(realPath))
+
 	// set default value
 	configPath := "./config.json"
 	cfg = Config{
@@ -39,6 +45,7 @@ func initEnv() {
 		Port:       "443",
 		CertFile:   "./cert.pem",
 		KeyFile:    "./key.pem",
+		InviteCode: "",
 		Notice:     "",
 	}
 
@@ -78,6 +85,33 @@ func serveUser(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet: // read userdata
 		http.ServeFile(w, r, path)
 	case http.MethodPost: // create/update userdata
+		isNewUser := false
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			isNewUser = true
+		}
+
+		if isNewUser && cfg.InviteCode != "" {
+			// check if user is changing PW
+			oldHash := r.Header.Get("X-Old-Hash")
+			oldPath := ""
+			if oldHash != "" && !strings.Contains(oldHash, "/") && !strings.Contains(oldHash, "\\") {
+				oldPath = filepath.Join(cfg.StorageDir, "users", filepath.Clean(oldHash))
+			}
+
+			// check old account or invite code
+			if oldPath != "" {
+				if info, err := os.Stat(oldPath); err != nil || info.IsDir() {
+					http.Error(w, "Invalid Old User", http.StatusForbidden)
+					return
+				}
+			} else {
+				if r.Header.Get("X-Invite-Code") != cfg.InviteCode {
+					http.Error(w, "Invalid Invite Code", http.StatusForbidden)
+					return
+				}
+			}
+		}
+
 		os.MkdirAll(filepath.Dir(path), 0700)
 		save(w, r, path)
 	case http.MethodDelete: // delete userdata
@@ -183,7 +217,7 @@ func save(w http.ResponseWriter, r *http.Request, path string) {
 // cross platform optimization middleware filter
 func cors(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.Contains(r.URL.Path, "..") { // block directory traversal
+		if strings.Contains(r.URL.Path, "..") || strings.Contains(r.URL.Path, "\\") { // block directory traversal
 			http.Error(w, "Directory Traversal Detected", http.StatusBadRequest)
 			return
 		}

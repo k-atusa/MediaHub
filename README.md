@@ -1,4 +1,4 @@
-# MediaHub v1.1.0
+# MediaHub v1.2.0
 
 project WHY(Web Hub Yard): Media Hub
 

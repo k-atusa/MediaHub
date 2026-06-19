@@ -23,11 +23,12 @@ async function makeKeys() {
 }
 
 // Store session and redirect
-function setSess(hash, maskedKey) {
+function setSess(hash, maskedKey, username) {
     const raw = mask.XOR(maskedKey);
     sessionStorage.clear();
     sessionStorage.setItem("userHash", hash);
     sessionStorage.setItem("userKey", toHex(raw));
+    sessionStorage.setItem("username", username);
     raw.fill(0);
     window.location.href = "./folder.html";
 }
@@ -35,21 +36,47 @@ function setSess(hash, maskedKey) {
 // Register
 document.getElementById("btnRegister").addEventListener("click", async () => {
     const res = await makeKeys(); if (!res) return;
+    const username = document.getElementById("username").value.trim();
     try {
         const check = await fetch(`${SERVER_URL}/api/userdata/${res.userHash}`);
         if (check.status !== 404) return alert("❌ Already registered");
-        await fetch(`${SERVER_URL}/api/userdata/${res.userHash}`, { method: "POST", body: new Uint8Array(0) });
-        alert("✅ Registered"); setSess(res.userHash, res.userKey);
+
+        const inviteModal = document.getElementById("inviteModal");
+        const inviteCodeInput = document.getElementById("inviteCodeInput");
+        inviteCodeInput.value = "";
+        inviteModal.showModal();
+
+        document.getElementById("btnConfirmInvite").onclick = async () => {
+            const inviteCode = inviteCodeInput.value.trim();
+            inviteModal.close();
+            try {
+                const req = await fetch(`${SERVER_URL}/api/userdata/${res.userHash}`, { 
+                    method: "POST", 
+                    headers: { "X-Invite-Code": inviteCode },
+                    body: new Uint8Array(0) 
+                });
+                if (!req.ok) {
+                    if (req.status === 403) return alert("❌ Invalid Invite Code");
+                    return alert("❌ Register failed");
+                }
+                alert("✅ Registered"); setSess(res.userHash, res.userKey, username);
+            } catch (e) { alert("❌ Register failed"); }
+        };
+
+        document.getElementById("btnCancelInvite").onclick = () => {
+            inviteModal.close();
+        };
     } catch (e) { alert("❌ Register failed"); }
 });
 
 // Login
 document.getElementById("btnLogin").addEventListener("click", async () => {
     const res = await makeKeys(); if (!res) return;
+    const username = document.getElementById("username").value.trim();
     try {
         const check = await fetch(`${SERVER_URL}/api/userdata/${res.userHash}`);
         if (check.status === 404) return alert("❌ Invalid credentials");
-        setSess(res.userHash, res.userKey);
+        setSess(res.userHash, res.userKey, username);
     } catch (e) { alert("❌ Login failed"); }
 });
 
