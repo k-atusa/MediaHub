@@ -1,6 +1,6 @@
 // MediaHub Folder Module
 import { SHA3256, SymMaster, Random, Masker } from './Bencrypt.js';
-import { EncodeCfg, DecodeCfg } from './Opsec.js';
+import { EncodeCfg, DecodeCfg, EncodeInt, PadLen } from './Opsec.js';
 import { makeImg, makeVid } from './media.js';
 import { makeToken, loadToken } from './storage.js';
 
@@ -14,17 +14,17 @@ const maskMap = (m) => { for (const k of Object.keys(m)) { const r = m[k]; m[k] 
 const rawMap = (m) => { const c = {}; for (const [k, v] of Object.entries(m)) c[k] = mask.XOR(v); return c; };
 const wipeMap = (m) => { for (const v of Object.values(m)) if (v?.fill) v.fill(0); };
 
-// load session
-let userHash = sessionStorage.getItem("userHash");
-let userKey = null;
+// Load session.
+let usrHsh = sessionStorage.getItem("userHash");
+let usrKey = null;
 {
     const raw = sessionStorage.getItem("userKey") ? fromHex(sessionStorage.getItem("userKey")) : null;
-    if (raw) { userKey = mask.XOR(raw); raw.fill(0); }
+    if (raw) { usrKey = mask.XOR(raw); raw.fill(0); }
 }
-let state = { folderMap: {}, name: "", key: null, id: "", fileMap: {}, page: 1, limit: 30 };
-if (!userHash || !userKey) window.location.href = "./index.html";
+let state = { fldMap: {}, name: "", key: null, id: "", flsMap: {}, page: 1, limit: 30 };
+if (!usrHsh || !usrKey) window.location.href = "./index.html";
 
-// Chunked file reader for encryption
+// Read file chunks.
 class FileSrc {
     constructor(file) { this.file = file; this.off = 0; }
     async read(size) {
@@ -35,51 +35,51 @@ class FileSrc {
     }
 }
 
-// Save user folder map
-async function saveUser() {
-    const rawUK = mask.XOR(userKey);
+// Save map to server.
+async function saveUsr() {
+    const rawUK = mask.XOR(usrKey);
     const sm = new SymMaster("gcm1", rawUK);
     rawUK.fill(0);
-    const um = rawMap(state.folderMap);
+    const um = rawMap(state.fldMap);
     const encoded = EncodeCfg(um);
     wipeMap(um);
-    await fetch(`${SERVER}/api/userdata/${userHash}`, { method: "POST", body: await sm.EnBin(encoded) });
+    await fetch(`${SERVER}/api/userdata/${usrHsh}`, { method: "POST", body: await sm.EnBin(encoded) });
     encoded.fill(0);
 }
 
-// Load user folder map
-async function loadUser() {
-    const res = await fetch(`${SERVER}/api/userdata/${userHash}`);
+// Load map from server.
+async function loadUsr() {
+    const res = await fetch(`${SERVER}/api/userdata/${usrHsh}`);
     if (res.status === 404) return;
-    const rawUK = mask.XOR(userKey);
+    const rawUK = mask.XOR(usrKey);
     const sm = new SymMaster("gcm1", rawUK);
     rawUK.fill(0);
     const dec = await sm.DeBin(new Uint8Array(await res.arrayBuffer()));
-    state.folderMap = DecodeCfg(dec);
+    state.fldMap = DecodeCfg(dec);
     dec.fill(0);
-    maskMap(state.folderMap);
-    showFold();
+    maskMap(state.fldMap);
+    showFld();
 }
 
-// Render folder dropdown
-function showFold() {
+// Render folder list.
+function showFld() {
     const select = document.getElementById("folderSelect");
     select.innerHTML = '<option value="">-- Folder --</option>';
-    Object.keys(state.folderMap).forEach(name => {
+    Object.keys(state.fldMap).forEach(name => {
         const opt = document.createElement("option"); opt.value = name; opt.textContent = name; select.appendChild(opt);
     });
 }
 
-// --- Event: Create folder ---
+// Create new folder.
 document.getElementById("btnCreateFolder").addEventListener("click", async () => {
     const name = document.getElementById("newFolderName").value.trim();
-    if (!name || state.folderMap[name]) return alert("⚠️ Invalid name");
-    const rk = Random(44); state.folderMap[name] = mask.XOR(rk); rk.fill(0);
-    await saveUser(); showFold();
+    if (!name || state.fldMap[name]) return alert("⚠️ Invalid name");
+    const rk = Random(44); state.fldMap[name] = mask.XOR(rk); rk.fill(0);
+    await saveUsr(); showFld();
     document.getElementById("newFolderName").value = "";
 });
 
-// --- Event: Export share token ---
+// Export share token.
 document.getElementById("btnExport").addEventListener("click", async () => {
     if (!state.name) return alert("⚠️ Select a folder");
     const token = await makeToken(state.name, state.key);
@@ -91,66 +91,66 @@ document.getElementById("btnExport").addEventListener("click", async () => {
     URL.revokeObjectURL(url);
 });
 
-// --- Event: Import share token ---
+// Import share token.
 document.getElementById("btnImport").addEventListener("click", () => {
     const input = document.createElement("input"); input.type = "file"; input.accept = ".txt";
     input.onchange = async () => {
         if (!input.files[0]) return;
         const info = await loadToken((await input.files[0].text()).trim());
         if (!info) return alert("❌ Invalid token");
-        if (state.folderMap[info.name]) {
+        if (state.fldMap[info.name]) {
             if (!confirm("Overwrite existing?")) return;
-            const oldRaw = mask.XOR(state.folderMap[info.name]);
-            const oldFolderId = getPid(oldRaw);
+            const oldRaw = mask.XOR(state.fldMap[info.name]);
+            const oldFldId = getPid(oldRaw);
             oldRaw.fill(0);
             try {
-                await fetch(`${SERVER}/api/storage/${oldFolderId}/names`, { method: "DELETE" });
+                await fetch(`${SERVER}/api/storage/${oldFldId}/names`, { method: "DELETE" });
             } catch (e) {
                 console.warn("Failed to delete old folder storage", e);
             }
         }
-        state.folderMap[info.name] = info.key;
-        await saveUser(); loadUser();
+        state.fldMap[info.name] = info.key;
+        await saveUsr(); loadUsr();
     };
     input.click();
 });
 
-// --- Event: Folder select ---
+// Handle folder select.
 document.getElementById("folderSelect").addEventListener("change", async (e) => {
     state.name = e.target.value; if (!state.name) return;
-    state.key = state.folderMap[state.name];
+    state.key = state.fldMap[state.name];
     const rawK = mask.XOR(state.key); state.id = getPid(rawK); rawK.fill(0);
     state.page = 1;
     document.getElementById("btnDeleteFolder").classList.remove("hidden");
-    await loadFold();
+    await loadFld();
 });
 
-// Load folder file list
-async function loadFold() {
+// Fetch folder files.
+async function loadFld() {
     document.getElementById("uploadContainer").classList.remove("hidden");
     document.getElementById("mediaContainer").classList.remove("hidden");
     const res = await fetch(`${SERVER}/api/storage/${state.id}/names`);
-    if (res.status === 404) state.fileMap = {};
+    if (res.status === 404) state.flsMap = {};
     else {
         const rawK = mask.XOR(state.key);
         const sm = new SymMaster("gcm1", rawK);
         rawK.fill(0);
         const dec = await sm.DeBin(new Uint8Array(await res.arrayBuffer()));
-        state.fileMap = DecodeCfg(dec);
+        state.flsMap = DecodeCfg(dec);
         dec.fill(0);
-        maskMap(state.fileMap);
+        maskMap(state.flsMap);
     }
-    showFiles();
+    showFls();
 }
 
-// Render media grid with pagination
-function showFiles() {
+// Render files grid.
+function showFls() {
     const grid = document.getElementById("mediaGrid"); grid.innerHTML = "";
-    const entries = Object.entries(state.fileMap);
+    const entries = Object.entries(state.flsMap);
     const total = Math.ceil(entries.length / state.limit) || 1;
     document.getElementById("pageIndicator").textContent = `${state.page} / ${total}`;
 
-    // Persist page state for session restore
+    // Save page state.
     sessionStorage.setItem("oldPage", state.page);
 
     const start = (state.page - 1) * state.limit;
@@ -158,7 +158,7 @@ function showFiles() {
         const card = document.createElement("div"); card.className = "media-card";
         const img = document.createElement("img"); img.className = "thumb-img"; img.alt = "Loading...";
         const rawFK = mask.XOR(fileKey);
-        loadThumb(getPid(rawFK), name.split('.').pop().toUpperCase(), img);
+        loadThm(getPid(rawFK.slice(0, 44)), name.split('.').pop().toUpperCase(), img);
         rawFK.fill(0);
 
         const title = document.createElement("div"); title.className = "file-title"; title.textContent = name;
@@ -179,8 +179,8 @@ function showFiles() {
     });
 }
 
-// Load and decrypt thumbnail
-async function loadThumb(filePid, ext, imgEl) {
+// Fetch thumb file.
+async function loadThm(filePid, ext, imgEl) {
     const res = await fetch(`${SERVER}/api/media/${state.id}/${filePid}/thumb`);
     if (res.status === 404) {
         imgEl.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='%23333'><rect width='24' height='24' rx='2'/><text x='50%' y='60%' font-family='sans-serif' font-size='5' font-weight='bold' fill='%23aaa' text-anchor='middle'>" + ext + "</text></svg>";
@@ -192,113 +192,133 @@ async function loadThumb(filePid, ext, imgEl) {
     imgEl.src = URL.createObjectURL(new Blob([await sm.DeBin(new Uint8Array(await res.arrayBuffer()))]));
 }
 
-// --- Event: Upload files ---
+// Handle file upload.
 document.getElementById("btnUpload").addEventListener("click", async () => {
-    const fileInput = document.getElementById("fileInput");
-    const btnUpload = document.getElementById("btnUpload");
-    const files = fileInput.files;
+    const fileIn = document.getElementById("fileInput");
+    const btnUp = document.getElementById("btnUpload");
+    const files = fileIn.files;
     if (files.length === 0) return alert("⚠️ Select files");
 
-    fileInput.disabled = true;
-    btnUpload.disabled = true;
-    const origText = btnUpload.textContent;
+    fileIn.disabled = true;
+    btnUp.disabled = true;
+    const origTxt = btnUp.textContent;
 
     try {
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
-            if (state.fileMap[file.name]) {
+            if (state.flsMap[file.name]) {
                 if (!confirm(`⚠️ File "${file.name}" already exists. Overwrite?`)) {
                     continue;
                 }
-                const oldRaw = mask.XOR(state.fileMap[file.name]);
-                const oldFilePid = getPid(oldRaw);
+                const oldRaw = mask.XOR(state.flsMap[file.name]);
+                const oldFlPid = getPid(oldRaw.slice(0, 44));
                 oldRaw.fill(0);
                 try {
-                    await fetch(`${SERVER}/api/media/${state.id}/${oldFilePid}/dat`, { method: "DELETE" });
-                    await fetch(`${SERVER}/api/media/${state.id}/${oldFilePid}/thumb`, { method: "DELETE" });
+                    await fetch(`${SERVER}/api/media/${state.id}/${oldFlPid}/dat`, { method: "DELETE" });
+                    await fetch(`${SERVER}/api/media/${state.id}/${oldFlPid}/thumb`, { method: "DELETE" });
                 } catch (e) {
                     console.warn("Failed to delete old file/thumbnail", e);
                 }
             }
-            btnUpload.textContent = `🚀 ${i + 1}/${files.length}`;
+            btnUp.textContent = `🚀 ${i + 1}/${files.length}`;
 
             const fileKey = Random(44); const filePid = getPid(fileKey);
 
-            // Auto-generate thumbnail by type
+            // Make thumb by type.
             let thumb = null;
             if (file.type.startsWith("image/")) thumb = await makeImg(file);
             else if (file.type.startsWith("video/")) thumb = await makeVid(file);
 
-            // Encrypt file
+            // Encrypt file.
             const smx = new SymMaster("gcmx1", fileKey);
-            const chunks = [];
-            await smx.EnFile(new FileSrc(file), file.size, { write: async (c) => chunks.push(c) });
+            const encChks = [];
+            await smx.EnFile(new FileSrc(file), file.size, { write: async (c) => encChks.push(c) });
 
-            let mediaBuf = new Uint8Array(chunks.reduce((a, c) => a + c.length, 0)); let offset = 0;
-            for (const c of chunks) { mediaBuf.set(c, offset); offset += c.length; }
+            const encSize = encChks.reduce((a, c) => a + c.length, 0);
+            const padSize = PadLen(encSize);
+            const totSize = encSize + padSize;
+            let medBuf = new Uint8Array(totSize);
+            let offset = 0;
+            for (const c of encChks) { medBuf.set(c, offset); offset += c.length; }
 
-            await fetch(`${SERVER}/api/media/${state.id}/${filePid}/dat`, { method: "POST", body: mediaBuf });
+            // Add random padding.
+            if (padSize > 0) {
+                let pOff = offset;
+                const pEnd = offset + padSize;
+                while (pOff < pEnd) {
+                    const chunk = Math.min(32768, pEnd - pOff);
+                    medBuf.set(Random(chunk), pOff);
+                    pOff += chunk;
+                }
+            }
+
+            await fetch(`${SERVER}/api/media/${state.id}/${filePid}/dat`, { method: "POST", body: medBuf });
 
             if (thumb) {
                 const rawSK = mask.XOR(state.key);
-                const folderSm = new SymMaster("gcm1", rawSK);
+                const fldSm = new SymMaster("gcm1", rawSK);
                 rawSK.fill(0);
-                await fetch(`${SERVER}/api/media/${state.id}/${filePid}/thumb`, { method: "POST", body: await folderSm.EnBin(new Uint8Array(await thumb.arrayBuffer())) });
+                await fetch(`${SERVER}/api/media/${state.id}/${filePid}/thumb`, { method: "POST", body: await fldSm.EnBin(new Uint8Array(await thumb.arrayBuffer())) });
             }
 
-            state.fileMap[file.name] = mask.XOR(fileKey);
+            // Save key to map.
+            const flInfo = new Uint8Array(52);
+            flInfo.set(fileKey, 0);
+            flInfo.set(EncodeInt(file.size, 8), 44);
+            state.flsMap[file.name] = mask.XOR(flInfo);
             fileKey.fill(0);
+            flInfo.fill(0);
         }
 
-        // Sync metadata
-        btnUpload.textContent = "🔄 Syncing...";
+        // Sync metadata.
+        btnUp.textContent = "🔄 Syncing...";
         const rawSK = mask.XOR(state.key);
-        const metaSm = new SymMaster("gcm1", rawSK);
+        const metSm = new SymMaster("gcm1", rawSK);
         rawSK.fill(0);
-        const um = rawMap(state.fileMap);
+        const um = rawMap(state.flsMap);
         const encoded = EncodeCfg(um);
         wipeMap(um);
-        await fetch(`${SERVER}/api/storage/${state.id}/names`, { method: "POST", body: await metaSm.EnBin(encoded) });
+        await fetch(`${SERVER}/api/storage/${state.id}/names`, { method: "POST", body: await metSm.EnBin(encoded) });
         encoded.fill(0);
 
-        fileInput.value = "";
-        await loadFold();
+        fileIn.value = "";
+        await loadFld();
     } catch (err) {
         console.error(err);
         alert("❌ Upload error: " + err.message);
     } finally {
-        fileInput.disabled = false;
-        btnUpload.disabled = false;
-        btnUpload.textContent = origText;
+        fileIn.disabled = false;
+        btnUp.disabled = false;
+        btnUp.textContent = origTxt;
     }
 });
 
-// --- Event: Delete folder ---
+// Delete folder.
 document.getElementById("btnDeleteFolder").addEventListener("click", async () => {
     if (!confirm("Delete this folder?")) return;
     await fetch(`${SERVER}/api/storage/${state.id}/names`, { method: "DELETE" });
-    delete state.folderMap[state.name]; await saveUser(); loadUser();
+    delete state.fldMap[state.name]; await saveUsr(); loadUsr();
     document.getElementById("uploadContainer").classList.add("hidden"); document.getElementById("mediaContainer").classList.add("hidden");
 });
 
-// --- Events: Pagination & sync ---
-document.getElementById("btnPrevPage").addEventListener("click", () => { if (state.page > 1) { state.page--; showFiles(); } });
-document.getElementById("btnNextPage").addEventListener("click", () => { if (state.page < Math.ceil(Object.keys(state.fileMap).length / state.limit)) { state.page++; showFiles(); } });
-document.getElementById("btnRefresh").addEventListener("click", () => { sessionStorage.removeItem("oldFold"); loadUser(); });
-document.getElementById("lblUserHash").textContent = userHash;
+// Handle pagination.
+document.getElementById("btnPrevPage").addEventListener("click", () => { if (state.page > 1) { state.page--; showFls(); } });
+document.getElementById("btnNextPage").addEventListener("click", () => { if (state.page < Math.ceil(Object.keys(state.flsMap).length / state.limit)) { state.page++; showFls(); } });
+document.getElementById("btnRefresh").addEventListener("click", () => { sessionStorage.removeItem("oldFold"); loadUsr(); });
+document.getElementById("lblUserHash").textContent = usrHsh;
 
-// Session restore on return
+// Restore session.
 async function boot() {
-    await loadUser();
+    await loadUsr();
     const oldFold = sessionStorage.getItem("oldFold");
     const oldPage = sessionStorage.getItem("oldPage");
-    if (oldFold && state.folderMap[oldFold]) {
+    if (oldFold && state.fldMap[oldFold]) {
         document.getElementById("folderSelect").value = oldFold;
-        state.name = oldFold; state.key = state.folderMap[oldFold];
+        state.name = oldFold; state.key = state.fldMap[oldFold];
         const rawK = mask.XOR(state.key); state.id = getPid(rawK); rawK.fill(0);
         state.page = oldPage ? parseInt(oldPage, 10) : 1;
         document.getElementById("btnDeleteFolder").classList.remove("hidden");
-        await loadFold();
+        await loadFld();
     }
 }
 boot();
