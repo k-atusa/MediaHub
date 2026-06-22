@@ -6,7 +6,7 @@ const mask = new Masker();
 const SERVER_URL = window.location.origin;
 const SECRET_PEPPER = "_PROJECT_WHY_MEDIAHUB_PEPPER_2026_!@#$";
 const toHex = (buf) => Array.from(buf).map(b => b.toString(16).padStart(2, '0')).join('');
-const getPid = (key) => toHex(SHA3256(key).slice(0, 16));
+const getPid = async (key) => { return toHex(SHA3256(key).slice(0, 16)); };
 
 // Derive auth keys from credentials
 async function makeKeys() {
@@ -19,7 +19,7 @@ async function makeKeys() {
     const hm = new HashMaster("arg2st");
     const [storeKey, userKey] = await hm.KDF(pwBytes, saltBytes);
     const masked = mask.XOR(userKey); userKey.fill(0);
-    return { userHash: getPid(storeKey), userKey: masked };
+    return { userHash: await getPid(storeKey), userKey: masked };
 }
 
 // Store session and redirect
@@ -50,10 +50,10 @@ document.getElementById("btnRegister").addEventListener("click", async () => {
             const inviteCode = inviteCodeInput.value.trim();
             inviteModal.close();
             try {
-                const req = await fetch(`${SERVER_URL}/api/userdata/${res.userHash}`, { 
-                    method: "POST", 
+                const req = await fetch(`${SERVER_URL}/api/userdata/${res.userHash}`, {
+                    method: "POST",
                     headers: { "X-Invite-Code": inviteCode },
-                    body: new Uint8Array(0) 
+                    body: new Uint8Array(0)
                 });
                 if (!req.ok) {
                     if (req.status === 403) return alert("❌ Invalid Invite Code");

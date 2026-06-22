@@ -12,9 +12,11 @@ import Opsec
 # disable self-signed warning
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# get physical ID by key
-def get_pid(key: bytes) -> str:
+def get_user_pid(key: bytes) -> str:
     return Bencrypt.SHA3256(key)[:16].hex()
+
+def get_obj_pid(key: bytes) -> str:
+    return key[32:44].hex()
 
 # authenticate user
 def authenticate(server_url, username, password):
@@ -24,7 +26,7 @@ def authenticate(server_url, username, password):
     
     hm = Bencrypt.HashMaster("arg2st")
     store_key, user_key = hm.KDF(pw_bytes, salt_bytes)
-    user_hash = get_pid(store_key)
+    user_hash = get_user_pid(store_key)
     return user_hash, user_key
 
 # make image thumbnail
@@ -99,8 +101,8 @@ def process_file_upload(server_url, folder_pid, fls_map, filepath):
     print(f"\n[Upload Start] {file_name} ({orig_size} bytes)...")
 
     # 1. Generate file unique key(32B) and derive physical file ID
-    file_key = Bencrypt.Random(32)
-    file_pid = get_pid(file_key)
+    file_key = Bencrypt.Random(32) + Bencrypt.Random(12)
+    file_pid = get_obj_pid(file_key)
 
     # 2. Analyze file extension and generate thumbnail based on file type
     ext = file_name.split('.')[-1].lower()
@@ -114,14 +116,14 @@ def process_file_upload(server_url, folder_pid, fls_map, filepath):
 
     # Encrypt thumbnail with file key (gcm1) and upload if thumbnail bytes were successfully built
     if thumb_bytes:
-        fl_sm = Bencrypt.SymMaster("gcm1", file_key)
+        fl_sm = Bencrypt.SymMaster("gcm1", file_key[:32])
         enc_thumb = fl_sm.EnBin(thumb_bytes)
         url_thumb = f"{server_url}/api/media/{folder_pid}/{file_pid}/thumb"
         requests.post(url_thumb, data=enc_thumb, verify=False)
         print("-> Thumbail upload complete!")
 
     # 3. Encrypt media file stream (gcmx1) and add random padding for size hiding
-    smx = Bencrypt.SymMaster("gcmx1", file_key)
+    smx = Bencrypt.SymMaster("gcmx1", file_key[:32])
     enc_size = smx.AfterSize(orig_size)
     pad_size = Opsec.PadLen(enc_size)
 
@@ -169,7 +171,7 @@ def main():
     if res.status_code == 200:
         if len(res.content) > 0:
             try:
-                sm = Bencrypt.SymMaster("gcm1", user_key)
+                sm = Bencrypt.SymMaster("gcm1", user_key[:32])
                 dec = sm.DeBin(res.content)
                 fld_map = Opsec.DecodeCfg(dec)
             except Exception as e:
@@ -201,8 +203,8 @@ def main():
                 continue
 
             # generate new folder random symmetric key and server synchronization
-            fld_map[new_fld_name] = Bencrypt.Random(32)
-            sm = Bencrypt.SymMaster("gcm1", user_key)
+            fld_map[new_fld_name] = Bencrypt.Random(32) + Bencrypt.Random(12)
+            sm = Bencrypt.SymMaster("gcm1", user_key[:32])
             encrypted_usr = sm.EnBin(Opsec.EncodeCfg(fld_map))
             requests.post(url_user, data=encrypted_usr, verify=False)
             print(f"Folder '{new_fld_name}' has been successfully created!")
@@ -217,7 +219,7 @@ def main():
 
         # tracking security folder physical container information
         folder_key = fld_map[selected_folder]
-        folder_pid = get_pid(folder_key)
+        folder_pid = get_obj_pid(folder_key)
 
         while True:
             # get encrypted file metadata map under the folder and decrypt
@@ -225,7 +227,7 @@ def main():
             res_meta = requests.get(url_meta, verify=False)
             fls_map = {}
             if res_meta.status_code == 200 and len(res_meta.content) > 0:
-                met_sm = Bencrypt.SymMaster("gcm1", folder_key)
+                met_sm = Bencrypt.SymMaster("gcm1", folder_key[:32])
                 dec_meta = met_sm.DeBin(res_meta.content)
                 fls_map = Opsec.DecodeCfg(dec_meta)
 
@@ -235,7 +237,7 @@ def main():
                 print("(No files in current folder)")
             for i, name in enumerate(files):
                 info = fls_map[name]
-                sz = Opsec.DecodeInt(info[32:40], False)
+                sz = Opsec.DecodeInt(info[44:52], False)
                 print(f"[{i}] {name} ({sz} bytes)")
             print("------------------------------")
             print("* download [NUMBER]")
@@ -258,12 +260,12 @@ def main():
                     print("Error: Invalid file number!")
                     continue
                 
-                file_key = fl_info[:32]
-                orig_size = Opsec.DecodeInt(fl_info[32:40], False)
-                file_pid = get_pid(file_key)
+                file_key = fl_info[:44]
+                orig_size = Opsec.DecodeInt(fl_info[44:52], False)
+                file_pid = get_obj_pid(file_key)
                 
                 print(f"[Download Start] {file_name}...")
-                smx = Bencrypt.SymMaster("gcmx1", file_key)
+                smx = Bencrypt.SymMaster("gcmx1", file_key[:32])
                 ciph_size = smx.AfterSize(orig_size)
                 
                 url_dat = f"{server_url}/api/media/{folder_pid}/{file_pid}/dat"
@@ -296,7 +298,7 @@ def main():
                     process_file_upload(server_url, folder_pid, fls_map, target_path)
 
                 # After all files are uploaded, synchronize the accumulated metadata list map
-                met_sm = Bencrypt.SymMaster("gcm1", folder_key)
+                met_sm = Bencrypt.SymMaster("gcm1", folder_key[:32])
                 encoded_meta = Opsec.EncodeCfg(fls_map)
                 requests.post(url_meta, data=met_sm.EnBin(encoded_meta), verify=False)
                 print("-> Metadata synchronization complete.")

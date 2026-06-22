@@ -1,5 +1,5 @@
 // MediaHub Viewer Module
-import { SymMaster, SHA3256, Masker } from './Bencrypt.js';
+import { SymMaster, Masker, HashMaster } from './Bencrypt.js';
 import { EncodeCfg, DecodeCfg, DecodeInt, EncodeInt } from './Opsec.js';
 import { NetSrc } from './media.js';
 const mask = new Masker();
@@ -10,6 +10,7 @@ const OPT_NOSW_WEBKIT = true;
 const SERVER = window.location.origin;
 const fromHex = (hex) => new Uint8Array(hex.match(/.{1,2}/g).map(b => parseInt(b, 16)));
 const toHex = (buf) => Array.from(buf).map(b => b.toString(16).padStart(2, '0')).join('');
+const getObjPid = (key) => toHex(key.slice(32, 44));
 
 // Get folder and file keys from session storage.
 let fldId = sessionStorage.getItem("currentFolderId");
@@ -21,8 +22,8 @@ let origSize = 0;
     const rawFlK = sessionStorage.getItem("currentFileKey") ? fromHex(sessionStorage.getItem("currentFileKey")) : null;
     if (rawFK) { fldKey = mask.XOR(rawFK); rawFK.fill(0); }
     if (rawFlK) {
-        origSize = DecodeInt(rawFlK.slice(32, 40));
-        const keyPrt = rawFlK.slice(0, 32);
+        origSize = DecodeInt(rawFlK.slice(44, 52));
+        const keyPrt = rawFlK.slice(0, 44);
         flKey = mask.XOR(keyPrt);
         keyPrt.fill(0);
         rawFlK.fill(0);
@@ -51,7 +52,7 @@ function getMime(name) {
 // Load and render file.
 async function start() {
     const rawFK = mask.XOR(flKey);
-    const flPid = toHex(SHA3256(rawFK).slice(0, 16));
+    const flPid = getObjPid(rawFK);
     rawFK.fill(0);
     const body = document.getElementById("viewBody");
     const kind = getKind(flName);
@@ -165,7 +166,7 @@ async function fullDown(flPid, body) {
 
     // Get exact cipher size.
     const rawFK2 = mask.XOR(flKey);
-    const smx = new SymMaster("gcmx1", rawFK2);
+    const smx = new SymMaster("gcmx1", rawFK2.slice(0, 32));
     rawFK2.fill(0);
     const ciphSize = smx.AfterSize(origSize);
 
@@ -189,16 +190,16 @@ async function editNm() {
     try {
         const res = await fetch(`${SERVER}/api/storage/${fldId}/names`);
         const rawSK = mask.XOR(fldKey);
-        const sm = new SymMaster("gcm1", rawSK);
+        const sm = new SymMaster("gcm1", rawSK.slice(0, 32));
         rawSK.fill(0);
         const dec = await sm.DeBin(new Uint8Array(await res.arrayBuffer()));
         const flsMap = DecodeCfg(dec);
         dec.fill(0);
         const rawFK = mask.XOR(flKey);
         // Build new map info.
-        const flInfo = new Uint8Array(40);
+        const flInfo = new Uint8Array(52);
         flInfo.set(rawFK, 0);
-        flInfo.set(EncodeInt(origSize, 8), 32);
+        flInfo.set(EncodeInt(origSize, 8), 44);
         flsMap[newNm] = flInfo; delete flsMap[flName];
         const encoded = EncodeCfg(flsMap);
         for (const v of Object.values(flsMap)) if (v?.fill) v.fill(0);
@@ -214,7 +215,7 @@ async function downFl() {
     // Full download for video save.
     if (kind === 'video' && !rawBuf) {
         const rawFK = mask.XOR(flKey);
-        const flPid = toHex(SHA3256(rawFK).slice(0, 16));
+        const flPid = getObjPid(rawFK);
         rawFK.fill(0);
         const body = document.getElementById("viewBody");
         const prog = document.createElement('div');
@@ -235,7 +236,7 @@ async function downFl() {
             const fullBuf = new Uint8Array(loaded); let off = 0;
             for (const c of chunks) { fullBuf.set(c, off); off += c.length; }
             const rawFK2 = mask.XOR(flKey);
-            const smx = new SymMaster('gcmx1', rawFK2); rawFK2.fill(0);
+            const smx = new SymMaster('gcmx1', rawFK2.slice(0, 32)); rawFK2.fill(0);
             const ciphSize = smx.AfterSize(origSize);
             const encBuf = fullBuf.slice(0, ciphSize);
             const plain = []; await smx.DeFile(new NetSrc(encBuf), encBuf.length, { write: async (c) => plain.push(c) });
@@ -255,13 +256,13 @@ async function delFl() {
     if (!confirm("Delete this file?")) return;
     try {
         const rawFK = mask.XOR(flKey);
-        const flPid = toHex(SHA3256(rawFK).slice(0, 16));
+        const flPid = getObjPid(rawFK);
         rawFK.fill(0);
         await fetch(`${SERVER}/api/media/${fldId}/${flPid}/dat`, { method: "DELETE" });
         await fetch(`${SERVER}/api/media/${fldId}/${flPid}/thumb`, { method: "DELETE" });
         const res = await fetch(`${SERVER}/api/storage/${fldId}/names`);
         const rawSK = mask.XOR(fldKey);
-        const sm = new SymMaster("gcm1", rawSK);
+        const sm = new SymMaster("gcm1", rawSK.slice(0, 32));
         rawSK.fill(0);
         const dec = await sm.DeBin(new Uint8Array(await res.arrayBuffer()));
         const flsMap = DecodeCfg(dec);
@@ -297,7 +298,7 @@ async function setNav() {
         const res = await fetch(`${SERVER}/api/storage/${fldId}/names`);
         if (res.status === 404) return;
         const rawSK = mask.XOR(fldKey);
-        const sm = new SymMaster("gcm1", rawSK);
+        const sm = new SymMaster("gcm1", rawSK.slice(0, 32));
         rawSK.fill(0);
         const dec = await sm.DeBin(new Uint8Array(await res.arrayBuffer()));
         const flsMap = DecodeCfg(dec);

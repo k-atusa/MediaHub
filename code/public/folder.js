@@ -8,7 +8,10 @@ import { makeToken, loadToken } from './storage.js';
 const SERVER = window.location.origin;
 const fromHex = (hex) => new Uint8Array(hex.match(/.{1,2}/g).map(b => parseInt(b, 16)));
 const toHex = (buf) => Array.from(buf).map(b => b.toString(16).padStart(2, '0')).join('');
-const getPid = (key) => toHex(SHA3256(key).slice(0, 16));
+const getUserPid = async (key) => {
+    return toHex(SHA3256(key).slice(0, 16));
+};
+const getObjPid = (key) => toHex(key.slice(32, 44));
 
 const mask = new Masker();
 const maskMap = (m) => { for (const k of Object.keys(m)) { const r = m[k]; m[k] = mask.XOR(r); r.fill(0); } };
@@ -77,7 +80,7 @@ function showFld() {
 document.getElementById("btnCreateFolder").addEventListener("click", async () => {
     const name = document.getElementById("newFolderName").value.trim();
     if (!name || state.fldMap[name]) return alert("⚠️ Invalid name");
-    const rk = Random(32); state.fldMap[name] = mask.XOR(rk); rk.fill(0);
+    const rk = new Uint8Array(44); rk.set(Random(32), 0); rk.set(Random(12), 32); state.fldMap[name] = mask.XOR(rk); rk.fill(0);
     await saveUsr(); showFld();
     document.getElementById("newFolderName").value = "";
 });
@@ -104,7 +107,7 @@ document.getElementById("btnImport").addEventListener("click", () => {
         if (state.fldMap[info.name]) {
             if (!confirm("Overwrite existing?")) return;
             const oldRaw = mask.XOR(state.fldMap[info.name]);
-            const oldFldId = getPid(oldRaw);
+            const oldFldId = getObjPid(oldRaw);
             oldRaw.fill(0);
             try {
                 await fetch(`${SERVER}/api/storage/${oldFldId}/names`, { method: "DELETE" });
@@ -122,7 +125,7 @@ document.getElementById("btnImport").addEventListener("click", () => {
 document.getElementById("folderSelect").addEventListener("change", async (e) => {
     state.name = e.target.value; if (!state.name) return;
     state.key = state.fldMap[state.name];
-    const rawK = mask.XOR(state.key); state.id = getPid(rawK); rawK.fill(0);
+    const rawK = mask.XOR(state.key); state.id = getObjPid(rawK); rawK.fill(0);
     state.page = 1;
     document.getElementById("btnDeleteFolder").classList.remove("hidden");
     await loadFld();
@@ -136,18 +139,18 @@ async function loadFld() {
     if (res.status === 404) state.flsMap = {};
     else {
         const rawK = mask.XOR(state.key);
-        const sm = new SymMaster("gcm1", rawK);
+        const sm = new SymMaster("gcm1", rawK.slice(0, 32));
         rawK.fill(0);
         const dec = await sm.DeBin(new Uint8Array(await res.arrayBuffer()));
         state.flsMap = DecodeCfg(dec);
         dec.fill(0);
         maskMap(state.flsMap);
     }
-    showFls();
+    await showFls();
 }
 
 // Render files grid.
-function showFls() {
+async function showFls() {
     const grid = document.getElementById("mediaGrid"); grid.innerHTML = "";
     const entries = Object.entries(state.flsMap);
     const total = Math.ceil(entries.length / state.limit) || 1;
@@ -157,12 +160,12 @@ function showFls() {
     sessionStorage.setItem("oldPage", state.page);
 
     const start = (state.page - 1) * state.limit;
-    entries.slice(start, start + state.limit).forEach(([name, fileKey]) => {
+    for (const [name, fileKey] of entries.slice(start, start + state.limit)) {
         const card = document.createElement("div"); card.className = "media-card";
         const img = document.createElement("img"); img.className = "thumb-img"; img.alt = "Loading...";
         const rawFK = mask.XOR(fileKey);
-        const fkSlice = rawFK.slice(0, 32);
-        loadThm(getPid(fkSlice), name.split('.').pop().toUpperCase(), img, fkSlice);
+        const fkSlice = rawFK.slice(0, 44);
+        loadThm(getObjPid(fkSlice), name.split('.').pop().toUpperCase(), img, fkSlice);
         rawFK.fill(0);
 
         const title = document.createElement("div"); title.className = "file-title"; title.textContent = name;
@@ -180,7 +183,7 @@ function showFls() {
             window.location.href = "./viewer.html";
         });
         grid.appendChild(card);
-    });
+    }
 }
 
 // Fetch thumb file.
@@ -191,7 +194,7 @@ async function loadThm(filePid, ext, imgEl, fileKeyRaw) {
         fileKeyRaw.fill(0);
         return;
     }
-    const sm = new SymMaster("gcm1", fileKeyRaw);
+    const sm = new SymMaster("gcm1", fileKeyRaw.slice(0, 32));
     fileKeyRaw.fill(0);
     imgEl.src = URL.createObjectURL(new Blob([await sm.DeBin(new Uint8Array(await res.arrayBuffer()))]));
 }
@@ -215,7 +218,7 @@ document.getElementById("btnUpload").addEventListener("click", async () => {
                     continue;
                 }
                 const oldRaw = mask.XOR(state.flsMap[file.name]);
-                const oldFlPid = getPid(oldRaw.slice(0, 32));
+                const oldFlPid = getObjPid(oldRaw.slice(0, 44));
                 oldRaw.fill(0);
                 try {
                     await fetch(`${SERVER}/api/media/${state.id}/${oldFlPid}/dat`, { method: "DELETE" });
@@ -226,7 +229,7 @@ document.getElementById("btnUpload").addEventListener("click", async () => {
             }
             btnUp.textContent = `🚀 ${i + 1}/${files.length}`;
 
-            const fileKey = Random(32); const filePid = getPid(fileKey);
+            const fileKey = new Uint8Array(44); fileKey.set(Random(32), 0); fileKey.set(Random(12), 32); const filePid = getObjPid(fileKey);
 
             // Make thumb by type.
             let thumb = null;
@@ -234,7 +237,7 @@ document.getElementById("btnUpload").addEventListener("click", async () => {
             else if (file.type.startsWith("video/")) thumb = await makeVid(file);
 
             // Encrypt file.
-            const smx = new SymMaster("gcmx1", fileKey);
+            const smx = new SymMaster("gcmx1", fileKey.slice(0, 32));
             const encChks = [];
             await smx.EnFile(new FileSrc(file), file.size, { write: async (c) => encChks.push(c) });
 
@@ -259,14 +262,14 @@ document.getElementById("btnUpload").addEventListener("click", async () => {
             await fetch(`${SERVER}/api/media/${state.id}/${filePid}/dat`, { method: "POST", body: medBuf });
 
             if (thumb) {
-                const thmSm = new SymMaster("gcm1", fileKey);
+                const thmSm = new SymMaster("gcm1", fileKey.slice(0, 32));
                 await fetch(`${SERVER}/api/media/${state.id}/${filePid}/thumb`, { method: "POST", body: await thmSm.EnBin(new Uint8Array(await thumb.arrayBuffer())) });
             }
 
             // Save key to map.
-            const flInfo = new Uint8Array(40);
+            const flInfo = new Uint8Array(52);
             flInfo.set(fileKey, 0);
-            flInfo.set(EncodeInt(file.size, 8), 32);
+            flInfo.set(EncodeInt(file.size, 8), 44);
             state.flsMap[file.name] = mask.XOR(flInfo);
             fileKey.fill(0);
             flInfo.fill(0);
@@ -275,7 +278,7 @@ document.getElementById("btnUpload").addEventListener("click", async () => {
         // Sync metadata.
         btnUp.textContent = "🔄 Syncing...";
         const rawSK = mask.XOR(state.key);
-        const metSm = new SymMaster("gcm1", rawSK);
+        const metSm = new SymMaster("gcm1", rawSK.slice(0, 32));
         rawSK.fill(0);
         const um = rawMap(state.flsMap);
         const encoded = EncodeCfg(um);
@@ -304,8 +307,8 @@ document.getElementById("btnDeleteFolder").addEventListener("click", async () =>
 });
 
 // Handle pagination.
-document.getElementById("btnPrevPage").addEventListener("click", () => { if (state.page > 1) { state.page--; showFls(); } });
-document.getElementById("btnNextPage").addEventListener("click", () => { if (state.page < Math.ceil(Object.keys(state.flsMap).length / state.limit)) { state.page++; showFls(); } });
+document.getElementById("btnPrevPage").addEventListener("click", async () => { if (state.page > 1) { state.page--; await showFls(); } });
+document.getElementById("btnNextPage").addEventListener("click", async () => { if (state.page < Math.ceil(Object.keys(state.flsMap).length / state.limit)) { state.page++; await showFls(); } });
 document.getElementById("btnRefresh").addEventListener("click", () => { sessionStorage.removeItem("oldFold"); loadUsr(); });
 document.getElementById("lblUserHash").textContent = usrHsh;
 
@@ -324,7 +327,7 @@ document.getElementById("btnConfirmPw").addEventListener("click", async () => {
     const hm = new HashMaster("arg2st");
     const [storeKey, newUserKeyRaw] = await hm.KDF(pwBytes, saltBytes);
 
-    const newHash = getPid(storeKey);
+    const newHash = await getUserPid(storeKey);
     const maskedNewKey = mask.XOR(newUserKeyRaw);
     newUserKeyRaw.fill(0);
     if (newHash === usrHsh) {
@@ -383,7 +386,7 @@ async function boot() {
     if (oldFold && state.fldMap[oldFold]) {
         document.getElementById("folderSelect").value = oldFold;
         state.name = oldFold; state.key = state.fldMap[oldFold];
-        const rawK = mask.XOR(state.key); state.id = getPid(rawK); rawK.fill(0);
+        const rawK = mask.XOR(state.key); state.id = getObjPid(rawK); rawK.fill(0);
         state.page = oldPage ? parseInt(oldPage, 10) : 1;
         document.getElementById("btnDeleteFolder").classList.remove("hidden");
         await loadFld();
