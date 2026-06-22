@@ -16,7 +16,7 @@ async function makeKeys() {
 
     const pwBytes = NormPW(password);
     const saltBytes = SHA3256(new TextEncoder().encode(username + SECRET_PEPPER));
-    const hm = new HashMaster("arg2", 32, 44);
+    const hm = new HashMaster("arg2st");
     const [storeKey, userKey] = await hm.KDF(pwBytes, saltBytes);
     const masked = mask.XOR(userKey); userKey.fill(0);
     return { userHash: getPid(storeKey), userKey: masked };

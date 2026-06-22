@@ -57,12 +57,12 @@ self.addEventListener('message', async (e) => {
     const d = e.data;
     if (d.action === 'REGISTER') {
         const raw = hexToU8(d.fileKey);
-        const aesKey = raw.slice(12, 44);
-        const cryptoKey = await crypto.subtle.importKey('raw', aesKey, 'AES-GCM', false, ['decrypt']);
+        const cryptoKey = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
+        raw.fill(0);
         regMap.set(d.filePid, {
             fldId: d.folderId,
-            gIV: raw.slice(0, 12),
-            aesKey,
+            gIV: null,
+            gIVPromise: null,
             cryptoKey,
             origSize: d.originalSize,
             mime: vidMime(d.fileName)
@@ -72,7 +72,7 @@ self.addEventListener('message', async (e) => {
         if (e.source) e.source.postMessage({ action: 'REGISTERED', filePid: d.filePid });
     } else if (d.action === 'UNREGISTER') {
         const info = regMap.get(d.filePid);
-        if (info) { info.aesKey.fill(0); info.gIV.fill(0); }
+        if (info) { if (info.gIV) info.gIV.fill(0); }
         regMap.delete(d.filePid);
         cchPurg(d.filePid);
     }
@@ -107,7 +107,7 @@ async function hndlStrm(req, fldId, flPid) {
     const info = await getInfo(flPid);
     if (!info) return new Response('Not registered', { status: 404 });
 
-    const { origSize, cryptoKey, gIV, mime } = info;
+    const { origSize, mime } = info;
 
     // Parse Range header.
     let rStart = 0, rEnd = origSize - 1;
@@ -193,15 +193,34 @@ async function hndlStrm(req, fldId, flPid) {
     });
 }
 
+// Lazy-load globalIV from file header (first 12 bytes).
+async function ensureGIV(info, fldId, flPid) {
+    if (info.gIV) return info.gIV;
+    if (!info.gIVPromise) {
+        info.gIVPromise = (async () => {
+            const res = await fetch(`/api/media/${fldId}/${flPid}/dat`, {
+                headers: { 'Range': 'bytes=0-11' }
+            });
+            info.gIV = new Uint8Array(await res.arrayBuffer());
+            return info.gIV;
+        })();
+    }
+    return info.gIVPromise;
+}
+
 // Fetch and decrypt chunk.
 async function fetchChk(info, fldId, flPid, chkIdx, signal) {
-    const { origSize, cryptoKey, gIV } = info;
+    const { origSize, cryptoKey } = info;
+
+    // Ensure globalIV is loaded from file header.
+    const gIV = await ensureGIV(info, fldId, flPid);
 
     // Calc plain size of chunk.
     const plainLen = Math.min(PLAIN_CHUNK, origSize - chkIdx * PLAIN_CHUNK);
     const cipherLen = plainLen + 16;
 
-    const cStart = chkIdx * CIPHER_CHUNK;
+    // Offset by 12 to skip globalIV prefix in encrypted file.
+    const cStart = 12 + chkIdx * CIPHER_CHUNK;
     const cEnd = cStart + cipherLen - 1;
 
     let lastErr;

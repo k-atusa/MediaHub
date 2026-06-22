@@ -99,6 +99,44 @@ function mkiv(g, c) {
     return iv;
 }
 
+function hmac_sha3_256(key, msg) {
+    const B = 136; // Block size for SHA3-256
+    let k = toU8(key);
+    const m = toU8(msg);
+
+    if (k.length > B) {
+        k = SHA3256(k);
+    }
+    if (k.length < B) {
+        const newK = new Uint8Array(B);
+        newK.set(k);
+        k = newK;
+    }
+
+    const o_key_pad = new Uint8Array(B);
+    const i_key_pad = new Uint8Array(B);
+    for (let i = 0; i < B; i++) {
+        o_key_pad[i] = k[i] ^ 0x5c;
+        i_key_pad[i] = k[i] ^ 0x36;
+    }
+
+    const innerData = new Uint8Array(B + m.length);
+    innerData.set(i_key_pad);
+    innerData.set(m, B);
+    const innerHash = SHA3256(innerData);
+
+    const outerData = new Uint8Array(B + innerHash.length);
+    outerData.set(o_key_pad);
+    outerData.set(innerHash, B);
+    const result = SHA3256(outerData);
+
+    zeroize(i_key_pad);
+    zeroize(o_key_pad);
+    zeroize(innerData);
+    zeroize(outerData);
+    return result;
+}
+
 function hmac_sha3_512(key, msg) {
     const B = 72; // Block size for SHA3-512 (rate = 576 bits = 72 bytes)
     let k = toU8(key);
@@ -229,6 +267,26 @@ export function SHA3512(data) {
     return new Uint8Array(deps.sha3512.create().update(data).arrayBuffer());
 }
 
+/**
+ * hmac_sha3_256
+ * @param {Uint8Array|string} key
+ * @param {Uint8Array|string} data
+ * @returns {Uint8Array}
+ */
+export function HMAC3256(key, data) {
+    return hmac_sha3_256(key, data);
+}
+
+/**
+ * hmac_sha3_512
+ * @param {Uint8Array|string} key
+ * @param {Uint8Array|string} data
+ * @returns {Uint8Array}
+ */
+export function HMAC3512(key, data) {
+    return hmac_sha3_512(key, data);
+}
+
 // ========== Data Masker ==========
 export class Masker {
     static #instance = null; // singleton
@@ -305,8 +363,8 @@ export class HashMaster {
      * @param {number} hashSize 
      * @param {number} keySize 
      */
-    constructor(algo, hashSize = 32, keySize = 44) {
-        if (!["sha3", "pbk2", "arg2"].includes(algo)) {
+    constructor(algo, hashSize = 32, keySize = 32) {
+        if (!["sha3", "arg2low", "arg2st"].includes(algo)) {
             throw new Error(`Unsupported algorithm: ${algo}`);
         }
         this.algo = algo;
@@ -336,15 +394,15 @@ export class HashMaster {
             master = SHA3512(combined);
             zeroize(combined);
 
-        } else if (this.algo === "pbk2") {
-            lblStore = "PWHASH_PBK2";
-            lblKeygen = "KEYGEN_PBK2";
-            master = await pbkdf2(pwBuf, saltBuf);
+        } else if (this.algo === "arg2low") {
+            lblStore = "PWHASH_ARG2LOW";
+            lblKeygen = "KEYGEN_ARG2LOW";
+            master = await argon2low(pwBuf, saltBuf);
 
-        } else if (this.algo === "arg2") {
-            lblStore = "PWHASH_ARG2";
-            lblKeygen = "KEYGEN_ARG2";
-            master = await argon2(pwBuf, saltBuf);
+        } else if (this.algo === "arg2st") {
+            lblStore = "PWHASH_ARG2ST";
+            lblKeygen = "KEYGEN_ARG2ST";
+            master = await argon2st(pwBuf, saltBuf);
 
         } else {
             return [null, null];
@@ -358,55 +416,39 @@ export class HashMaster {
 }
 
 // ========== Hash Functions ==========
-/**
- * pbkdf2
- * @param {Uint8Array|string} pw 
- * @param {Uint8Array|string} salt 
- * @param {number} iter 
- * @param {number} outsize 
- * @returns {Promise<Uint8Array>}
- */
-export async function pbkdf2(pw, salt, iter = 1000000, outsize = 64) {
-    const passBytes = toU8(pw);
-    const saltBytes = toU8(salt);
+async function argon2low(pw, salt) {
+    const pwBuf = toU8(pw);
+    const saltBuf = toU8(salt);
+    const type = isNode ? deps.argon2.argon2id : deps.argon2.Argon2id;
 
     if (isNode) {
-        return new Promise((resolve, reject) => { // make promise wrapper
-            deps.crypto.pbkdf2(passBytes, saltBytes, iter, outsize, 'sha512', (err, key) => {
-                if (err) reject(err);
-                else resolve(new Uint8Array(key));
-            });
-        });
-
-    } else { // Browser API returns promise
-        const keyMaterial = await deps.crypto.subtle.importKey(
-            "raw",
-            passBytes,
-            "PBKDF2",
-            false,
-            ["deriveBits"]
-        );
-        const derivedBits = await deps.crypto.subtle.deriveBits(
-            {
-                name: "PBKDF2",
-                salt: saltBytes,
-                iterations: iter,
-                hash: "SHA-512"
-            },
-            keyMaterial,
-            outsize * 8
-        );
-        return new Uint8Array(derivedBits);
+        const options = {
+            type: type || 2,
+            timeCost: 4,
+            memoryCost: 65536,
+            parallelism: 8,
+            hashLength: 64,
+            raw: true,
+            salt: saltBuf
+        };
+        const hash = await deps.argon2.hash(pwBuf, options);
+        return new Uint8Array(hash);
+    } else {
+        const options = {
+            pass: pwBuf,
+            salt: saltBuf,
+            type: type || 2,
+            time: 4,
+            mem: 65536,
+            parallelism: 8,
+            hashLen: 64
+        };
+        const res = await deps.argon2.hash(options);
+        return new Uint8Array(res.hash);
     }
 }
 
-/**
- * argon2 (Raw Hash)
- * @param {Uint8Array|string} pw 
- * @param {Uint8Array|string} salt 
- * @returns {Promise<Uint8Array>} 48 bytes raw hash
- */
-export async function argon2(pw, salt) {
+async function argon2st(pw, salt) {
     const pwBuf = toU8(pw);
     const saltBuf = toU8(salt);
     const type = isNode ? deps.argon2.argon2id : deps.argon2.Argon2id;
@@ -416,8 +458,8 @@ export async function argon2(pw, salt) {
             type: type || 2,
             timeCost: 3,
             memoryCost: 262144,
-            parallelism: 4,
-            hashLength: 48,
+            parallelism: 6,
+            hashLength: 64,
             raw: true,
             salt: saltBuf
         };
@@ -430,72 +472,11 @@ export async function argon2(pw, salt) {
             type: type || 2,
             time: 3,
             mem: 262144,
-            parallelism: 4,
-            hashLen: 48
+            parallelism: 6,
+            hashLen: 64
         };
         const res = await deps.argon2.hash(options);
         return new Uint8Array(res.hash);
-    }
-}
-
-/**
- * argon2Hash
- * @param {Uint8Array|string} pw - Password (or binary data)
- * @param {Uint8Array|string} salt - Salt (Optional, but recommended)
- * @returns {Promise<string>} Encoded hash string
- */
-export async function argon2Hash(pw, salt = null) {
-    const pwBuf = toU8(pw);
-    const saltBuf = salt ? toU8(salt) : undefined;
-    const type = isNode ? deps.argon2.argon2id : deps.argon2.Argon2id;
-
-    // set same parameters as python argon2-cffi
-    if (isNode) {
-        const options = {
-            type: type || 2,
-            timeCost: 3,
-            memoryCost: 262144,
-            parallelism: 4,
-            hashLength: 48,
-            raw: false // Return encoded string
-        };
-        if (saltBuf) options.salt = saltBuf;
-        return await deps.argon2.hash(pwBuf, options);
-
-    } else {
-        const options = {
-            pass: pwBuf,
-            type: type || 2,
-            time: 3,
-            mem: 262144,
-            parallelism: 4,
-            hashLen: 48
-        };
-        if (saltBuf) {
-            options.salt = saltBuf;
-        }
-        const res = await deps.argon2.hash(options);
-        return res.encoded;
-    }
-}
-
-/**
- * argon2Verify
- * @param {string} hashed - The encoded hash string to verify against
- * @param {Uint8Array|string} pw - Password (or binary data)
- * @returns {Promise<boolean>}
- */
-export async function argon2Verify(hashed, pw) {
-    const pwBuf = toU8(pw);
-    try {
-        if (isNode) {
-            return await deps.argon2.verify(hashed, pwBuf);
-        } else {
-            await deps.argon2.verify({ pass: pwBuf, encoded: hashed });
-            return true;
-        }
-    } catch (e) {
-        return false;
     }
 }
 
@@ -503,7 +484,7 @@ export async function argon2Verify(hashed, pw) {
 export class SymMaster {
     /**
      * @param {string} algo - "gcm1" or "gcmx1"
-     * @param {Uint8Array} key - 44 bytes (12B IV + 32B Key)
+     * @param {Uint8Array} key - 32 bytes AES-256 Key
      */
     constructor(algo, key) {
         this.mask = new Masker();
@@ -511,8 +492,8 @@ export class SymMaster {
         if (algo === "gcm1" || algo === "gcmx1") {
             this.algo = algo;
             this.worker = new AES1();
-            if (this.key.length !== 44) {
-                throw new Error("Key length must be 44 bytes (12B IV + 32B Key)");
+            if (this.key.length !== 32) {
+                throw new Error("Key length must be 32 bytes");
             }
         } else {
             throw new Error(`Unsupported algorithm: ${algo}`);
@@ -526,14 +507,14 @@ export class SymMaster {
      */
     AfterSize(size) {
         if (this.algo === "gcm1") {
-            return size + 16;
+            return size + 28;
         } else if (this.algo === "gcmx1") {
             const chunkSize = 1048576;
             let c = Math.floor(size / chunkSize) + 1;
             if (size !== 0 && size % chunkSize === 0) {
                 c -= 1;
             }
-            return size + (16 * c);
+            return size + 12 + (16 * c);
         }
         return 0;
     }
@@ -633,17 +614,17 @@ class AES1 {
 
     /**
      * enAESGCM: Simple AES-GCM Encryption
-     * @param {Uint8Array} key - 44 bytes (12 bytes IV + 32 bytes Key)
+     * @param {Uint8Array} key - 32 bytes Key
      * @param {Uint8Array} data 
-     * @returns {Promise<Uint8Array>} ciphertext + tag(16 bytes)
+     * @returns {Promise<Uint8Array>} IV(12) + ciphertext + tag(16)
      */
     async enAESGCM(key, data) {
         this._processed = 0;
         const k = toU8(key);
         const d = toU8(data);
-        if (k.length !== 44) throw new Error("key size must be 44 bytes");
-        const iv = k.slice(0, 12);
-        const aesKey = k.slice(12);
+        if (k.length !== 32) throw new Error("key size must be 32 bytes");
+        const iv = Random(12);
+        const aesKey = k;
 
         try {
             if (isNode) {
@@ -651,7 +632,7 @@ class AES1 {
                 const encrypted = Buffer.concat([cipher.update(d), cipher.final()]);
                 const tag = cipher.getAuthTag();
                 this._processed = d.length;
-                return new Uint8Array(Buffer.concat([encrypted, tag]));
+                return new Uint8Array(Buffer.concat([iv, encrypted, tag]));
 
             } else {
                 const importedKey = await deps.crypto.subtle.importKey(
@@ -661,7 +642,10 @@ class AES1 {
                     { name: "AES-GCM", iv: iv }, importedKey, d
                 ); // res = ciphertext + tag
                 this._processed = d.length;
-                return new Uint8Array(res);
+                const result = new Uint8Array(12 + res.byteLength);
+                result.set(iv, 0);
+                result.set(new Uint8Array(res), 12);
+                return result;
             }
 
         } finally {
@@ -671,22 +655,23 @@ class AES1 {
 
     /**
      * deAESGCM: Simple AES-GCM Decryption
-     * @param {Uint8Array} key - 44 bytes
-     * @param {Uint8Array} data - ciphertext + tag
+     * @param {Uint8Array} key - 32 bytes
+     * @param {Uint8Array} data - IV(12) + ciphertext + tag(16)
      * @returns {Promise<Uint8Array>} plaintext
      */
     async deAESGCM(key, data) {
         this._processed = 0;
         const k = toU8(key);
         const d = toU8(data);
-        if (k.length !== 44) throw new Error("key size must be 44 bytes");
-        const iv = k.slice(0, 12);
-        const aesKey = k.slice(12);
+        if (k.length !== 32) throw new Error("key size must be 32 bytes");
+        if (d.length < 28) throw new Error("cipher too short");
+        const iv = d.slice(0, 12);
+        const aesKey = k;
 
         try {
             if (isNode) {
                 const tag = d.slice(d.length - 16);
-                const ciphertext = d.slice(0, d.length - 16);
+                const ciphertext = d.slice(12, d.length - 16);
                 const decipher = deps.crypto.createDecipheriv('aes-256-gcm', aesKey, iv);
                 decipher.setAuthTag(tag);
                 const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
@@ -699,7 +684,7 @@ class AES1 {
                 );
                 try {
                     const res = await deps.crypto.subtle.decrypt(
-                        { name: "AES-GCM", iv: iv }, importedKey, d
+                        { name: "AES-GCM", iv: iv }, importedKey, d.slice(12)
                     ); // input is ciphertext + tag
                     this._processed = d.length;
                     return new Uint8Array(res);
@@ -724,9 +709,9 @@ class AES1 {
     async enAESGCMx(key, src, size, dst, chunkSize = 1048576) {
         this._processed = 0;
         const k = toU8(key);
-        if (k.length !== 44) throw new Error("key size must be 44 bytes");
-        const globalIV = k.slice(0, 12);
-        const aesKeyBytes = k.slice(12);
+        if (k.length !== 32) throw new Error("key size must be 32 bytes");
+        const globalIV = Random(12);
+        const aesKeyBytes = k;
         let count = 0;
 
         // Pre-import key (Browser optimization)
@@ -736,7 +721,7 @@ class AES1 {
         }
 
         // Setup Pipeline
-        let writeChain = Promise.resolve(); // Ensures sequential writes
+        let writeChain = Promise.resolve().then(() => dst.write(globalIV)); // Ensures sequential writes
         let nextChunkPromise = src.read(chunkSize > size ? size : chunkSize); // Start First Read
         let remaining = size;
 
@@ -795,11 +780,12 @@ class AES1 {
     async deAESGCMx(key, src, size, dst, chunkSize = 1048576) {
         this._processed = 0;
         const k = toU8(key);
-        if (k.length !== 44) throw new Error("key size must be 44 bytes");
-        if (size < 16) throw new Error("cipher too short to decrypt");
-        const globalIV = k.slice(0, 12);
-        const aesKeyBytes = k.slice(12);
+        if (k.length !== 32) throw new Error("key size must be 32 bytes");
+        if (size < 28) throw new Error("cipher too short to decrypt");
+        const globalIV = await src.read(12);
+        const aesKeyBytes = k;
         let count = 0;
+        this._processed = 12;
 
         // Pre-import key (Browser optimization)
         let webKey = null;
@@ -817,7 +803,7 @@ class AES1 {
 
         // Setup Pipeline
         let writeChain = Promise.resolve();
-        let remaining = size;
+        let remaining = size - 12;
         let nextBlockPromise = readBlock(Math.min(chunkSize, remaining - 16)); // read first block
 
         do { // Must have at least tag bytes
@@ -874,10 +860,7 @@ export class AsymMaster {
      * @param {string} algo
      */
     constructor(algo) {
-        if (algo === "rsa1" || algo === "rsa2") {
-            this.algo = algo;
-            this.worker = new RSA1();
-        } else if (algo === "ecc1") {
+        if (algo === "ecc1") {
             this.algo = algo;
             this.worker = new ECC1();
         } else if (algo === "pqc1") {
@@ -893,11 +876,7 @@ export class AsymMaster {
      * @returns {Promise<[Uint8Array, Uint8Array]>} [pub, pri]
      */
     async Genkey() {
-        if (this.algo === "rsa1") {
-            return await this.worker.genkey(2048);
-        } else if (this.algo === "rsa2") {
-            return await this.worker.genkey(4096);
-        } else if (this.algo === "ecc1") {
+        if (this.algo === "ecc1") {
             return await this.worker.genkey();
         } else if (this.algo === "pqc1") {
             return await this.worker.genkey();
@@ -925,194 +904,6 @@ export class AsymMaster {
     }
 }
 
-// ========== RSA Encryption ==========
-class RSA1 {
-    constructor() {
-        this.pub = null; // Node: KeyObject, Browser: CryptoKey
-        this.pri = null; // Node: KeyObject, Browser: CryptoKey (OAEP)
-        this.signPub = null;  // Browser only: CryptoKey (PKCS1)
-        this.signPri = null;  // Browser only: CryptoKey (PKCS1)
-    }
-
-    /**
-     * Generate RSA 2048/3072/4096 bits key pair, Returns DER(PKIX, PKCS8) formatted [publicKey, privateKey]
-     * @param {number} bits
-     * @returns {Promise<[Uint8Array, Uint8Array]>}
-     */
-    async genkey(bits = 2048) {
-        if (isNode) {
-            return new Promise((resolve, reject) => { // wrap in promise
-                deps.crypto.generateKeyPair('rsa', {
-                    modulusLength: bits,
-                    publicKeyEncoding: { type: 'spki', format: 'der' },
-                    privateKeyEncoding: { type: 'pkcs8', format: 'der' }
-                }, (err, publicKey, privateKey) => {
-                    if (err) reject(err);
-                    else { // load keys
-                        this.loadkey(new Uint8Array(publicKey), new Uint8Array(privateKey));
-                        resolve([new Uint8Array(publicKey), new Uint8Array(privateKey)]);
-                    }
-                });
-            });
-
-        } else {
-            const keyPair = await deps.crypto.subtle.generateKey( // make generic key
-                {
-                    name: "RSA-OAEP",
-                    modulusLength: bits,
-                    publicExponent: new Uint8Array([1, 0, 1]), // 65537
-                    hash: "SHA-512"
-                },
-                true, // extractable
-                ["encrypt", "decrypt"]
-            );
-
-            // Export to DER (SPKI/PKCS8)
-            const pubDer = await deps.crypto.subtle.exportKey("spki", keyPair.publicKey);
-            const priDer = await deps.crypto.subtle.exportKey("pkcs8", keyPair.privateKey);
-            const pubU8 = new Uint8Array(pubDer);
-            const priU8 = new Uint8Array(priDer);
-
-            // Load keys
-            await this.loadkey(pubU8, priU8);
-            return [pubU8, priU8];
-        }
-    }
-
-    /**
-     * loadkey: Import DER(PKIX, PKCS8) keys
-     * @param {Uint8Array} publicBuf 
-     * @param {Uint8Array} privateBuf 
-     */
-    async loadkey(publicBuf, privateBuf) {
-        const pub = publicBuf ? toU8(publicBuf) : null;
-        const pri = privateBuf ? toU8(privateBuf) : null;
-        if (isNode) {
-            if (pub) {
-                this.pub = deps.crypto.createPublicKey({ key: pub, format: 'der', type: 'spki' });
-            }
-            if (pri) {
-                this.pri = deps.crypto.createPrivateKey({ key: pri, format: 'der', type: 'pkcs8' });
-            }
-
-        } else { // double import in browser
-            if (pub) {
-                this.pub = await deps.crypto.subtle.importKey(
-                    "spki", pub,
-                    { name: "RSA-OAEP", hash: "SHA-512" },
-                    true, ["encrypt"]
-                );
-                this.signPub = await deps.crypto.subtle.importKey(
-                    "spki", pub,
-                    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-                    true, ["verify"]
-                );
-            }
-            if (pri) {
-                this.pri = await deps.crypto.subtle.importKey(
-                    "pkcs8", pri,
-                    { name: "RSA-OAEP", hash: "SHA-512" },
-                    true, ["decrypt"]
-                );
-                this.signPri = await deps.crypto.subtle.importKey(
-                    "pkcs8", pri,
-                    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-                    true, ["sign"]
-                );
-            }
-        }
-    }
-
-    /**
-     * encrypt: OAEP-SHA-512
-     * @param {Uint8Array} data 
-     * @returns {Promise<Uint8Array>}
-     */
-    async encrypt(data) {
-        const d = toU8(data);
-        if (isNode) {
-            const buf = deps.crypto.publicEncrypt({
-                key: this.pub,
-                padding: deps.crypto.constants.RSA_PKCS1_OAEP_PADDING,
-                oaepHash: 'sha512'
-            }, d);
-            return new Uint8Array(buf);
-        } else {
-            const buf = await deps.crypto.subtle.encrypt(
-                { name: "RSA-OAEP" },
-                this.pub, // SHA-512 set during import
-                d
-            );
-            return new Uint8Array(buf);
-        }
-    }
-
-    /**
-     * decrypt: OAEP-SHA-512
-     * @param {Uint8Array} data 
-     * @returns {Promise<Uint8Array>}
-     */
-    async decrypt(data) {
-        const d = toU8(data);
-        if (isNode) {
-            const buf = deps.crypto.privateDecrypt({
-                key: this.pri,
-                padding: deps.crypto.constants.RSA_PKCS1_OAEP_PADDING,
-                oaepHash: 'sha512'
-            }, d);
-            return new Uint8Array(buf);
-        } else {
-            const buf = await deps.crypto.subtle.decrypt(
-                { name: "RSA-OAEP" },
-                this.pri, // SHA-512 set during import
-                d
-            );
-            return new Uint8Array(buf);
-        }
-    }
-
-    /**
-     * sign: PKCS#1 v1.5 with SHA-256
-     * @param {Uint8Array} data 
-     * @returns {Promise<Uint8Array>}
-     */
-    async sign(data) {
-        const d = toU8(data);
-        if (isNode) {
-            const buf = deps.crypto.sign("sha256", d, this.pri); // 'sha256' implies PKCS1 v1.5 padding by default in Node
-            return new Uint8Array(buf);
-        } else {
-            const buf = await deps.crypto.subtle.sign(
-                "RSASSA-PKCS1-v1_5", // SHA-256 set during import
-                this.signPri,
-                d
-            );
-            return new Uint8Array(buf);
-        }
-    }
-
-    /**
-     * verify: PKCS#1 v1.5 with SHA-256
-     * @param {Uint8Array} data 
-     * @param {Uint8Array} signature 
-     * @returns {Promise<boolean>}
-     */
-    async verify(data, signature) {
-        const d = toU8(data);
-        const s = toU8(signature);
-        if (isNode) {
-            return deps.crypto.verify("sha256", d, this.pub, s); // 'sha256' implies PKCS1 v1.5 padding by default in Node
-        } else {
-            return await deps.crypto.subtle.verify(
-                "RSASSA-PKCS1-v1_5", // SHA-256 set during import
-                this.signPub,
-                s,
-                d
-            );
-        }
-    }
-}
-
 // ========== ECC Encryption ==========
 class ECC1 {
     constructor() {
@@ -1120,7 +911,6 @@ class ECC1 {
         this.priX = null; // 56 bytes
         this.pubEd = null; // 57 bytes
         this.priEd = null; // 57 bytes
-        // encryption format: [1B PubLen][PubKey][encdata][tag]
     }
 
     /**
@@ -1223,17 +1013,16 @@ class ECC1 {
         }
 
         // encrypt
-        const gcmKey = genkey(new Uint8Array(sharedSecret), "KEYGEN_ECC1_ENCRYPT", 44);
+        const gcmKey = genkey(new Uint8Array(sharedSecret), "KEYGEN_ECC1_ENCRYPT", 32);
         zeroize(sharedSecret);
         let em = new SymMaster("gcm1", gcmKey);
         const enc = await em.EnBin(d);
         zeroize(gcmKey);
 
-        // Pack: [1B Len][EphPub][Enc]
-        const res = new Uint8Array(1 + ephPubRaw.length + enc.length);
-        res[0] = ephPubRaw.length;
-        res.set(ephPubRaw, 1);
-        res.set(enc, 1 + ephPubRaw.length);
+        // Pack: [EphPub 56B][Enc]
+        const res = new Uint8Array(ephPubRaw.length + enc.length);
+        res.set(ephPubRaw, 0);
+        res.set(enc, ephPubRaw.length);
         return res;
     }
 
@@ -1245,9 +1034,9 @@ class ECC1 {
     async decrypt(data) {
         // parse data
         const d = toU8(data);
-        const keyLen = d[0];
-        const ephPubRaw = d.slice(1, 1 + keyLen);
-        const enc = d.slice(1 + keyLen);
+        if (d.length < 56) throw new Error("cipher too short");
+        const ephPubRaw = d.slice(0, 56);
+        const enc = d.slice(56);
 
         // get shared secret
         let sharedSecret;
@@ -1263,7 +1052,7 @@ class ECC1 {
         }
 
         // decrypt
-        const gcmKey = genkey(new Uint8Array(sharedSecret), "KEYGEN_ECC1_ENCRYPT", 44);
+        const gcmKey = genkey(new Uint8Array(sharedSecret), "KEYGEN_ECC1_ENCRYPT", 32);
         zeroize(sharedSecret);
         let em = new SymMaster("gcm1", gcmKey);
         try {
@@ -1437,7 +1226,7 @@ class PQC1 {
         zeroize(ssvECC);
         zeroize(ssvKEM);
 
-        const gcmKey = genkey(combinedSecret, "KEYGEN_PQC1_ENCRYPT", 44);
+        const gcmKey = genkey(combinedSecret, "KEYGEN_PQC1_ENCRYPT", 32);
         zeroize(combinedSecret);
         let em = new SymMaster("gcm1", gcmKey);
         const enc = await em.EnBin(d);
@@ -1489,7 +1278,7 @@ class PQC1 {
         zeroize(ssvECC);
         zeroize(ssvKEM);
 
-        const gcmKey = genkey(combinedSecret, "KEYGEN_PQC1_ENCRYPT", 44);
+        const gcmKey = genkey(combinedSecret, "KEYGEN_PQC1_ENCRYPT", 32);
         zeroize(combinedSecret);
         let em = new SymMaster("gcm1", gcmKey);
         try {

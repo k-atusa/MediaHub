@@ -21,8 +21,8 @@ let origSize = 0;
     const rawFlK = sessionStorage.getItem("currentFileKey") ? fromHex(sessionStorage.getItem("currentFileKey")) : null;
     if (rawFK) { fldKey = mask.XOR(rawFK); rawFK.fill(0); }
     if (rawFlK) {
-        origSize = DecodeInt(rawFlK.slice(44, 52));
-        const keyPrt = rawFlK.slice(0, 44);
+        origSize = DecodeInt(rawFlK.slice(32, 40));
+        const keyPrt = rawFlK.slice(0, 32);
         flKey = mask.XOR(keyPrt);
         keyPrt.fill(0);
         rawFlK.fill(0);
@@ -196,9 +196,9 @@ async function editNm() {
         dec.fill(0);
         const rawFK = mask.XOR(flKey);
         // Build new map info.
-        const flInfo = new Uint8Array(52);
+        const flInfo = new Uint8Array(40);
         flInfo.set(rawFK, 0);
-        flInfo.set(EncodeInt(origSize, 8), 44);
+        flInfo.set(EncodeInt(origSize, 8), 32);
         flsMap[newNm] = flInfo; delete flsMap[flName];
         const encoded = EncodeCfg(flsMap);
         for (const v of Object.values(flsMap)) if (v?.fill) v.fill(0);

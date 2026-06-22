@@ -77,7 +77,7 @@ function showFld() {
 document.getElementById("btnCreateFolder").addEventListener("click", async () => {
     const name = document.getElementById("newFolderName").value.trim();
     if (!name || state.fldMap[name]) return alert("⚠️ Invalid name");
-    const rk = Random(44); state.fldMap[name] = mask.XOR(rk); rk.fill(0);
+    const rk = Random(32); state.fldMap[name] = mask.XOR(rk); rk.fill(0);
     await saveUsr(); showFld();
     document.getElementById("newFolderName").value = "";
 });
@@ -161,7 +161,8 @@ function showFls() {
         const card = document.createElement("div"); card.className = "media-card";
         const img = document.createElement("img"); img.className = "thumb-img"; img.alt = "Loading...";
         const rawFK = mask.XOR(fileKey);
-        loadThm(getPid(rawFK.slice(0, 44)), name.split('.').pop().toUpperCase(), img);
+        const fkSlice = rawFK.slice(0, 32);
+        loadThm(getPid(fkSlice), name.split('.').pop().toUpperCase(), img, fkSlice);
         rawFK.fill(0);
 
         const title = document.createElement("div"); title.className = "file-title"; title.textContent = name;
@@ -183,15 +184,15 @@ function showFls() {
 }
 
 // Fetch thumb file.
-async function loadThm(filePid, ext, imgEl) {
+async function loadThm(filePid, ext, imgEl, fileKeyRaw) {
     const res = await fetch(`${SERVER}/api/media/${state.id}/${filePid}/thumb`);
     if (res.status === 404) {
         imgEl.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='%23333'><rect width='24' height='24' rx='2'/><text x='50%' y='60%' font-family='sans-serif' font-size='5' font-weight='bold' fill='%23aaa' text-anchor='middle'>" + ext + "</text></svg>";
+        fileKeyRaw.fill(0);
         return;
     }
-    const rawK = mask.XOR(state.key);
-    const sm = new SymMaster("gcm1", rawK);
-    rawK.fill(0);
+    const sm = new SymMaster("gcm1", fileKeyRaw);
+    fileKeyRaw.fill(0);
     imgEl.src = URL.createObjectURL(new Blob([await sm.DeBin(new Uint8Array(await res.arrayBuffer()))]));
 }
 
@@ -214,7 +215,7 @@ document.getElementById("btnUpload").addEventListener("click", async () => {
                     continue;
                 }
                 const oldRaw = mask.XOR(state.flsMap[file.name]);
-                const oldFlPid = getPid(oldRaw.slice(0, 44));
+                const oldFlPid = getPid(oldRaw.slice(0, 32));
                 oldRaw.fill(0);
                 try {
                     await fetch(`${SERVER}/api/media/${state.id}/${oldFlPid}/dat`, { method: "DELETE" });
@@ -225,7 +226,7 @@ document.getElementById("btnUpload").addEventListener("click", async () => {
             }
             btnUp.textContent = `🚀 ${i + 1}/${files.length}`;
 
-            const fileKey = Random(44); const filePid = getPid(fileKey);
+            const fileKey = Random(32); const filePid = getPid(fileKey);
 
             // Make thumb by type.
             let thumb = null;
@@ -258,16 +259,14 @@ document.getElementById("btnUpload").addEventListener("click", async () => {
             await fetch(`${SERVER}/api/media/${state.id}/${filePid}/dat`, { method: "POST", body: medBuf });
 
             if (thumb) {
-                const rawSK = mask.XOR(state.key);
-                const fldSm = new SymMaster("gcm1", rawSK);
-                rawSK.fill(0);
-                await fetch(`${SERVER}/api/media/${state.id}/${filePid}/thumb`, { method: "POST", body: await fldSm.EnBin(new Uint8Array(await thumb.arrayBuffer())) });
+                const thmSm = new SymMaster("gcm1", fileKey);
+                await fetch(`${SERVER}/api/media/${state.id}/${filePid}/thumb`, { method: "POST", body: await thmSm.EnBin(new Uint8Array(await thumb.arrayBuffer())) });
             }
 
             // Save key to map.
-            const flInfo = new Uint8Array(52);
+            const flInfo = new Uint8Array(40);
             flInfo.set(fileKey, 0);
-            flInfo.set(EncodeInt(file.size, 8), 44);
+            flInfo.set(EncodeInt(file.size, 8), 32);
             state.flsMap[file.name] = mask.XOR(flInfo);
             fileKey.fill(0);
             flInfo.fill(0);
@@ -322,7 +321,7 @@ document.getElementById("btnConfirmPw").addEventListener("click", async () => {
 
     const pwBytes = NormPW(newPw);
     const saltBytes = SHA3256(new TextEncoder().encode(username + SECRET_PEPPER));
-    const hm = new HashMaster("arg2", 32, 44);
+    const hm = new HashMaster("arg2st");
     const [storeKey, newUserKeyRaw] = await hm.KDF(pwBytes, saltBytes);
 
     const newHash = getPid(storeKey);

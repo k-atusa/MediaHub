@@ -1,5 +1,5 @@
 // test794b : USAG-Lib opsec
-const BencryptURL = './Bencrypt.js'; // changed from CDN to local
+const BencryptURL = './Bencrypt.js';
 const { Random, HashMaster, SymMaster, AsymMaster } = await import(BencryptURL);
 
 // Helper: Fill zeros to buffer
@@ -218,18 +218,28 @@ export function DecodeCfg(data) {
 // Opsec header handler
 export class Opsec {
     constructor() {
-        this.Reset();
-        this.SaltLen = 32;
+        this.Init();
+        this.SaltLen = 32
     }
 
-    // reset after reading BodyKey
-    Reset() {
+    Clear() {
+        zeroize(this._salt);
+        zeroize(this._encHeadData);
+        zeroize(this.MsgInfo);
+        zeroize(this.SmsgInfo);
+        zeroize(this._sign);
+        zeroize(this.BodyKey);
+        zeroize(this.BodyInfo);
+        this.Init();
+    }
+
+    // set initial values
+    Init() {
         this._headAlgo = "";
         this.Msg = "";
         this.MsgInfo = new Uint8Array(0);
 
         this._salt = new Uint8Array(0);
-        this._pwHash = new Uint8Array(0);
         this._encHeadData = new Uint8Array(0);
 
         this.Smsg = "";
@@ -286,7 +296,7 @@ export class Opsec {
             await outs.write(EncodeInt(65535, 2));
             await outs.write(EncodeInt(size - 65535, 2));
         } else {
-            throw new Error(`Data size too big: ${size}`);
+            throw new Error(`Header too big: ${size}`);
         }
         await outs.write(head);
     }
@@ -330,18 +340,17 @@ export class Opsec {
         this._headAlgo = method;
         this._salt = Random(this.SaltLen);
         if (this.BodySize >= 0) {
-            this.BodyKey = Random(44);
+            this.BodyKey = Random(32);
         }
 
         const pwBytes = (typeof pw === 'string') ? strToU8(pw) : pw;
         const kfBytes = (typeof kf === 'string') ? strToU8(kf) : kf;
         const combinedPw = concat([pwBytes, kfBytes]);
 
-        // get pwhash & header key, encrypt header
+        // get header key, encrypt header
         const hm = new HashMaster(method);
-        const [pwHash, hkey] = await hm.KDF(combinedPw, this._salt);
+        const [, hkey] = await hm.KDF(combinedPw, this._salt);
         zeroize(combinedPw);
-        this._pwHash = pwHash;
 
         const headData = this._wrapEncHead();
         const sm = new SymMaster("gcm1", hkey);
@@ -355,7 +364,6 @@ export class Opsec {
         if (this.MsgInfo.length > 0) cfg["minf"] = this.MsgInfo;
         cfg["hal"] = this._headAlgo;
         cfg["salt"] = this._salt;
-        cfg["pwh"] = this._pwHash;
         cfg["ehd"] = this._encHeadData;
         return EncodeCfg(cfg);
     }
@@ -371,7 +379,7 @@ export class Opsec {
         // generate random parameters
         this._headAlgo = method;
         if (this.BodySize >= 0) {
-            this.BodyKey = Random(44);
+            this.BodyKey = Random(32);
         }
 
         const peerPubBytes = (typeof peerPub === 'string') ? strToU8(peerPub) : peerPub;
@@ -380,12 +388,16 @@ export class Opsec {
         if (myPri !== null) {
             const am = new AsymMaster(method);
             await am.Loadkey(null, myPri);
-            // sign to [hal][peerPub][smsg][sinf]
+            // sign to [hal][peerPub][smsg][sinf] with 0-byte suffix for each field
             const signTgt = concat([
                 strToU8(method),
+                new Uint8Array([0]),
                 peerPubBytes,
+                new Uint8Array([0]),
                 strToU8(this.Smsg),
-                this.SmsgInfo
+                new Uint8Array([0]),
+                this.SmsgInfo,
+                new Uint8Array([0])
             ]);
             this._sign = await am.Sign(signTgt);
             zeroize(signTgt);
@@ -395,17 +407,7 @@ export class Opsec {
         const am = new AsymMaster(method);
         await am.Loadkey(peerPubBytes, null);
         const headData = this._wrapEncHead();
-
-        if (method === "rsa1" || method === "rsa2") {
-            // RSA Hybrid: Encrypt Key with RSA, Data with AES
-            const hkey = Random(44);
-            this.MsgInfo = await am.Encrypt(hkey);
-            const sm = new SymMaster("gcm1", hkey);
-            this._encHeadData = await sm.EnBin(headData);
-            zeroize(hkey);
-        } else {
-            this._encHeadData = await am.Encrypt(headData);
-        }
+        this._encHeadData = await am.Encrypt(headData);
         zeroize(headData);
 
         // wrap header
@@ -422,13 +424,12 @@ export class Opsec {
      * @param {Uint8Array} data
      */
     View(data) {
-        this.Reset();
+        this.Init();
         const cfg = DecodeCfg(data);
         if (cfg["msg"]) this.Msg = u8ToStr(cfg["msg"]);
         if (cfg["minf"]) this.MsgInfo = cfg["minf"];
         if (cfg["hal"]) this._headAlgo = u8ToStr(cfg["hal"]);
         if (cfg["salt"]) this._salt = cfg["salt"];
-        if (cfg["pwh"]) this._pwHash = cfg["pwh"];
         if (cfg["ehd"]) this._encHeadData = cfg["ehd"];
     }
 
@@ -438,25 +439,17 @@ export class Opsec {
      * @param {Uint8Array} kf 
      */
     async Decpw(pw, kf = new Uint8Array(0)) {
-        if (this._headAlgo === "") throw new Error("Call view() first");
+        if (this._headAlgo === "") throw new Error("Opsec not initialized or invalid data");
         const pwBytes = (typeof pw === 'string') ? strToU8(pw) : pw;
         const kfBytes = (typeof kf === 'string') ? strToU8(kf) : kf;
         const combinedPw = concat([pwBytes, kfBytes]);
 
         // check parameters, get header key
         const hm = new HashMaster(this._headAlgo);
-        const [pwHash, hkey] = await hm.KDF(combinedPw, this._salt);
+        const [, hkey] = await hm.KDF(combinedPw, this._salt);
         zeroize(combinedPw);
 
-        // check password (constant time comparison)
-        if (pwHash.length !== this._pwHash.length) throw new Error("Incorrect password");
-        let diff = 0;
-        for (let i = 0; i < pwHash.length; i++) {
-            diff |= pwHash[i] ^ this._pwHash[i];
-        }
-        if (diff !== 0) throw new Error("Incorrect password");
-
-        // decrypt header
+        // decrypt header (verification by SymMaster)
         const sm = new SymMaster("gcm1", hkey);
         const headData = await sm.DeBin(this._encHeadData);
         zeroize(hkey);
@@ -472,20 +465,11 @@ export class Opsec {
      */
     async Decpub(myPri, myPub = null, peerPub = null) {
         // check parameters, decrypt header
-        if (this._headAlgo === "") throw new Error("Call view() first");
+        if (this._headAlgo === "") throw new Error("Opsec not initialized or invalid data");
         const am = new AsymMaster(this._headAlgo);
         await am.Loadkey(null, myPri);
 
-        let headData;
-        if (this._headAlgo === "rsa1" || this._headAlgo === "rsa2") {
-            // RSA Hybrid
-            const hkey = await am.Decrypt(this.MsgInfo);
-            const sm = new SymMaster("gcm1", hkey);
-            headData = await sm.DeBin(this._encHeadData);
-            zeroize(hkey);
-        } else {
-            headData = await am.Decrypt(this._encHeadData);
-        }
+        let headData = await am.Decrypt(this._encHeadData);
         this._unwrapEncHead(headData);
         zeroize(headData);
 
@@ -498,11 +482,16 @@ export class Opsec {
 
         const amVerify = new AsymMaster(this._headAlgo);
         await amVerify.Loadkey(peerPub, null);
+        // verify sign [hal][myPub][smsg][sinf] with 0-byte suffix for each field
         const signTgt = concat([
             strToU8(this._headAlgo),
+            new Uint8Array([0]),
             myPub,
+            new Uint8Array([0]),
             strToU8(this.Smsg),
-            this.SmsgInfo
+            new Uint8Array([0]),
+            this.SmsgInfo,
+            new Uint8Array([0])
         ]);
 
         const verified = await amVerify.Verify(signTgt, this._sign);

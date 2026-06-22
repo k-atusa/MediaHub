@@ -22,7 +22,7 @@ def authenticate(server_url, username, password):
     salt_bytes = Bencrypt.SHA3256((username + SECRET_PEPPER).encode('utf-8'))
     pw_bytes = Bencode.NormPW(password)
     
-    hm = Bencrypt.HashMaster("arg2", 32, 44)
+    hm = Bencrypt.HashMaster("arg2st")
     store_key, user_key = hm.KDF(pw_bytes, salt_bytes)
     user_hash = get_pid(store_key)
     return user_hash, user_key
@@ -91,15 +91,15 @@ def make_video_thumbnail(filepath):
     return thumb_bytes
 
 # process single file upload
-def process_file_upload(server_url, folder_pid, folder_key, fls_map, filepath):
+def process_file_upload(server_url, folder_pid, fls_map, filepath):
     if not os.path.isfile(filepath):
         return
     file_name = os.path.basename(filepath)
     orig_size = os.path.getsize(filepath)
     print(f"\n[Upload Start] {file_name} ({orig_size} bytes)...")
 
-    # 1. Generate file unique key(44B) and derive physical file ID
-    file_key = Bencrypt.Random(44)
+    # 1. Generate file unique key(32B) and derive physical file ID
+    file_key = Bencrypt.Random(32)
     file_pid = get_pid(file_key)
 
     # 2. Analyze file extension and generate thumbnail based on file type
@@ -112,10 +112,10 @@ def process_file_upload(server_url, folder_pid, folder_key, fls_map, filepath):
         print("-> Image file detected: Generating thumbnail...")
         thumb_bytes = make_image_thumbnail(filepath)
 
-    # Encrypt thumbnail with folder key (gcm1) and upload if thumbnail bytes were successfully built
+    # Encrypt thumbnail with file key (gcm1) and upload if thumbnail bytes were successfully built
     if thumb_bytes:
-        fld_sm = Bencrypt.SymMaster("gcm1", folder_key)
-        enc_thumb = fld_sm.EnBin(thumb_bytes)
+        fl_sm = Bencrypt.SymMaster("gcm1", file_key)
+        enc_thumb = fl_sm.EnBin(thumb_bytes)
         url_thumb = f"{server_url}/api/media/{folder_pid}/{file_pid}/thumb"
         requests.post(url_thumb, data=enc_thumb, verify=False)
         print("-> Thumbail upload complete!")
@@ -141,7 +141,7 @@ def process_file_upload(server_url, folder_pid, folder_key, fls_map, filepath):
             print(f"-> Upload failed: code {res.status_code}")
             return
 
-    # 5. Prepare file info for memory map update (44 bytes key + 8 bytes original size)
+    # 5. Prepare file info for memory map update (32 bytes key + 8 bytes original size)
     fl_info = file_key + Opsec.EncodeInt(orig_size, 8, False)
     fls_map[file_name] = fl_info
 
@@ -201,7 +201,7 @@ def main():
                 continue
 
             # generate new folder random symmetric key and server synchronization
-            fld_map[new_fld_name] = Bencrypt.Random(44)
+            fld_map[new_fld_name] = Bencrypt.Random(32)
             sm = Bencrypt.SymMaster("gcm1", user_key)
             encrypted_usr = sm.EnBin(Opsec.EncodeCfg(fld_map))
             requests.post(url_user, data=encrypted_usr, verify=False)
@@ -235,7 +235,7 @@ def main():
                 print("(No files in current folder)")
             for i, name in enumerate(files):
                 info = fls_map[name]
-                sz = Opsec.DecodeInt(info[44:52], False)
+                sz = Opsec.DecodeInt(info[32:40], False)
                 print(f"[{i}] {name} ({sz} bytes)")
             print("------------------------------")
             print("* download [NUMBER]")
@@ -258,8 +258,8 @@ def main():
                     print("Error: Invalid file number!")
                     continue
                 
-                file_key = fl_info[:44]
-                orig_size = Opsec.DecodeInt(fl_info[44:52], False)
+                file_key = fl_info[:32]
+                orig_size = Opsec.DecodeInt(fl_info[32:40], False)
                 file_pid = get_pid(file_key)
                 
                 print(f"[Download Start] {file_name}...")
@@ -291,9 +291,9 @@ def main():
                     for sub_file in os.listdir(target_path):
                         full_sub_path = os.path.join(target_path, sub_file)
                         if os.path.isfile(full_sub_path):
-                            process_file_upload(server_url, folder_pid, folder_key, fls_map, full_sub_path)
+                            process_file_upload(server_url, folder_pid, fls_map, full_sub_path)
                 else:
-                    process_file_upload(server_url, folder_pid, folder_key, fls_map, target_path)
+                    process_file_upload(server_url, folder_pid, fls_map, target_path)
 
                 # After all files are uploaded, synchronize the accumulated metadata list map
                 met_sm = Bencrypt.SymMaster("gcm1", folder_key)

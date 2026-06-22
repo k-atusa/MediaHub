@@ -13,7 +13,7 @@ export async function makeToken(name, maskedKey) {
     const op = new Opsec();
     op.Smsg = name;
     op.SmsgInfo = rawKey;
-    const head = await op.Encpw("arg2", NormPW(pw));
+    const head = await op.Encpw("arg2st", NormPW(pw));
     rawKey.fill(0);
     return Encode64(head, "#"); // no opsec-write layer
 }
