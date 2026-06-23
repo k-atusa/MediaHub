@@ -1,4 +1,4 @@
-# MediaHub v1.3.5
+# MediaHub v1.3.6
 
 project WHY(Web Hub Yard): Media Hub
 
@@ -9,7 +9,7 @@ project WHY(Web Hub Yard): Media Hub
 - Make your folder and upload files. You can share your folder with others.
 - MediaHub supports views of text, pdf, image, and video.
 - File bigger than 500MB is hard to process. Consider cutting media before uploading with ffmpeg.
-- System does not care about concurrency: Each user must upload after other user's session is cleared.
+- System does not care about concurrency: **Each user must upload after other user's session is cleared.**
 - Focus of MediaHub is lightweight media share/watch. Making your own backup drive with other service is recommended.
 
 ## Architecture

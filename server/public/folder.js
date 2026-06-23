@@ -93,7 +93,8 @@ document.getElementById("btnExport").addEventListener("click", async () => {
     const blob = new Blob([token], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url;
-    a.download = `${state.name}_share.txt`; a.click();
+    const safeName = state.name.replace(/[\\/:*?"<>|]/g, "_");
+    a.download = `${safeName}_share.txt`; a.click();
     URL.revokeObjectURL(url);
 });
 
@@ -152,7 +153,7 @@ async function loadFld() {
 // Render files grid.
 async function showFls() {
     const grid = document.getElementById("mediaGrid"); grid.innerHTML = "";
-    const entries = Object.entries(state.flsMap);
+    const entries = Object.entries(state.flsMap).sort((a, b) => a[0].localeCompare(b[0]));
     const total = Math.ceil(entries.length / state.limit) || 1;
     document.getElementById("pageIndicator").textContent = `${state.page} / ${total}`;
 
