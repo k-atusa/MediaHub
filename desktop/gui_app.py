@@ -354,7 +354,15 @@ class ViewerWindow(QMainWindow):
             return
 
         key = event.key()
-        if key in (Qt.Key.Key_Up, Qt.Key.Key_Down):
+        if key == Qt.Key.Key_Space:
+            from PyQt6.QtMultimedia import QMediaPlayer
+            if self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
+                self.player.pause()
+                self.show_overlay("⏸  Paused")
+            else:
+                self.player.play()
+                self.show_overlay("▶  Playing")
+        elif key in (Qt.Key.Key_Up, Qt.Key.Key_Down):
             vol = self.vol_slider.value()
             new_vol = vol + 5 if key == Qt.Key.Key_Up else vol - 5
             new_vol = max(0, min(100, new_vol))
