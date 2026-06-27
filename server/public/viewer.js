@@ -303,7 +303,7 @@ async function setNav() {
         const dec = await sm.DeBin(new Uint8Array(await res.arrayBuffer()));
         const flsMap = DecodeCfg(dec);
         dec.fill(0);
-        const entries = Object.entries(flsMap);
+        const entries = Object.entries(flsMap).sort((a, b) => a[0].localeCompare(b[0]));
         const idx = entries.findIndex(([name]) => name === flName);
         if (idx === -1) { for (const [, v] of entries) if (v?.fill) v.fill(0); return; }
 
