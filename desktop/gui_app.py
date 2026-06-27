@@ -21,6 +21,9 @@ except ImportError:
 from mediahub_core import MediaHubClient
 from mediahub_proxy import MediaHubProxy
 import urllib.parse
+import json
+
+CREDENTIALS_FILE = os.path.join(os.path.expanduser("."), ".mediahub_credentials.json")
 
 class SortableTableItem(QTableWidgetItem):
     def __lt__(self, other):
@@ -436,7 +439,39 @@ class MediaHubApp(QMainWindow):
         self.init_login_ui()
         self.init_main_ui()
         
-        self.stack.setCurrentIndex(0)
+        # Try auto-login with saved credentials
+        creds = self.load_credentials()
+        if creds:
+            self.url_input.setText(creds.get('url', ''))
+            self.user_input.setText(creds.get('user', ''))
+            self.pass_input.setText(creds.get('password', ''))
+            self.stack.setCurrentIndex(0)
+            self.do_login()
+        else:
+            self.stack.setCurrentIndex(0)
+
+    def load_credentials(self):
+        try:
+            if os.path.exists(CREDENTIALS_FILE):
+                with open(CREDENTIALS_FILE, 'r') as f:
+                    return json.load(f)
+        except Exception:
+            pass
+        return None
+
+    def save_credentials(self, url, user, password):
+        try:
+            with open(CREDENTIALS_FILE, 'w') as f:
+                json.dump({'url': url, 'user': user, 'password': password}, f)
+        except Exception:
+            pass
+
+    def clear_credentials(self):
+        try:
+            if os.path.exists(CREDENTIALS_FILE):
+                os.remove(CREDENTIALS_FILE)
+        except Exception:
+            pass
 
     def init_login_ui(self):
         login_widget = QWidget()
@@ -502,9 +537,14 @@ class MediaHubApp(QMainWindow):
         btn_layout.addWidget(self.new_folder_btn)
         btn_layout.addWidget(self.refresh_fld_btn)
         
+        self.logout_btn = QPushButton("Logout")
+        self.logout_btn.setStyleSheet("background-color: #333; color: #CF6679; font-size: 12px; padding: 6px;")
+        self.logout_btn.clicked.connect(self.do_logout)
+        
         sidebar_layout.addWidget(folder_label)
         sidebar_layout.addWidget(self.folder_list)
         sidebar_layout.addLayout(btn_layout)
+        sidebar_layout.addWidget(self.logout_btn)
         sidebar.setLayout(sidebar_layout)
         
         # Main Area
@@ -591,12 +631,28 @@ class MediaHubApp(QMainWindow):
         self.worker.start()
 
     def on_login_success(self):
+        # Save credentials for next launch
+        self.save_credentials(
+            self.url_input.text().strip(),
+            self.user_input.text().strip(),
+            self.pass_input.text()
+        )
         self.stack.setCurrentIndex(1)
         self.do_fetch_folders()
 
     def on_login_error(self, err):
         self.login_btn.setEnabled(True)
         self.status_label.setText(f"Error: {err}")
+
+    def do_logout(self):
+        self.clear_credentials()
+        self.client = None
+        self.folder_list.clear()
+        self.file_table.setRowCount(0)
+        self.pass_input.clear()
+        self.stack.setCurrentIndex(0)
+        self.login_btn.setEnabled(True)
+        self.status_label.setText("")
 
     def do_fetch_folders(self):
         self.folder_list.clear()
