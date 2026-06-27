@@ -117,6 +117,32 @@ class DownloadWorker(WorkerBase):
         except Exception as e:
             self.error.emit(str(e))
 
+class ThumbnailWorker(WorkerBase):
+    success = pyqtSignal(int, QPixmap)
+
+    def __init__(self, client, folder_pid, file_pid, file_key_bytes, row):
+        super().__init__()
+        self.client = client
+        self.folder_pid = folder_pid
+        self.file_pid = file_pid
+        self.file_key_bytes = file_key_bytes
+        self.row = row
+
+    def run(self):
+        try:
+            import requests
+            import Bencrypt
+            url = f"{self.client.server_url}/api/media/{self.folder_pid}/{self.file_pid}/thumb"
+            res = requests.get(url, verify=False)
+            if res.status_code == 200 and res.content:
+                sm = Bencrypt.SymMaster("gcm1", self.file_key_bytes[:32])
+                raw = sm.DeBin(res.content)
+                pixmap = QPixmap.fromImage(QImage.fromData(raw))
+                if not pixmap.isNull():
+                    self.success.emit(self.row, pixmap)
+        except Exception:
+            pass
+
 class ScalableImageLabel(QLabel):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -559,13 +585,22 @@ class MediaHubApp(QMainWindow):
         self.search_input.setPlaceholderText("Search files...")
         self.search_input.textChanged.connect(self.filter_files)
         
-        self.file_table = QTableWidget(0, 2)
-        self.file_table.setHorizontalHeaderLabels(["Filename", "Size"])
-        self.file_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.file_table = QTableWidget(0, 3)
+        self.file_table.setHorizontalHeaderLabels(["", "Filename", "Size"])
+        self.file_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        self.file_table.setColumnWidth(0, 80)
+        self.file_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.file_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         self.file_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.file_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.file_table.itemDoubleClicked.connect(self.do_view_file)
         self.file_table.setSortingEnabled(True)
+        self.file_table.verticalHeader().setDefaultSectionSize(70)
+        self.file_table.verticalHeader().hide()
+        # Disable sorting on thumbnail column (col 0)
+        self.file_table.horizontalHeader().sectionClicked.connect(
+            lambda col: self.file_table.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder) if col == 0 else None
+        )
         
         action_layout = QHBoxLayout()
         self.upload_btn = QPushButton("Upload Files")
@@ -607,7 +642,7 @@ class MediaHubApp(QMainWindow):
         import unicodedata
         search_text = unicodedata.normalize('NFC', text).lower()
         for row in range(self.file_table.rowCount()):
-            item = self.file_table.item(row, 0)
+            item = self.file_table.item(row, 1)  # column 1 = filename
             if item:
                 item_text = unicodedata.normalize('NFC', item.text()).lower()
                 self.file_table.setRowHidden(row, search_text not in item_text)
@@ -697,14 +732,52 @@ class MediaHubApp(QMainWindow):
         self.current_folder_key = key
         self.current_files_map = files
         self.proxy.update_context(self.client, files)
+        self._thumb_workers = []  # keep references to prevent GC
         
         self.file_table.setSortingEnabled(False)
         self.file_table.setRowCount(0)
         from mediahub_core import Opsec
+        
+        IMAGE_EXTS = {'jpg', 'jpeg', 'png', 'gif', 'webp'}
+        VIDEO_EXTS = {'mp4', 'webm', 'mov', 'mkv'}
+        TEXT_EXTS  = {'txt', 'md', 'csv', 'py', 'json', 'log'}
+        PDF_EXTS   = {'pdf'}
+        
         for name, info in files.items():
             sz = Opsec.DecodeInt(info[44:52], False)
             row = self.file_table.rowCount()
             self.file_table.insertRow(row)
+            self.file_table.setRowHeight(row, 70)
+            
+            # Placeholder thumbnail widget
+            thumb_lbl = QLabel()
+            thumb_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            ext = name.rsplit('.', 1)[-1].lower() if '.' in name else ''
+            
+            if ext in IMAGE_EXTS | VIDEO_EXTS:
+                # Will be replaced by real thumbnail asynchronously
+                thumb_lbl.setText("⏳")
+                thumb_lbl.setStyleSheet("color:#888; font-size:22px;")
+                file_key = info[:44]
+                file_pid = self.client.get_obj_pid(file_key)
+                w = ThumbnailWorker(self.client, pid, file_pid, file_key, row)
+                w.success.connect(self.on_thumbnail_ready)
+                w.start()
+                self._thumb_workers.append(w)
+            elif ext in PDF_EXTS:
+                thumb_lbl.setText("📄")
+                thumb_lbl.setStyleSheet("font-size:32px;")
+            elif ext in TEXT_EXTS:
+                thumb_lbl.setText("📝")
+                thumb_lbl.setStyleSheet("font-size:32px;")
+            else:
+                thumb_lbl.setText("📁")
+                thumb_lbl.setStyleSheet("font-size:32px;")
+            
+            self.file_table.setCellWidget(row, 0, thumb_lbl)
+            
+            # Invisible dummy item for column 0 to allow sorting row selection
+            self.file_table.setItem(row, 0, SortableTableItem(""))
             
             name_item = SortableTableItem(name)
             name_item.setData(Qt.ItemDataRole.UserRole, name.lower())
@@ -712,12 +785,18 @@ class MediaHubApp(QMainWindow):
             size_item = SortableTableItem(self.format_size(sz))
             size_item.setData(Qt.ItemDataRole.UserRole, sz)
             
-            self.file_table.setItem(row, 0, name_item)
-            self.file_table.setItem(row, 1, size_item)
+            self.file_table.setItem(row, 1, name_item)
+            self.file_table.setItem(row, 2, size_item)
             
         self.file_table.setSortingEnabled(True)
         # Re-apply filter if text exists
         self.filter_files(self.search_input.text())
+
+    def on_thumbnail_ready(self, row, pixmap):
+        thumb_lbl = self.file_table.cellWidget(row, 0)
+        if thumb_lbl:
+            scaled = pixmap.scaled(68, 68, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            thumb_lbl.setPixmap(scaled)
 
     def set_loading(self, loading=True):
         self.upload_btn.setEnabled(not loading)
@@ -777,7 +856,7 @@ class MediaHubApp(QMainWindow):
             # Just downloading the first selected one for now to keep it simple, or we can queue them
             # We will just download the first one for demonstration
             row = selected_rows[0].row()
-            file_name = self.file_table.item(row, 0).text()
+            file_name = self.file_table.item(row, 1).text()  # column 1 = filename
             fl_info = self.current_files_map[file_name]
             
             self.worker = DownloadWorker(self.client, self.current_folder_pid, fl_info, file_name, out_dir)
@@ -800,7 +879,7 @@ class MediaHubApp(QMainWindow):
             return
             
         row = selected_rows[0].row()
-        file_name = self.file_table.item(row, 0).text()
+        file_name = self.file_table.item(row, 1).text()  # column 1 = filename
         
         encoded_name = urllib.parse.quote(file_name)
         stream_url = f"http://127.0.0.1:18080/stream/{self.current_folder_pid}/{encoded_name}"
