@@ -3,7 +3,7 @@ import os
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                              QLabel, QLineEdit, QPushButton, QListWidget, QListWidgetItem, 
                              QStackedWidget, QFileDialog, QMessageBox, QInputDialog, QTableWidget,
-                             QTableWidgetItem, QHeaderView, QProgressBar, QTextEdit)
+                             QTableWidgetItem, QHeaderView, QProgressBar, QTextEdit, QSlider, QStyle)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl, QPoint, QPointF
 from PyQt6.QtGui import QFont, QIcon, QColor, QPixmap, QPainter, QImage
 try:
@@ -33,6 +33,18 @@ class SortableTableItem(QTableWidgetItem):
         if data1 is not None and data2 is not None:
             return data1 < data2
         return super().__lt__(other)
+
+class ClickableSlider(QSlider):
+    """QSlider that jumps to the clicked position on a single click."""
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            val = QStyle.sliderValueFromPosition(
+                self.minimum(), self.maximum(),
+                int(event.position().x()), self.width()
+            )
+            self.setValue(val)
+            self.sliderMoved.emit(val)
+        super().mousePressEvent(event)
 
 class WorkerBase(QThread):
     error = pyqtSignal(str)
@@ -290,12 +302,10 @@ class ViewerWindow(QMainWindow):
         self.player.setVideoOutput(self.video_widget)
         self.player.setSource(QUrl(self.file_url))
         
-        from PyQt6.QtWidgets import QSlider
-        
         # Seek Bar & Time
         seek_layout = QHBoxLayout()
         self.time_lbl = QLabel("00:00 / 00:00")
-        self.seek_slider = QSlider(Qt.Orientation.Horizontal)
+        self.seek_slider = ClickableSlider(Qt.Orientation.Horizontal)
         self.seek_slider.setRange(0, 0)
         self.seek_slider.sliderMoved.connect(self.set_position)
         
@@ -324,6 +334,7 @@ class ViewerWindow(QMainWindow):
         
         self.layout.addLayout(controls)
         self.player.play()
+
 
     def set_position(self, position):
         self.player.setPosition(position)
