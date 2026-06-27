@@ -502,11 +502,13 @@ class MediaHubApp(QMainWindow):
         self.stack.addWidget(main_widget)
 
     def filter_files(self, text):
-        search_text = text.lower()
+        import unicodedata
+        search_text = unicodedata.normalize('NFC', text).lower()
         for row in range(self.file_table.rowCount()):
             item = self.file_table.item(row, 0)
             if item:
-                self.file_table.setRowHidden(row, search_text not in item.text().lower())
+                item_text = unicodedata.normalize('NFC', item.text()).lower()
+                self.file_table.setRowHidden(row, search_text not in item_text)
 
     def do_login(self):
         url = self.url_input.text().strip()
