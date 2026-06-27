@@ -9,6 +9,4 @@ opencv-python
 PyQt6
 urllib3
 PyQt6-WebEngine
-PyQt6-Multimedia
-PyQt6-MultimediaWidgets
 keyring
