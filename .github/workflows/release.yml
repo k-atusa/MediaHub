@@ -8,6 +8,9 @@ on:
         required: true
         default: 'v1.0.0-beta'
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build on ${{ matrix.os }}
