@@ -1,0 +1,122 @@
+name: Build MediaHub
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0-beta)'
+        required: true
+        default: 'v1.0.0-beta'
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install System Dependencies (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libxcb-cursor0 libxcb-xinerama0 libglib2.0-0 libsm6 libxext6 libxrender-dev
+        sudo apt-get install -y ruby ruby-dev rubygems build-essential
+        sudo gem install fpm
+
+    - name: Install Python Dependencies
+      working-directory: desktop
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+
+    - name: Build with PyInstaller
+      working-directory: desktop
+      run: |
+        pyinstaller build.spec
+
+    - name: Package Windows (EXE)
+      if: runner.os == 'Windows'
+      working-directory: desktop/dist
+      run: |
+        # PyInstaller already creates MediaHub folder or exe, zip it
+        Compress-Archive -Path MediaHub -DestinationPath MediaHub-Windows.zip
+
+    - name: Package macOS (DMG)
+      if: runner.os == 'macOS'
+      working-directory: desktop
+      run: |
+        mkdir -p dist/dmg
+        cp -r dist/MediaHub.app dist/dmg/
+        ln -s /Applications dist/dmg/Applications
+        hdiutil create -volname "MediaHub" -srcfolder dist/dmg -ov -format UDZO "dist/MediaHub-macOS.dmg"
+
+    - name: Package Linux (DEB & RPM)
+      if: runner.os == 'Linux'
+      working-directory: desktop/dist
+      run: |
+        # Create a directory structure for the package
+        mkdir -p package_root/usr/bin
+        mkdir -p package_root/usr/lib/mediahub
+        cp -r MediaHub/* package_root/usr/lib/mediahub/
+        ln -s /usr/lib/mediahub/MediaHub package_root/usr/bin/mediahub
+
+        # Build DEB
+        fpm -s dir -t deb -n mediahub -v 1.0.0 -C package_root --prefix / -p MediaHub-Linux.deb .
+        
+        # Build RPM
+        fpm -s dir -t rpm -n mediahub -v 1.0.0 -C package_root --prefix / -p MediaHub-Linux.rpm .
+
+    - name: Upload Artifacts (Windows)
+      if: runner.os == 'Windows'
+      uses: actions/upload-artifact@v3
+      with:
+        name: MediaHub-Windows
+        path: desktop/dist/MediaHub-Windows.zip
+
+    - name: Upload Artifacts (macOS)
+      if: runner.os == 'macOS'
+      uses: actions/upload-artifact@v3
+      with:
+        name: MediaHub-macOS
+        path: desktop/dist/MediaHub-macOS.dmg
+
+    - name: Upload Artifacts (Linux DEB)
+      if: runner.os == 'Linux'
+      uses: actions/upload-artifact@v3
+      with:
+        name: MediaHub-Linux-DEB
+        path: desktop/dist/MediaHub-Linux.deb
+
+    - name: Upload Artifacts (Linux RPM)
+      if: runner.os == 'Linux'
+      uses: actions/upload-artifact@v3
+      with:
+        name: MediaHub-Linux-RPM
+        path: desktop/dist/MediaHub-Linux.rpm
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/download-artifact@v3
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ github.event.inputs.version }}
+        name: Release ${{ github.event.inputs.version }}
+        prerelease: true
+        files: |
+          MediaHub-Windows/MediaHub-Windows.zip
+          MediaHub-macOS/MediaHub-macOS.dmg
+          MediaHub-Linux-DEB/MediaHub-Linux.deb
+          MediaHub-Linux-RPM/MediaHub-Linux.rpm
