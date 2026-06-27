@@ -52,18 +52,25 @@ class ProxyRequestHandler(http.server.BaseHTTPRequestHandler):
         
         # Parse Range header
         r_start, r_end = 0, orig_size - 1
-        open_end = True
+        is_partial = False
         range_header = self.headers.get("Range")
         if range_header:
+            # Handle standard Range: bytes=A-B or bytes=A-
             rm = re.match(r"bytes=(\d+)-(\d*)", range_header)
             if rm:
                 r_start = int(rm.group(1))
                 if rm.group(2):
                     r_end = int(rm.group(2))
-                    open_end = False
+                is_partial = True
+            else:
+                # Handle suffix Range: bytes=-N
+                rm2 = re.match(r"bytes=-(\d+)", range_header)
+                if rm2:
+                    suffix_len = int(rm2.group(1))
+                    r_start = max(0, orig_size - suffix_len)
+                    is_partial = True
                     
         # Determine response code and headers
-        is_partial = not open_end
         if r_start > r_end or r_start >= orig_size:
             self.send_response(416)
             self.send_header("Content-Range", f"bytes */{orig_size}")

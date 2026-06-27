@@ -206,7 +206,6 @@ class ViewerWindow(QMainWindow):
 
     def next_frame(self):
         import cv2
-        from PyQt6.QtGui import QImage, QPixmap
         ret, frame = self.cap.read()
         if ret:
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
