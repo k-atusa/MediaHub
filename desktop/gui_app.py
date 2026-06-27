@@ -41,7 +41,7 @@ class FetchFoldersWorker(WorkerBase):
             self.error.emit(str(e))
 
 class FetchFilesWorker(WorkerBase):
-    success = pyqtSignal(str, str, dict)
+    success = pyqtSignal(str, bytes, dict)
     
     def __init__(self, client, folder_name):
         super().__init__()
