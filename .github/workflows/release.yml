@@ -17,7 +17,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -78,28 +78,28 @@ jobs:
 
     - name: Upload Artifacts (Windows)
       if: runner.os == 'Windows'
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: MediaHub-Windows
         path: desktop/dist/MediaHub-Windows.zip
 
     - name: Upload Artifacts (macOS)
       if: runner.os == 'macOS'
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: MediaHub-macOS
         path: desktop/dist/MediaHub-macOS.dmg
 
     - name: Upload Artifacts (Linux DEB)
       if: runner.os == 'Linux'
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: MediaHub-Linux-DEB
         path: desktop/dist/MediaHub-Linux.deb
 
     - name: Upload Artifacts (Linux RPM)
       if: runner.os == 'Linux'
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: MediaHub-Linux-RPM
         path: desktop/dist/MediaHub-Linux.rpm
@@ -108,7 +108,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/download-artifact@v3
+    - uses: actions/download-artifact@v4
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
