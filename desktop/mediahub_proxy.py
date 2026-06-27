@@ -62,12 +62,8 @@ class ProxyRequestHandler(http.server.BaseHTTPRequestHandler):
                     r_end = int(rm.group(2))
                     open_end = False
                     
-        # Cap open-ended requests
-        MAX_RESPONSE = 2 * 1048576
-        if open_end and r_end - r_start + 1 > MAX_RESPONSE:
-            r_end = r_start + MAX_RESPONSE - 1
-        r_end = min(r_end, orig_size - 1)
-        
+        # Determine response code and headers
+        is_partial = not open_end
         if r_start > r_end or r_start >= orig_size:
             self.send_response(416)
             self.send_header("Content-Range", f"bytes */{orig_size}")
@@ -84,10 +80,14 @@ class ProxyRequestHandler(http.server.BaseHTTPRequestHandler):
         mime = {"mp4": "video/mp4", "webm": "video/webm", "mov": "video/mp4", "mkv": "video/x-matroska", 
                 "png": "image/png", "jpg": "image/jpeg", "pdf": "application/pdf"}.get(ext, "application/octet-stream")
         
-        self.send_response(206)
+        if is_partial:
+            self.send_response(206)
+            self.send_header("Content-Range", f"bytes {r_start}-{r_end}/{orig_size}")
+        else:
+            self.send_response(200)
+            
         self.send_header("Content-Type", mime)
         self.send_header("Content-Length", str(content_length))
-        self.send_header("Content-Range", f"bytes {r_start}-{r_end}/{orig_size}")
         self.send_header("Accept-Ranges", "bytes")
         self.send_header("Cache-Control", "no-store")
         self.send_header("Access-Control-Allow-Origin", "*")
