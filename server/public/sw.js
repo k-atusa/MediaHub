@@ -57,7 +57,9 @@ self.addEventListener('message', async (e) => {
     const d = e.data;
     if (d.action === 'REGISTER') {
         const raw = hexToU8(d.fileKey);
-        const cryptoKey = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
+        const aesKey = raw.slice(0, 32);
+        const cryptoKey = await crypto.subtle.importKey('raw', aesKey, 'AES-GCM', false, ['decrypt']);
+        aesKey.fill(0);
         raw.fill(0);
         regMap.set(d.filePid, {
             fldId: d.folderId,
