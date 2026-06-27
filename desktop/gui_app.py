@@ -344,24 +344,39 @@ class ViewerWindow(QMainWindow):
 
     def show_overlay(self, text):
         if not hasattr(self, 'overlay_lbl'):
-            self.overlay_lbl = QLabel(self.video_widget)
+            # On macOS, native video renderer draws over child widgets.
+            # Solution: create a separate frameless, always-on-top window.
+            self.overlay_lbl = QLabel()
+            self.overlay_lbl.setWindowFlags(
+                Qt.WindowType.FramelessWindowHint |
+                Qt.WindowType.WindowStaysOnTopHint |
+                Qt.WindowType.Tool
+            )
+            self.overlay_lbl.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+            self.overlay_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+            self.overlay_lbl.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
             self.overlay_lbl.setStyleSheet("""
-                color: white;
-                background-color: rgba(0, 0, 0, 150);
-                padding: 10px;
-                border-radius: 5px;
-                font-size: 24px;
-                font-weight: bold;
+                QLabel {
+                    color: white;
+                    background-color: rgba(0, 0, 0, 180);
+                    padding: 12px 18px;
+                    border-radius: 8px;
+                    font-size: 22px;
+                    font-weight: bold;
+                }
             """)
-            self.overlay_lbl.move(20, 20)
-            
+
             from PyQt6.QtCore import QTimer
             self.overlay_timer = QTimer(self)
             self.overlay_timer.setSingleShot(True)
             self.overlay_timer.timeout.connect(self.overlay_lbl.hide)
-            
+
         self.overlay_lbl.setText(text)
         self.overlay_lbl.adjustSize()
+
+        # Position over the video widget using global screen coordinates
+        global_pos = self.video_widget.mapToGlobal(self.video_widget.rect().topLeft())
+        self.overlay_lbl.move(global_pos.x() + 20, global_pos.y() + 20)
         self.overlay_lbl.show()
         self.overlay_lbl.raise_()
         self.overlay_timer.start(1500)
