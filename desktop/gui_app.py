@@ -184,46 +184,41 @@ class ViewerWindow(QMainWindow):
         self.layout.addWidget(txt)
         
     def show_video(self):
-        self.video_lbl = ScalableImageLabel()
-        self.layout.addWidget(self.video_lbl)
+        try:
+            from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
+            from PyQt6.QtMultimediaWidgets import QVideoWidget
+        except ImportError:
+            lbl = QLabel("QtMultimedia is not available on this system.")
+            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.layout.addWidget(lbl)
+            return
+
+        self.video_widget = QVideoWidget()
+        self.layout.addWidget(self.video_widget)
         
-        import cv2
-        from PyQt6.QtCore import QTimer
-        self.cap = cv2.VideoCapture(self.file_url)
-        fps = self.cap.get(cv2.CAP_PROP_FPS)
-        if fps <= 0: fps = 30
+        self.player = QMediaPlayer()
+        self.audio_output = QAudioOutput()
+        self.audio_output.setVolume(1.0)
         
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.next_frame)
-        self.timer.start(int(1000 / fps))
+        self.player.setAudioOutput(self.audio_output)
+        self.player.setVideoOutput(self.video_widget)
+        self.player.setSource(QUrl(self.file_url))
         
         controls = QHBoxLayout()
-        play_btn = QPushButton("Play/Pause")
+        play_btn = QPushButton("Play / Pause")
         play_btn.clicked.connect(self.toggle_play)
         controls.addWidget(play_btn)
         
         self.layout.addLayout(controls)
-
-    def next_frame(self):
-        import cv2
-        ret, frame = self.cap.read()
-        if ret:
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            h, w, ch = frame.shape
-            bytes_per_line = ch * w
-            qimg = QImage(frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
-            pixmap = QPixmap.fromImage(qimg)
-            self.video_lbl.setPixmap(pixmap)
-        else:
-            self.timer.stop()
-            self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # Loop or just stop
+        self.player.play()
 
     def toggle_play(self):
-        if hasattr(self, 'timer'):
-            if self.timer.isActive():
-                self.timer.stop()
+        if hasattr(self, 'player'):
+            from PyQt6.QtMultimedia import QMediaPlayer
+            if self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
+                self.player.pause()
             else:
-                self.timer.start()
+                self.player.play()
             
     def show_pdf(self):
         if QWebEngineView is None:
@@ -237,10 +232,9 @@ class ViewerWindow(QMainWindow):
         self.layout.addWidget(self.web)
         
     def closeEvent(self, event):
-        if hasattr(self, 'timer'):
-            self.timer.stop()
-        if hasattr(self, 'cap'):
-            self.cap.release()
+        if hasattr(self, 'player'):
+            self.player.stop()
+            self.player.setSource(QUrl(""))
         if hasattr(self, 'web') and self.web is not None:
             self.web.load(QUrl(""))
             
