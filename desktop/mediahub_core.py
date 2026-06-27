@@ -173,6 +173,7 @@ class MediaHubClient:
         smx = Bencrypt.SymMaster("gcmx1", file_key[:32])
         enc_size = smx.AfterSize(orig_size)
         pad_size = Opsec.PadLen(enc_size)
+        total_upload_size = enc_size + pad_size
 
         with tempfile.TemporaryFile() as tmp_f:
             with open(filepath, "rb") as f_in:
@@ -181,11 +182,47 @@ class MediaHubClient:
                 Opsec.PadFile(tmp_f, pad_size)
             tmp_f.seek(0)
             
-            # 4. Upload encrypted media
+            # 4. Upload via file wrapper for progress tracking (avoids chunked transfer encoding)
             url_dat = f"{self.server_url}/api/media/{folder_pid}/{file_pid}/dat"
-            res = requests.post(url_dat, data=tmp_f, verify=False)
+
+            import time
+
+            class ProgressFileWrapper:
+                def __init__(self, f, total, callback):
+                    self._f = f
+                    self._total = total
+                    self._sent = 0
+                    self._callback = callback
+                    self._window_start = time.monotonic()
+                    self._window_bytes = 0
+
+                def read(self, size=-1):
+                    chunk = self._f.read(size)
+                    if chunk:
+                        self._sent += len(chunk)
+                        self._window_bytes += len(chunk)
+                        now = time.monotonic()
+                        elapsed = now - self._window_start
+                        if elapsed >= 0.5 and self._callback:
+                            speed_bps = self._window_bytes / elapsed
+                            self._callback(self._sent, self._total, speed_bps)
+                            self._window_start = now
+                            self._window_bytes = 0
+                    return chunk
+
+                def __len__(self):
+                    return self._total
+
+            wrapper = ProgressFileWrapper(tmp_f, total_upload_size, progress_callback)
+            res = requests.post(url_dat, data=wrapper, verify=False,
+                                headers={'Content-Length': str(total_upload_size)})
             if res.status_code != 200:
                 raise Exception(f"Upload failed: code {res.status_code}")
+
+            # Final progress update
+            if progress_callback:
+                progress_callback(total_upload_size, total_upload_size, 0)
+
 
         # 5. Prepare file info
         fl_info = file_key + Opsec.EncodeInt(orig_size, 8, False)

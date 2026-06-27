@@ -82,6 +82,7 @@ class FetchFilesWorker(WorkerBase):
 
 class UploadWorker(WorkerBase):
     success = pyqtSignal()
+    progress = pyqtSignal(int, int, float)  # bytes_sent, total_bytes, speed_bps
     
     def __init__(self, client, folder_pid, folder_key, fls_map, filepaths):
         super().__init__()
@@ -94,7 +95,10 @@ class UploadWorker(WorkerBase):
     def run(self):
         try:
             for fp in self.filepaths:
-                self.client.upload_file(self.folder_pid, self.folder_key, self.fls_map, fp)
+                self.client.upload_file(
+                    self.folder_pid, self.folder_key, self.fls_map, fp,
+                    progress_callback=lambda s, t, spd: self.progress.emit(s, t, spd)
+                )
             self.success.emit()
         except Exception as e:
             self.error.emit(str(e))
@@ -629,17 +633,26 @@ class MediaHubApp(QMainWindow):
         
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
+        self.progress_bar.setRange(0, 100)
         self.progress_bar.setTextVisible(False)
         self.progress_bar.setStyleSheet("""
             QProgressBar { border: 1px solid #333; border-radius: 5px; background-color: #1E1E1E; height: 10px; }
             QProgressBar::chunk { background-color: #BB86FC; border-radius: 5px; }
         """)
+        self.upload_status_lbl = QLabel("")
+        self.upload_status_lbl.setVisible(False)
+        self.upload_status_lbl.setStyleSheet("color: #BB86FC; font-size: 12px;")
+        
+        upload_progress_layout = QVBoxLayout()
+        upload_progress_layout.setSpacing(2)
+        upload_progress_layout.addWidget(self.upload_status_lbl)
+        upload_progress_layout.addWidget(self.progress_bar)
         
         content_layout.addWidget(self.current_folder_label)
         content_layout.addWidget(self.search_input)
         content_layout.addWidget(self.file_table)
         content_layout.addLayout(action_layout)
-        content_layout.addWidget(self.progress_bar)
+        content_layout.addLayout(upload_progress_layout)
         content.setLayout(content_layout)
         
         layout.addWidget(sidebar)
@@ -813,8 +826,21 @@ class MediaHubApp(QMainWindow):
         self.download_btn.setEnabled(not loading)
         self.view_btn.setEnabled(not loading)
         self.progress_bar.setVisible(loading)
+        self.upload_status_lbl.setVisible(loading)
         if loading:
-            self.progress_bar.setRange(0, 0) # Indeterminate
+            self.progress_bar.setRange(0, 100)
+            self.progress_bar.setValue(0)
+            self.upload_status_lbl.setText("Preparing...")
+
+    def on_upload_progress(self, bytes_sent, total_bytes, speed_bps):
+        if total_bytes > 0:
+            pct = int(bytes_sent * 100 / total_bytes)
+            self.progress_bar.setValue(pct)
+            if speed_bps > 0:
+                speed_mb = speed_bps / (1024 * 1024)
+                self.upload_status_lbl.setText(f"Uploading... {pct}%  |  {speed_mb:.1f} MB/s")
+            else:
+                self.upload_status_lbl.setText(f"Uploading... {pct}%")
 
     def do_upload(self):
         if not self.current_folder_name:
@@ -827,6 +853,7 @@ class MediaHubApp(QMainWindow):
             self.worker = UploadWorker(self.client, self.current_folder_pid, self.current_folder_key, self.current_files_map, files)
             self.worker.success.connect(self.on_upload_success)
             self.worker.error.connect(self.on_op_error)
+            self.worker.progress.connect(self.on_upload_progress)
             self.worker.start()
 
     def do_upload_dir(self):
@@ -842,10 +869,12 @@ class MediaHubApp(QMainWindow):
                 self.worker = UploadWorker(self.client, self.current_folder_pid, self.current_folder_key, self.current_files_map, files)
                 self.worker.success.connect(self.on_upload_success)
                 self.worker.error.connect(self.on_op_error)
+                self.worker.progress.connect(self.on_upload_progress)
                 self.worker.start()
 
     def on_upload_success(self):
         self.set_loading(False)
+        self.upload_status_lbl.setVisible(False)
         QMessageBox.information(self, "Success", "Upload complete!")
         self.on_folder_selected(self.folder_list.currentItem()) # refresh
 
