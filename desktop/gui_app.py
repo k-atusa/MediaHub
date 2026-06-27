@@ -22,8 +22,16 @@ from mediahub_core import MediaHubClient
 from mediahub_proxy import MediaHubProxy
 import urllib.parse
 import json
+try:
+    import keyring
+    KEYRING_AVAILABLE = True
+except ImportError:
+    KEYRING_AVAILABLE = False
 
-CREDENTIALS_FILE = os.path.join(os.path.expanduser("."), ".mediahub_credentials.json")
+KEYRING_SERVICE  = "mediahub"
+KEYRING_ACCOUNT  = "session"  # single fixed entry; all data stored as JSON
+# Legacy file to clean up on first run
+_LEGACY_CREDS_FILE = os.path.join(os.path.expanduser("."), ".mediahub_credentials.json")
 
 class SortableTableItem(QTableWidgetItem):
     def __lt__(self, other):
@@ -488,39 +496,77 @@ class MediaHubApp(QMainWindow):
         self.init_login_ui()
         self.init_main_ui()
         
-        # Try auto-login with saved credentials
+        # Clean up any old plaintext credentials file from previous versions
+        self._cleanup_legacy_file()
+
+        # Try auto-login from keychain
         creds = self.load_credentials()
         if creds:
-            self.url_input.setText(creds.get('url', ''))
-            self.user_input.setText(creds.get('user', ''))
-            self.pass_input.setText(creds.get('password', ''))
-            self.stack.setCurrentIndex(0)
-            self.do_login()
+            # Restore session from derived keys - no password needed
+            url = creds['url']
+            username = creds['username']
+            user_hash = creds['user_hash']
+            user_key = creds['user_key']
+            self.url_input.setText(url)
+            self.user_input.setText(username)
+            self.client = MediaHubClient(url, username, "")
+            self.client.set_user_auth(user_hash, user_key)
+            self.stack.setCurrentIndex(1)
+            self.do_fetch_folders()
         else:
             self.stack.setCurrentIndex(0)
 
-    def load_credentials(self):
+    def _cleanup_legacy_file(self):
+        """Delete the old plaintext credentials file if it still exists."""
         try:
-            if os.path.exists(CREDENTIALS_FILE):
-                with open(CREDENTIALS_FILE, 'r') as f:
-                    return json.load(f)
+            if os.path.exists(_LEGACY_CREDS_FILE):
+                os.remove(_LEGACY_CREDS_FILE)
         except Exception:
             pass
-        return None
 
-    def save_credentials(self, url, user, password):
+    def load_credentials(self):
+        """Load all session data from the OS keychain."""
+        if not KEYRING_AVAILABLE:
+            return None
         try:
-            with open(CREDENTIALS_FILE, 'w') as f:
-                json.dump({'url': url, 'user': user, 'password': password}, f)
+            raw = keyring.get_password(KEYRING_SERVICE, KEYRING_ACCOUNT)
+            if not raw:
+                return None
+            data = json.loads(raw)
+            return {
+                'url':       data['url'],
+                'username':  data['username'],
+                'user_hash': data['user_hash'],
+                'user_key':  bytes.fromhex(data['user_key']),
+            }
+        except Exception:
+            return None
+
+    def save_credentials(self, url, username, user_hash, user_key):
+        """Store all session data in the OS keychain as a single JSON entry."""
+        if not KEYRING_AVAILABLE:
+            return
+        try:
+            keyring.set_password(
+                KEYRING_SERVICE, KEYRING_ACCOUNT,
+                json.dumps({
+                    'url':       url,
+                    'username':  username,
+                    'user_hash': user_hash,
+                    'user_key':  user_key.hex(),
+                })
+            )
         except Exception:
             pass
 
     def clear_credentials(self):
-        try:
-            if os.path.exists(CREDENTIALS_FILE):
-                os.remove(CREDENTIALS_FILE)
-        except Exception:
-            pass
+        """Delete the keychain entry (and any legacy file)."""
+        if KEYRING_AVAILABLE:
+            try:
+                keyring.delete_password(KEYRING_SERVICE, KEYRING_ACCOUNT)
+            except Exception:
+                pass
+        self._cleanup_legacy_file()
 
     def init_login_ui(self):
         login_widget = QWidget()
@@ -699,12 +745,15 @@ class MediaHubApp(QMainWindow):
         self.worker.start()
 
     def on_login_success(self):
-        # Save credentials for next launch
+        # Save ONLY the derived keys to keychain - never the password
         self.save_credentials(
             self.url_input.text().strip(),
             self.user_input.text().strip(),
-            self.pass_input.text()
+            self.client.user_hash,
+            self.client.user_key,
         )
+        # Clear password from memory immediately
+        self.pass_input.clear()
         self.stack.setCurrentIndex(1)
         self.do_fetch_folders()
 

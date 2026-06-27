@@ -36,6 +36,11 @@ class MediaHubClient:
         self.user_hash = self.get_user_pid(store_key)
         self.user_key = user_key
 
+    def set_user_auth(self, user_hash: str, user_key: bytes):
+        """Restore authenticated session from stored keys (no password needed)."""
+        self.user_hash = user_hash
+        self.user_key = user_key
+
     def fetch_folders(self):
         if not self.user_hash:
             raise Exception("Not authenticated")
