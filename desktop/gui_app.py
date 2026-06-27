@@ -595,6 +595,7 @@ class MediaHubApp(QMainWindow):
         self.file_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.file_table.itemDoubleClicked.connect(self.do_view_file)
         self.file_table.setSortingEnabled(True)
+        self.file_table.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
         self.file_table.verticalHeader().setDefaultSectionSize(70)
         self.file_table.verticalHeader().hide()
         # Disable sorting on thumbnail column (col 0)
