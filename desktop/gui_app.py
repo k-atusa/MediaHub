@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                              QLabel, QLineEdit, QPushButton, QListWidget, QListWidgetItem, 
                              QStackedWidget, QFileDialog, QMessageBox, QInputDialog, QTableWidget,
                              QTableWidgetItem, QHeaderView, QProgressBar, QTextEdit)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl, QPoint, QPointF
 from PyQt6.QtGui import QFont, QIcon, QColor, QPixmap, QPainter, QImage
 try:
     from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
@@ -21,6 +21,15 @@ except ImportError:
 from mediahub_core import MediaHubClient
 from mediahub_proxy import MediaHubProxy
 import urllib.parse
+
+class SortableTableItem(QTableWidgetItem):
+    def __lt__(self, other):
+        # Sort by UserRole (numeric size) if available
+        data1 = self.data(Qt.ItemDataRole.UserRole)
+        data2 = other.data(Qt.ItemDataRole.UserRole)
+        if data1 is not None and data2 is not None:
+            return data1 < data2
+        return super().__lt__(other)
 
 class WorkerBase(QThread):
     error = pyqtSignal(str)
@@ -109,20 +118,64 @@ class ScalableImageLabel(QLabel):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._pixmap = None
+        self._scale_factor = 1.0
+        self._offset = QPointF(0, 0)
+        self._last_mouse_pos = QPoint()
 
     def setPixmap(self, pixmap):
         self._pixmap = pixmap
+        self._scale_factor = 1.0
+        self._offset = QPointF(0, 0)
         self.update()
+
+    def wheelEvent(self, event):
+        if not self._pixmap:
+            return
+        # Zoom in or out
+        angle = event.angleDelta().y()
+        zoom_step = 1.1 if angle > 0 else 0.9
+        
+        # Calculate cursor position relative to the image
+        cursor_pos = event.position()
+        
+        # Adjust offset so zooming centers on the mouse cursor
+        self._offset = cursor_pos - (cursor_pos - self._offset) * zoom_step
+        self._scale_factor *= zoom_step
+        
+        # Clamp scale factor to reasonable limits
+        self._scale_factor = max(0.1, min(self._scale_factor, 10.0))
+        self.update()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._last_mouse_pos = event.position()
+
+    def mouseMoveEvent(self, event):
+        if event.buttons() & Qt.MouseButton.LeftButton:
+            delta = event.position() - self._last_mouse_pos
+            self._offset += delta
+            self._last_mouse_pos = event.position()
+            self.update()
 
     def paintEvent(self, event):
         if not self._pixmap:
             return
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-        scaled_pixmap = self._pixmap.scaled(self.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-        x = (self.width() - scaled_pixmap.width()) // 2
-        y = (self.height() - scaled_pixmap.height()) // 2
-        painter.drawPixmap(x, y, scaled_pixmap)
+        
+        # We start by drawing the pixmap scaled to fit the window (if scale factor is 1)
+        # To do this correctly while allowing zoom/pan, we calculate the base scale to fit:
+        base_scaled = self._pixmap.scaled(self.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        
+        base_x = (self.width() - base_scaled.width()) / 2
+        base_y = (self.height() - base_scaled.height()) / 2
+        
+        painter.translate(self._offset)
+        painter.scale(self._scale_factor, self._scale_factor)
+        
+        # When zoomed in, we still draw from the base centered position
+        # so that it stays relative
+        painter.drawPixmap(int(base_x), int(base_y), base_scaled)
 
 class ViewerWindow(QMainWindow):
     def __init__(self, file_url, file_name, parent=None):
@@ -204,13 +257,59 @@ class ViewerWindow(QMainWindow):
         self.player.setVideoOutput(self.video_widget)
         self.player.setSource(QUrl(self.file_url))
         
+        from PyQt6.QtWidgets import QSlider
+        
+        # Seek Bar & Time
+        seek_layout = QHBoxLayout()
+        self.time_lbl = QLabel("00:00 / 00:00")
+        self.seek_slider = QSlider(Qt.Orientation.Horizontal)
+        self.seek_slider.setRange(0, 0)
+        self.seek_slider.sliderMoved.connect(self.set_position)
+        
+        self.player.positionChanged.connect(self.position_changed)
+        self.player.durationChanged.connect(self.duration_changed)
+        
+        seek_layout.addWidget(self.time_lbl)
+        seek_layout.addWidget(self.seek_slider)
+        self.layout.addLayout(seek_layout)
+        
+        # Controls & Volume
         controls = QHBoxLayout()
         play_btn = QPushButton("Play / Pause")
         play_btn.clicked.connect(self.toggle_play)
+        
+        vol_lbl = QLabel("Volume:")
+        self.vol_slider = QSlider(Qt.Orientation.Horizontal)
+        self.vol_slider.setRange(0, 100)
+        self.vol_slider.setValue(100)
+        self.vol_slider.valueChanged.connect(self.set_volume)
+        
         controls.addWidget(play_btn)
+        controls.addStretch()
+        controls.addWidget(vol_lbl)
+        controls.addWidget(self.vol_slider)
         
         self.layout.addLayout(controls)
         self.player.play()
+
+    def set_position(self, position):
+        self.player.setPosition(position)
+
+    def position_changed(self, position):
+        self.seek_slider.setValue(position)
+        self.update_time_label()
+
+    def duration_changed(self, duration):
+        self.seek_slider.setRange(0, duration)
+        self.update_time_label()
+
+    def update_time_label(self):
+        pos = self.player.position() // 1000
+        dur = self.player.duration() // 1000
+        self.time_lbl.setText(f"{pos//60:02d}:{pos%60:02d} / {dur//60:02d}:{dur%60:02d}")
+
+    def set_volume(self, volume):
+        self.audio_output.setVolume(volume / 100.0)
 
     def toggle_play(self):
         if hasattr(self, 'player'):
@@ -354,12 +453,17 @@ class MediaHubApp(QMainWindow):
         self.current_folder_label = QLabel("Select a folder")
         self.current_folder_label.setStyleSheet("font-size: 24px; font-weight: bold; margin-bottom: 10px;")
         
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Search files...")
+        self.search_input.textChanged.connect(self.filter_files)
+        
         self.file_table = QTableWidget(0, 2)
-        self.file_table.setHorizontalHeaderLabels(["Filename", "Size (Bytes)"])
+        self.file_table.setHorizontalHeaderLabels(["Filename", "Size"])
         self.file_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.file_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.file_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.file_table.itemDoubleClicked.connect(self.do_view_file)
+        self.file_table.setSortingEnabled(True)
         
         action_layout = QHBoxLayout()
         self.upload_btn = QPushButton("Upload Files")
@@ -386,6 +490,7 @@ class MediaHubApp(QMainWindow):
         """)
         
         content_layout.addWidget(self.current_folder_label)
+        content_layout.addWidget(self.search_input)
         content_layout.addWidget(self.file_table)
         content_layout.addLayout(action_layout)
         content_layout.addWidget(self.progress_bar)
@@ -395,6 +500,13 @@ class MediaHubApp(QMainWindow):
         layout.addWidget(content)
         main_widget.setLayout(layout)
         self.stack.addWidget(main_widget)
+
+    def filter_files(self, text):
+        search_text = text.lower()
+        for row in range(self.file_table.rowCount()):
+            item = self.file_table.item(row, 0)
+            if item:
+                self.file_table.setRowHidden(row, search_text not in item.text().lower())
 
     def do_login(self):
         url = self.url_input.text().strip()
@@ -453,20 +565,39 @@ class MediaHubApp(QMainWindow):
         self.worker.error.connect(lambda e: QMessageBox.critical(self, "Error", f"Failed to fetch files: {e}"))
         self.worker.start()
 
+    def format_size(self, size):
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if size < 1024.0:
+                return f"{size:.1f} {unit}" if unit != 'B' else f"{size} {unit}"
+            size /= 1024.0
+        return f"{size:.1f} PB"
+
     def on_files_fetched(self, pid, key, files):
         self.current_folder_pid = pid
         self.current_folder_key = key
         self.current_files_map = files
         self.proxy.update_context(self.client, files)
         
+        self.file_table.setSortingEnabled(False)
         self.file_table.setRowCount(0)
         from mediahub_core import Opsec
         for name, info in files.items():
             sz = Opsec.DecodeInt(info[44:52], False)
             row = self.file_table.rowCount()
             self.file_table.insertRow(row)
-            self.file_table.setItem(row, 0, QTableWidgetItem(name))
-            self.file_table.setItem(row, 1, QTableWidgetItem(str(sz)))
+            
+            name_item = SortableTableItem(name)
+            name_item.setData(Qt.ItemDataRole.UserRole, name.lower())
+            
+            size_item = SortableTableItem(self.format_size(sz))
+            size_item.setData(Qt.ItemDataRole.UserRole, sz)
+            
+            self.file_table.setItem(row, 0, name_item)
+            self.file_table.setItem(row, 1, size_item)
+            
+        self.file_table.setSortingEnabled(True)
+        # Re-apply filter if text exists
+        self.filter_files(self.search_input.text())
 
     def set_loading(self, loading=True):
         self.upload_btn.setEnabled(not loading)
