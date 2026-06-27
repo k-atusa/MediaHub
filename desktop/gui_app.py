@@ -318,6 +318,53 @@ class ViewerWindow(QMainWindow):
                 self.player.pause()
             else:
                 self.player.play()
+
+    def keyPressEvent(self, event):
+        if not hasattr(self, 'player'):
+            super().keyPressEvent(event)
+            return
+
+        key = event.key()
+        if key in (Qt.Key.Key_Up, Qt.Key.Key_Down):
+            vol = self.vol_slider.value()
+            new_vol = vol + 5 if key == Qt.Key.Key_Up else vol - 5
+            new_vol = max(0, min(100, new_vol))
+            self.vol_slider.setValue(new_vol)
+            self.show_overlay(f"Volume: {new_vol}%")
+        elif key in (Qt.Key.Key_Left, Qt.Key.Key_Right):
+            pos = self.player.position()
+            dur = self.player.duration()
+            offset = 10000 if key == Qt.Key.Key_Right else -10000
+            new_pos = max(0, min(dur, pos + offset))
+            self.player.setPosition(new_pos)
+            sign = "+10s" if offset > 0 else "-10s"
+            self.show_overlay(f"Seek: {sign}")
+        else:
+            super().keyPressEvent(event)
+
+    def show_overlay(self, text):
+        if not hasattr(self, 'overlay_lbl'):
+            self.overlay_lbl = QLabel(self.video_widget)
+            self.overlay_lbl.setStyleSheet("""
+                color: white;
+                background-color: rgba(0, 0, 0, 150);
+                padding: 10px;
+                border-radius: 5px;
+                font-size: 24px;
+                font-weight: bold;
+            """)
+            self.overlay_lbl.move(20, 20)
+            
+            from PyQt6.QtCore import QTimer
+            self.overlay_timer = QTimer(self)
+            self.overlay_timer.setSingleShot(True)
+            self.overlay_timer.timeout.connect(self.overlay_lbl.hide)
+            
+        self.overlay_lbl.setText(text)
+        self.overlay_lbl.adjustSize()
+        self.overlay_lbl.show()
+        self.overlay_lbl.raise_()
+        self.overlay_timer.start(1500)
             
     def show_pdf(self):
         if QWebEngineView is None:
