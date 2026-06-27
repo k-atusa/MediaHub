@@ -1,0 +1,10 @@
+pycryptodomex
+cryptography
+argon2-cffi
+pqcrypto
+requests
+numpy
+matplotlib
+opencv-python
+PyQt6
+urllib3
