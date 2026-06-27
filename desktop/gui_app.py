@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                              QStackedWidget, QFileDialog, QMessageBox, QInputDialog, QTableWidget,
                              QTableWidgetItem, QHeaderView, QProgressBar, QTextEdit)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl
-from PyQt6.QtGui import QFont, QIcon, QColor, QPixmap
+from PyQt6.QtGui import QFont, QIcon, QColor, QPixmap, QPainter, QImage
 try:
     from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
     from PyQt6.QtMultimediaWidgets import QVideoWidget
@@ -19,6 +19,8 @@ except ImportError:
     QWebEngineView = None
 
 from mediahub_core import MediaHubClient
+from mediahub_proxy import MediaHubProxy
+import urllib.parse
 
 class WorkerBase(QThread):
     error = pyqtSignal(str)
@@ -103,11 +105,29 @@ class DownloadWorker(WorkerBase):
         except Exception as e:
             self.error.emit(str(e))
 
+class ScalableImageLabel(QLabel):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._pixmap = None
+
+    def setPixmap(self, pixmap):
+        self._pixmap = pixmap
+        self.update()
+
+    def paintEvent(self, event):
+        if not self._pixmap:
+            return
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        scaled_pixmap = self._pixmap.scaled(self.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        x = (self.width() - scaled_pixmap.width()) // 2
+        y = (self.height() - scaled_pixmap.height()) // 2
+        painter.drawPixmap(x, y, scaled_pixmap)
 
 class ViewerWindow(QMainWindow):
-    def __init__(self, file_path, file_name, parent=None):
+    def __init__(self, file_url, file_name, parent=None):
         super().__init__(parent)
-        self.file_path = file_path
+        self.file_url = file_url
         self.setWindowTitle(f"MediaHub Viewer - {file_name}")
         self.resize(800, 600)
         self.setStyleSheet("""
@@ -139,35 +159,37 @@ class ViewerWindow(QMainWindow):
             self.layout.addWidget(lbl)
             
     def show_image(self):
-        self.lbl = QLabel()
-        self.pixmap = QPixmap(self.file_path)
-        self.lbl.setPixmap(self.pixmap.scaled(self.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
-        self.lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        import requests
+        self.lbl = ScalableImageLabel()
         self.layout.addWidget(self.lbl)
         
-    def resizeEvent(self, event):
-        if hasattr(self, 'lbl') and hasattr(self, 'pixmap'):
-            self.lbl.setPixmap(self.pixmap.scaled(self.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
-        super().resizeEvent(event)
+        try:
+            res = requests.get(self.file_url)
+            qimg = QImage.fromData(res.content)
+            self.pixmap = QPixmap.fromImage(qimg)
+            self.lbl.setPixmap(self.pixmap)
+        except Exception as e:
+            err = QLabel(f"Failed to load image: {e}")
+            self.layout.addWidget(err)
         
     def show_text(self):
+        import requests
         txt = QTextEdit()
         txt.setReadOnly(True)
         try:
-            with open(self.file_path, 'r', encoding='utf-8') as f:
-                txt.setText(f.read())
+            res = requests.get(self.file_url)
+            txt.setText(res.content.decode('utf-8', errors='replace'))
         except Exception as e:
             txt.setText(f"Error reading text file: {e}")
         self.layout.addWidget(txt)
         
     def show_video(self):
-        self.video_lbl = QLabel()
-        self.video_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.video_lbl = ScalableImageLabel()
         self.layout.addWidget(self.video_lbl)
         
         import cv2
         from PyQt6.QtCore import QTimer
-        self.cap = cv2.VideoCapture(self.file_path)
+        self.cap = cv2.VideoCapture(self.file_url)
         fps = self.cap.get(cv2.CAP_PROP_FPS)
         if fps <= 0: fps = 30
         
@@ -192,7 +214,7 @@ class ViewerWindow(QMainWindow):
             bytes_per_line = ch * w
             qimg = QImage(frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
             pixmap = QPixmap.fromImage(qimg)
-            self.video_lbl.setPixmap(pixmap.scaled(self.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+            self.video_lbl.setPixmap(pixmap)
         else:
             self.timer.stop()
             self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0) # Loop or just stop
@@ -212,7 +234,7 @@ class ViewerWindow(QMainWindow):
             return
             
         self.web = QWebEngineView()
-        self.web.load(QUrl.fromLocalFile(self.file_path))
+        self.web.load(QUrl(self.file_url))
         self.layout.addWidget(self.web)
         
     def closeEvent(self, event):
@@ -222,19 +244,15 @@ class ViewerWindow(QMainWindow):
             self.cap.release()
         if hasattr(self, 'web') and self.web is not None:
             self.web.load(QUrl(""))
-        
-        # Delete temporary file securely when viewer is closed
-        if os.path.exists(self.file_path):
-            try:
-                os.remove(self.file_path)
-            except Exception as e:
-                print(f"Failed to delete temp file: {e}")
+            
         super().closeEvent(event)
 
 
 class MediaHubApp(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.proxy = MediaHubProxy(port=18080)
+        self.proxy.start()
         self.client = None
         self.current_folder_name = None
         self.current_folder_pid = None
@@ -446,6 +464,7 @@ class MediaHubApp(QMainWindow):
         self.current_folder_pid = pid
         self.current_folder_key = key
         self.current_files_map = files
+        self.proxy.update_context(self.client, files)
         
         self.file_table.setRowCount(0)
         from mediahub_core import Opsec
@@ -536,27 +555,22 @@ class MediaHubApp(QMainWindow):
             QMessageBox.warning(self, "Warning", "Select a file to view")
             return
             
-        self.set_loading(True)
         row = selected_rows[0].row()
         file_name = self.file_table.item(row, 0).text()
-        fl_info = self.current_files_map[file_name]
         
-        import tempfile
-        out_dir = tempfile.gettempdir()
+        encoded_name = urllib.parse.quote(file_name)
+        stream_url = f"http://127.0.0.1:18080/stream/{self.current_folder_pid}/{encoded_name}"
         
-        self.worker = DownloadWorker(self.client, self.current_folder_pid, fl_info, file_name, out_dir)
-        self.worker.success.connect(self.on_view_download_success)
-        self.worker.error.connect(self.on_op_error)
-        self.worker.start()
-
-    def on_view_download_success(self, out_path):
-        self.set_loading(False)
-        self.viewer = ViewerWindow(out_path, os.path.basename(out_path), parent=self)
+        self.viewer = ViewerWindow(stream_url, file_name, parent=self)
         self.viewer.show()
 
     def on_op_error(self, err):
         self.set_loading(False)
         QMessageBox.critical(self, "Error", str(err))
+        
+    def closeEvent(self, event):
+        self.proxy.stop()
+        super().closeEvent(event)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
