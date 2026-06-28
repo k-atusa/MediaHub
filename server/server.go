@@ -71,12 +71,18 @@ func initEnv() {
 	}
 }
 
+// return error with 1.5s delay
+func postError(w http.ResponseWriter, error string, code int) {
+	time.Sleep(1500 * time.Millisecond)
+	http.Error(w, error, code)
+}
+
 // handles userdata
 func serveUser(w http.ResponseWriter, r *http.Request) {
 	// URL: /api/userdata/{user_hash}
 	userHash := strings.TrimPrefix(r.URL.Path, "/api/userdata/")
 	if userHash == "" || strings.Contains(userHash, "/") {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
+		postError(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
@@ -101,12 +107,12 @@ func serveUser(w http.ResponseWriter, r *http.Request) {
 			// check old account or invite code
 			if oldPath != "" {
 				if info, err := os.Stat(oldPath); err != nil || info.IsDir() {
-					http.Error(w, "Invalid Old User", http.StatusForbidden)
+					postError(w, "Invalid Old User", http.StatusForbidden)
 					return
 				}
 			} else {
 				if r.Header.Get("X-Invite-Code") != cfg.InviteCode {
-					http.Error(w, "Invalid Invite Code", http.StatusForbidden)
+					postError(w, "Invalid Invite Code", http.StatusForbidden)
 					return
 				}
 			}
@@ -118,7 +124,7 @@ func serveUser(w http.ResponseWriter, r *http.Request) {
 		os.Remove(path)
 		w.WriteHeader(http.StatusOK)
 	default:
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		postError(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
 }
 
@@ -128,16 +134,37 @@ func serveMeta(w http.ResponseWriter, r *http.Request) {
 	target := strings.TrimPrefix(r.URL.Path, "/api/storage/")
 	parts := strings.Split(target, "/")
 	if len(parts) < 2 {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
+		postError(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
 	folderID, metaType := parts[0], parts[1]
 	if metaType != "names" {
-		http.Error(w, "Invalid Metadata Type", http.StatusBadRequest)
+		postError(w, "Invalid Metadata Type", http.StatusBadRequest)
 		return
 	}
 
 	path := filepath.Join(cfg.StorageDir, "data", filepath.Clean(folderID), "names")
+	isCreation := false
+	if r.Method == http.MethodPost {
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			isCreation = true
+		}
+	}
+
+	// Folder creation or deletion needs user validation
+	if r.Method == http.MethodDelete || isCreation {
+		userHash := r.Header.Get("X-User-Hash")
+		if userHash == "" || strings.Contains(userHash, "/") || strings.Contains(userHash, "\\") {
+			postError(w, "Bad Request: Invalid User Hash", http.StatusBadRequest)
+			return
+		}
+		userPath := filepath.Join(cfg.StorageDir, "users", filepath.Clean(userHash))
+		if info, err := os.Stat(userPath); os.IsNotExist(err) || info.IsDir() {
+			postError(w, "Invalid User", http.StatusForbidden)
+			return
+		}
+	}
+
 	switch r.Method {
 	case http.MethodGet: // read metadata
 		http.ServeFile(w, r, path)
@@ -148,7 +175,7 @@ func serveMeta(w http.ResponseWriter, r *http.Request) {
 		os.RemoveAll(filepath.Dir(path))
 		w.WriteHeader(http.StatusOK)
 	default:
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		postError(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
 }
 
@@ -158,12 +185,12 @@ func serveMedia(w http.ResponseWriter, r *http.Request) {
 	target := strings.TrimPrefix(r.URL.Path, "/api/media/")
 	parts := strings.Split(target, "/")
 	if len(parts) < 3 {
-		http.Error(w, "Folder/File ID and Data Type(dat/thumb) Required", http.StatusBadRequest)
+		postError(w, "Folder/File ID and Data Type(dat/thumb) Required", http.StatusBadRequest)
 		return
 	}
 	folderID, fileID, dataType := parts[0], parts[1], parts[2]
 	if dataType != "dat" && dataType != "thumb" {
-		http.Error(w, "Invalid Data Type", http.StatusBadRequest)
+		postError(w, "Invalid Data Type", http.StatusBadRequest)
 		return
 	}
 
@@ -177,20 +204,30 @@ func serveMedia(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Accept-Ranges", "bytes")
 		http.ServeFile(w, r, path)
 	case http.MethodPost: // create/update media file
+		userHash := r.Header.Get("X-User-Hash")
+		if userHash == "" || strings.Contains(userHash, "/") || strings.Contains(userHash, "\\") {
+			postError(w, "Bad Request: Invalid User Hash", http.StatusBadRequest)
+			return
+		}
+		userPath := filepath.Join(cfg.StorageDir, "users", filepath.Clean(userHash))
+		if info, err := os.Stat(userPath); os.IsNotExist(err) || info.IsDir() {
+			postError(w, "Invalid User", http.StatusForbidden)
+			return
+		}
 		os.MkdirAll(filepath.Dir(path), 0755)
 		save(w, r, path)
 	case http.MethodDelete: // delete media file
 		os.Remove(path)
 		w.WriteHeader(http.StatusOK)
 	default:
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		postError(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
 }
 
 // handles notice fetch
 func serveNotice(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		postError(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -201,13 +238,13 @@ func serveNotice(w http.ResponseWriter, r *http.Request) {
 func save(w http.ResponseWriter, r *http.Request, path string) {
 	out, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		postError(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 	defer out.Close()
 
 	if _, err = io.Copy(out, r.Body); err != nil {
-		http.Error(w, "Write Fault", http.StatusInternalServerError)
+		postError(w, "Write Fault", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
@@ -218,7 +255,7 @@ func save(w http.ResponseWriter, r *http.Request, path string) {
 func cors(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.URL.Path, "..") || strings.Contains(r.URL.Path, "\\") { // block directory traversal
-			http.Error(w, "Directory Traversal Detected", http.StatusBadRequest)
+			postError(w, "Directory Traversal Detected", http.StatusBadRequest)
 			return
 		}
 

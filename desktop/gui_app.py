@@ -1,9 +1,13 @@
 import sys
 import os
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-                             QLabel, QLineEdit, QPushButton, QListWidget, QListWidgetItem, 
+import json
+import unicodedata
+import urllib.parse
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+                             QLabel, QLineEdit, QPushButton, QListWidget, QListWidgetItem,
                              QStackedWidget, QFileDialog, QMessageBox, QInputDialog, QTableWidget,
-                             QTableWidgetItem, QHeaderView, QProgressBar, QTextEdit, QSlider, QStyle)
+                             QTableWidgetItem, QHeaderView, QProgressBar, QTextEdit, QSlider,
+                             QStyle, QCheckBox)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl, QPoint, QPointF
 from PyQt6.QtGui import QFont, QIcon, QColor, QPixmap, QPainter, QImage
 try:
@@ -18,223 +22,213 @@ try:
 except ImportError:
     QWebEngineView = None
 
-from mediahub_core import MediaHubClient
-from mediahub_proxy import MediaHubProxy
-import urllib.parse
-import json
+from mediahub_core import MHClient
+from mediahub_proxy import MHProxy
+import Opsec
+
 try:
     import keyring
-    KEYRING_AVAILABLE = True
+    HAS_KEYRING = True
 except ImportError:
-    KEYRING_AVAILABLE = False
+    HAS_KEYRING = False
 
-KEYRING_SERVICE  = "mediahub"
-KEYRING_ACCOUNT  = "session"  # single fixed entry; all data stored as JSON
-# Legacy file to clean up on first run
-_LEGACY_CREDS_FILE = os.path.join(os.path.expanduser("."), ".mediahub_credentials.json")
+KR_SVC = "mediahub"
+KR_ACC = "session"
 
-class SortableTableItem(QTableWidgetItem):
+
+# --- Utility Widgets ---
+
+class SortItem(QTableWidgetItem):
     def __lt__(self, other):
-        # Sort by UserRole (numeric size) if available
-        data1 = self.data(Qt.ItemDataRole.UserRole)
-        data2 = other.data(Qt.ItemDataRole.UserRole)
-        if data1 is not None and data2 is not None:
-            return data1 < data2
+        d1 = self.data(Qt.ItemDataRole.UserRole)
+        d2 = other.data(Qt.ItemDataRole.UserRole)
+        if d1 is not None and d2 is not None:
+            return d1 < d2
         return super().__lt__(other)
 
-class ClickableSlider(QSlider):
-    """QSlider that jumps to the clicked position on a single click."""
+
+class ClickSldr(QSlider):
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             val = QStyle.sliderValueFromPosition(
                 self.minimum(), self.maximum(),
-                int(event.position().x()), self.width()
-            )
+                int(event.position().x()), self.width())
             self.setValue(val)
             self.sliderMoved.emit(val)
         super().mousePressEvent(event)
 
-class WorkerBase(QThread):
+
+class ScaleLabel(QLabel):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._pm = None
+        self._sc = 1.0
+        self._off = QPointF(0, 0)
+        self._last = QPoint()
+
+    def setPixmap(self, pm):
+        self._pm = pm
+        self._sc = 1.0
+        self._off = QPointF(0, 0)
+        self.update()
+
+    def wheelEvent(self, ev):
+        if not self._pm:
+            return
+        step = 1.1 if ev.angleDelta().y() > 0 else 0.9
+        pos = ev.position()
+        self._off = pos - (pos - self._off) * step
+        self._sc = max(0.1, min(self._sc * step, 10.0))
+        self.update()
+
+    def mousePressEvent(self, ev):
+        if ev.button() == Qt.MouseButton.LeftButton:
+            self._last = ev.position()
+
+    def mouseMoveEvent(self, ev):
+        if ev.buttons() & Qt.MouseButton.LeftButton:
+            self._off += ev.position() - self._last
+            self._last = ev.position()
+            self.update()
+
+    def paintEvent(self, ev):
+        if not self._pm:
+            return
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        sc = self._pm.scaled(self.size(), Qt.AspectRatioMode.KeepAspectRatio,
+                             Qt.TransformationMode.SmoothTransformation)
+        bx = (self.width() - sc.width()) / 2
+        by = (self.height() - sc.height()) / 2
+        p.translate(self._off)
+        p.scale(self._sc, self._sc)
+        p.drawPixmap(int(bx), int(by), sc)
+
+
+# --- Worker Threads ---
+
+class WkBase(QThread):
     error = pyqtSignal(str)
 
-class LoginWorker(WorkerBase):
+
+class WkLogin(WkBase):
     success = pyqtSignal()
-    
-    def __init__(self, client):
+
+    def __init__(self, cli):
         super().__init__()
-        self.client = client
-        
+        self.cli = cli
+
     def run(self):
         try:
-            self.client.authenticate()
+            self.cli.auth()
             self.success.emit()
         except Exception as e:
             self.error.emit(str(e))
 
-class FetchFoldersWorker(WorkerBase):
+
+class WkFlds(WkBase):
     success = pyqtSignal(dict)
-    
-    def __init__(self, client):
+
+    def __init__(self, cli):
         super().__init__()
-        self.client = client
-        
+        self.cli = cli
+
     def run(self):
         try:
-            folders = self.client.fetch_folders()
-            self.success.emit(folders)
+            self.success.emit(self.cli.getFlds())
         except Exception as e:
             self.error.emit(str(e))
 
-class FetchFilesWorker(WorkerBase):
+
+class WkFiles(WkBase):
     success = pyqtSignal(str, bytes, dict)
-    
-    def __init__(self, client, folder_name):
+
+    def __init__(self, cli, name):
         super().__init__()
-        self.client = client
-        self.folder_name = folder_name
-        
+        self.cli = cli
+        self.name = name
+
     def run(self):
         try:
-            pid, key, files = self.client.fetch_files(self.folder_name)
+            pid, key, files = self.cli.getFiles(self.name)
             self.success.emit(pid, key, files)
         except Exception as e:
             self.error.emit(str(e))
 
-class UploadWorker(WorkerBase):
+
+class WkUpload(WkBase):
     success = pyqtSignal()
-    progress = pyqtSignal(int, int, float)  # bytes_sent, total_bytes, speed_bps
-    
-    def __init__(self, client, folder_pid, folder_key, fls_map, filepaths):
+    progress = pyqtSignal(int, int, float)
+
+    def __init__(self, cli, fPid, fKey, flMap, paths):
         super().__init__()
-        self.client = client
-        self.folder_pid = folder_pid
-        self.folder_key = folder_key
-        self.fls_map = fls_map
-        self.filepaths = filepaths
-        
+        self.cli = cli
+        self.fPid = fPid
+        self.fKey = fKey
+        self.flMap = flMap
+        self.paths = paths
+
     def run(self):
         try:
-            for fp in self.filepaths:
-                self.client.upload_file(
-                    self.folder_pid, self.folder_key, self.fls_map, fp,
-                    progress_callback=lambda s, t, spd: self.progress.emit(s, t, spd)
-                )
+            for fp in self.paths:
+                self.cli.upFile(
+                    self.fPid, self.fKey, self.flMap, fp,
+                    progCb=lambda s, t, spd: self.progress.emit(s, t, spd))
             self.success.emit()
         except Exception as e:
             self.error.emit(str(e))
 
-class DownloadWorker(WorkerBase):
+
+class WkDown(WkBase):
     success = pyqtSignal(str)
-    
-    def __init__(self, client, folder_pid, fl_info, file_name, out_dir):
+
+    def __init__(self, cli, fPid, flInfo, name, outDir):
         super().__init__()
-        self.client = client
-        self.folder_pid = folder_pid
-        self.fl_info = fl_info
-        self.file_name = file_name
-        self.out_dir = out_dir
-        
+        self.cli = cli
+        self.fPid = fPid
+        self.flInfo = flInfo
+        self.name = name
+        self.outDir = outDir
+
     def run(self):
         try:
-            out_path = self.client.download_file(self.folder_pid, self.fl_info, self.file_name, self.out_dir)
-            self.success.emit(out_path)
+            self.success.emit(self.cli.dnFile(self.fPid, self.flInfo, self.name, self.outDir))
         except Exception as e:
             self.error.emit(str(e))
 
-class ThumbnailWorker(WorkerBase):
-    success = pyqtSignal(int, QPixmap)
 
-    def __init__(self, client, folder_pid, file_pid, file_key_bytes, row):
+class WkThumb(WkBase):
+    success = pyqtSignal(str, bytes)  # fpid, raw image bytes
+
+    def __init__(self, cli, fPid, fpid, fkBytes):
         super().__init__()
-        self.client = client
-        self.folder_pid = folder_pid
-        self.file_pid = file_pid
-        self.file_key_bytes = file_key_bytes
-        self.row = row
+        self.cli = cli
+        self.fPid = fPid
+        self.fpid = fpid
+        self.fkBytes = fkBytes
 
     def run(self):
         try:
             import requests
             import Bencrypt
-            url = f"{self.client.server_url}/api/media/{self.folder_pid}/{self.file_pid}/thumb"
+            url = f"{self.cli.url}/api/media/{self.fPid}/{self.fpid}/thumb"
             res = requests.get(url, verify=False)
             if res.status_code == 200 and res.content:
-                sm = Bencrypt.SymMaster("gcm1", self.file_key_bytes[:32])
+                sm = Bencrypt.SymMaster("gcm1", self.fkBytes[:32])
                 raw = sm.DeBin(res.content)
-                pixmap = QPixmap.fromImage(QImage.fromData(raw))
-                if not pixmap.isNull():
-                    self.success.emit(self.row, pixmap)
+                if raw:
+                    self.success.emit(self.fpid, raw)
         except Exception:
             pass
 
-class ScalableImageLabel(QLabel):
-    def __init__(self, parent=None):
+
+# --- Viewer Window ---
+
+class Viewer(QMainWindow):
+    def __init__(self, fileUrl, fileName, parent=None):
         super().__init__(parent)
-        self._pixmap = None
-        self._scale_factor = 1.0
-        self._offset = QPointF(0, 0)
-        self._last_mouse_pos = QPoint()
-
-    def setPixmap(self, pixmap):
-        self._pixmap = pixmap
-        self._scale_factor = 1.0
-        self._offset = QPointF(0, 0)
-        self.update()
-
-    def wheelEvent(self, event):
-        if not self._pixmap:
-            return
-        # Zoom in or out
-        angle = event.angleDelta().y()
-        zoom_step = 1.1 if angle > 0 else 0.9
-        
-        # Calculate cursor position relative to the image
-        cursor_pos = event.position()
-        
-        # Adjust offset so zooming centers on the mouse cursor
-        self._offset = cursor_pos - (cursor_pos - self._offset) * zoom_step
-        self._scale_factor *= zoom_step
-        
-        # Clamp scale factor to reasonable limits
-        self._scale_factor = max(0.1, min(self._scale_factor, 10.0))
-        self.update()
-
-    def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-            self._last_mouse_pos = event.position()
-
-    def mouseMoveEvent(self, event):
-        if event.buttons() & Qt.MouseButton.LeftButton:
-            delta = event.position() - self._last_mouse_pos
-            self._offset += delta
-            self._last_mouse_pos = event.position()
-            self.update()
-
-    def paintEvent(self, event):
-        if not self._pixmap:
-            return
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-        
-        # We start by drawing the pixmap scaled to fit the window (if scale factor is 1)
-        # To do this correctly while allowing zoom/pan, we calculate the base scale to fit:
-        base_scaled = self._pixmap.scaled(self.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-        
-        base_x = (self.width() - base_scaled.width()) / 2
-        base_y = (self.height() - base_scaled.height()) / 2
-        
-        painter.translate(self._offset)
-        painter.scale(self._scale_factor, self._scale_factor)
-        
-        # When zoomed in, we still draw from the base centered position
-        # so that it stays relative
-        painter.drawPixmap(int(base_x), int(base_y), base_scaled)
-
-class ViewerWindow(QMainWindow):
-    def __init__(self, file_url, file_name, parent=None):
-        super().__init__(parent)
-        self.file_url = file_url
-        self.setWindowTitle(f"MediaHub Viewer - {file_name}")
+        self.fileUrl = fileUrl
+        self.setWindowTitle(f"MediaHub - {fileName}")
         self.resize(800, 600)
         self.setStyleSheet("""
             QMainWindow { background-color: #121212; color: #FFFFFF; }
@@ -244,126 +238,100 @@ class ViewerWindow(QMainWindow):
             QPushButton { background-color: #BB86FC; color: #000; border: none; border-radius: 6px; padding: 10px 20px; font-weight: bold; }
             QPushButton:hover { background-color: #9965f4; }
         """)
-        
-        self.central_widget = QWidget()
-        self.setCentralWidget(self.central_widget)
-        self.layout = QVBoxLayout(self.central_widget)
-        self.layout.setContentsMargins(10,10,10,10)
-        
-        ext = file_name.split('.')[-1].lower()
+
+        self.cw = QWidget()
+        self.setCentralWidget(self.cw)
+        self.lay = QVBoxLayout(self.cw)
+        self.lay.setContentsMargins(10, 10, 10, 10)
+
+        ext = fileName.split('.')[-1].lower()
         if ext in ['png', 'jpg', 'jpeg', 'gif', 'webp']:
-            self.show_image()
+            self._showImg()
         elif ext in ['mp4', 'webm', 'mov', 'mkv']:
-            self.show_video()
+            self._showVid()
         elif ext in ['txt', 'md', 'csv', 'py', 'json', 'log']:
-            self.show_text()
-        elif ext in ['pdf']:
-            self.show_pdf()
+            self._showTxt()
+        elif ext == 'pdf':
+            self._showPdf()
         else:
             lbl = QLabel("Unsupported file type for internal viewer.")
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.layout.addWidget(lbl)
-            
-    def show_image(self):
+            self.lay.addWidget(lbl)
+
+    def _showImg(self):
         import requests
-        self.lbl = ScalableImageLabel()
-        self.layout.addWidget(self.lbl)
-        
+        self.lbl = ScaleLabel()
+        self.lay.addWidget(self.lbl)
         try:
-            res = requests.get(self.file_url)
-            qimg = QImage.fromData(res.content)
-            self.pixmap = QPixmap.fromImage(qimg)
-            self.lbl.setPixmap(self.pixmap)
+            res = requests.get(self.fileUrl)
+            self.lbl.setPixmap(QPixmap.fromImage(QImage.fromData(res.content)))
         except Exception as e:
-            err = QLabel(f"Failed to load image: {e}")
-            self.layout.addWidget(err)
-        
-    def show_text(self):
+            self.lay.addWidget(QLabel(f"Failed to load image: {e}"))
+
+    def _showTxt(self):
         import requests
         txt = QTextEdit()
         txt.setReadOnly(True)
         try:
-            res = requests.get(self.file_url)
+            res = requests.get(self.fileUrl)
             txt.setText(res.content.decode('utf-8', errors='replace'))
         except Exception as e:
-            txt.setText(f"Error reading text file: {e}")
-        self.layout.addWidget(txt)
-        
-    def show_video(self):
+            txt.setText(f"Error: {e}")
+        self.lay.addWidget(txt)
+
+    def _showVid(self):
         try:
             from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
             from PyQt6.QtMultimediaWidgets import QVideoWidget
         except ImportError:
-            lbl = QLabel("QtMultimedia is not available on this system.")
+            lbl = QLabel("QtMultimedia is not available.")
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.layout.addWidget(lbl)
+            self.lay.addWidget(lbl)
             return
 
-        self.video_widget = QVideoWidget()
-        self.layout.addWidget(self.video_widget)
-        
+        self.vidW = QVideoWidget()
+        self.lay.addWidget(self.vidW)
         self.player = QMediaPlayer()
-        self.audio_output = QAudioOutput()
-        self.audio_output.setVolume(1.0)
-        
-        self.player.setAudioOutput(self.audio_output)
-        self.player.setVideoOutput(self.video_widget)
-        self.player.setSource(QUrl(self.file_url))
-        
-        # Seek Bar & Time
-        seek_layout = QHBoxLayout()
-        self.time_lbl = QLabel("00:00 / 00:00")
-        self.seek_slider = ClickableSlider(Qt.Orientation.Horizontal)
-        self.seek_slider.setRange(0, 0)
-        self.seek_slider.sliderMoved.connect(self.set_position)
-        
-        self.player.positionChanged.connect(self.position_changed)
-        self.player.durationChanged.connect(self.duration_changed)
-        
-        seek_layout.addWidget(self.time_lbl)
-        seek_layout.addWidget(self.seek_slider)
-        self.layout.addLayout(seek_layout)
-        
-        # Controls & Volume
-        controls = QHBoxLayout()
-        play_btn = QPushButton("Play / Pause")
-        play_btn.clicked.connect(self.toggle_play)
-        
-        vol_lbl = QLabel("Volume:")
-        self.vol_slider = QSlider(Qt.Orientation.Horizontal)
-        self.vol_slider.setRange(0, 100)
-        self.vol_slider.setValue(100)
-        self.vol_slider.valueChanged.connect(self.set_volume)
-        
-        controls.addWidget(play_btn)
-        controls.addStretch()
-        controls.addWidget(vol_lbl)
-        controls.addWidget(self.vol_slider)
-        
-        self.layout.addLayout(controls)
+        self.audio = QAudioOutput()
+        self.audio.setVolume(1.0)
+        self.player.setAudioOutput(self.audio)
+        self.player.setVideoOutput(self.vidW)
+        self.player.setSource(QUrl(self.fileUrl))
+
+        # seek bar
+        seekLay = QHBoxLayout()
+        self.timeLbl = QLabel("00:00 / 00:00")
+        self.seekBar = ClickSldr(Qt.Orientation.Horizontal)
+        self.seekBar.setRange(0, 0)
+        self.seekBar.sliderMoved.connect(self.player.setPosition)
+        self.player.positionChanged.connect(self._onPos)
+        self.player.durationChanged.connect(lambda d: self.seekBar.setRange(0, d))
+        seekLay.addWidget(self.timeLbl)
+        seekLay.addWidget(self.seekBar)
+        self.lay.addLayout(seekLay)
+
+        # controls
+        ctrlLay = QHBoxLayout()
+        playBtn = QPushButton("Play / Pause")
+        playBtn.clicked.connect(self._toggle)
+        volLbl = QLabel("Volume:")
+        self.volSldr = QSlider(Qt.Orientation.Horizontal)
+        self.volSldr.setRange(0, 100)
+        self.volSldr.setValue(100)
+        self.volSldr.valueChanged.connect(lambda v: self.audio.setVolume(v / 100.0))
+        ctrlLay.addWidget(playBtn)
+        ctrlLay.addStretch()
+        ctrlLay.addWidget(volLbl)
+        ctrlLay.addWidget(self.volSldr)
+        self.lay.addLayout(ctrlLay)
         self.player.play()
 
+    def _onPos(self, pos):
+        self.seekBar.setValue(pos)
+        p, d = pos // 1000, self.player.duration() // 1000
+        self.timeLbl.setText(f"{p//60:02d}:{p%60:02d} / {d//60:02d}:{d%60:02d}")
 
-    def set_position(self, position):
-        self.player.setPosition(position)
-
-    def position_changed(self, position):
-        self.seek_slider.setValue(position)
-        self.update_time_label()
-
-    def duration_changed(self, duration):
-        self.seek_slider.setRange(0, duration)
-        self.update_time_label()
-
-    def update_time_label(self):
-        pos = self.player.position() // 1000
-        dur = self.player.duration() // 1000
-        self.time_lbl.setText(f"{pos//60:02d}:{pos%60:02d} / {dur//60:02d}:{dur%60:02d}")
-
-    def set_volume(self, volume):
-        self.audio_output.setVolume(volume / 100.0)
-
-    def toggle_play(self):
+    def _toggle(self):
         if hasattr(self, 'player'):
             from PyQt6.QtMultimedia import QMediaPlayer
             if self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
@@ -371,108 +339,91 @@ class ViewerWindow(QMainWindow):
             else:
                 self.player.play()
 
-    def keyPressEvent(self, event):
+    def keyPressEvent(self, ev):
         if not hasattr(self, 'player'):
-            super().keyPressEvent(event)
+            super().keyPressEvent(ev)
             return
-
-        key = event.key()
+        key = ev.key()
         if key == Qt.Key.Key_Space:
             from PyQt6.QtMultimedia import QMediaPlayer
             if self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
                 self.player.pause()
-                self.show_overlay("⏸  Paused")
+                self._overlay("⏸  Paused")
             else:
                 self.player.play()
-                self.show_overlay("▶  Playing")
+                self._overlay("▶  Playing")
         elif key in (Qt.Key.Key_Up, Qt.Key.Key_Down):
-            vol = self.vol_slider.value()
-            new_vol = vol + 5 if key == Qt.Key.Key_Up else vol - 5
-            new_vol = max(0, min(100, new_vol))
-            self.vol_slider.setValue(new_vol)
-            self.show_overlay(f"Volume: {new_vol}%")
+            v = self.volSldr.value() + (5 if key == Qt.Key.Key_Up else -5)
+            v = max(0, min(100, v))
+            self.volSldr.setValue(v)
+            self._overlay(f"Volume: {v}%")
         elif key in (Qt.Key.Key_Left, Qt.Key.Key_Right):
-            pos = self.player.position()
-            dur = self.player.duration()
-            offset = 10000 if key == Qt.Key.Key_Right else -10000
-            new_pos = max(0, min(dur, pos + offset))
-            self.player.setPosition(new_pos)
-            sign = "+10s" if offset > 0 else "-10s"
-            self.show_overlay(f"Seek: {sign}")
+            off = 10000 if key == Qt.Key.Key_Right else -10000
+            self.player.setPosition(max(0, min(self.player.duration(), self.player.position() + off)))
+            self._overlay(f"Seek: {'+10s' if off > 0 else '-10s'}")
         else:
-            super().keyPressEvent(event)
+            super().keyPressEvent(ev)
 
-    def show_overlay(self, text):
-        if not hasattr(self, 'overlay_lbl'):
-            # On macOS, native video renderer draws over child widgets.
-            # Solution: create a separate frameless, always-on-top window.
-            self.overlay_lbl = QLabel()
-            self.overlay_lbl.setWindowFlags(
+    def _overlay(self, text):
+        if not hasattr(self, '_ovLbl'):
+            self._ovLbl = QLabel()
+            self._ovLbl.setWindowFlags(
                 Qt.WindowType.FramelessWindowHint |
                 Qt.WindowType.WindowStaysOnTopHint |
-                Qt.WindowType.Tool
-            )
-            self.overlay_lbl.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-            self.overlay_lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-            self.overlay_lbl.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
-            self.overlay_lbl.setStyleSheet("""
-                QLabel {
-                    color: white;
-                    background-color: rgba(0, 0, 0, 180);
-                    padding: 12px 18px;
-                    border-radius: 8px;
-                    font-size: 22px;
-                    font-weight: bold;
-                }
+                Qt.WindowType.Tool)
+            self._ovLbl.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+            self._ovLbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+            self._ovLbl.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+            self._ovLbl.setStyleSheet("""
+                QLabel { color: white; background-color: rgba(0,0,0,180);
+                         padding: 12px 18px; border-radius: 8px;
+                         font-size: 22px; font-weight: bold; }
             """)
-
             from PyQt6.QtCore import QTimer
-            self.overlay_timer = QTimer(self)
-            self.overlay_timer.setSingleShot(True)
-            self.overlay_timer.timeout.connect(self.overlay_lbl.hide)
+            self._ovTimer = QTimer(self)
+            self._ovTimer.setSingleShot(True)
+            self._ovTimer.timeout.connect(self._ovLbl.hide)
 
-        self.overlay_lbl.setText(text)
-        self.overlay_lbl.adjustSize()
+        self._ovLbl.setText(text)
+        self._ovLbl.adjustSize()
+        gp = self.vidW.mapToGlobal(self.vidW.rect().topLeft())
+        self._ovLbl.move(gp.x() + 20, gp.y() + 20)
+        self._ovLbl.show()
+        self._ovLbl.raise_()
+        self._ovTimer.start(1500)
 
-        # Position over the video widget using global screen coordinates
-        global_pos = self.video_widget.mapToGlobal(self.video_widget.rect().topLeft())
-        self.overlay_lbl.move(global_pos.x() + 20, global_pos.y() + 20)
-        self.overlay_lbl.show()
-        self.overlay_lbl.raise_()
-        self.overlay_timer.start(1500)
-            
-    def show_pdf(self):
+    def _showPdf(self):
         if QWebEngineView is None:
-            lbl = QLabel("PyQt6-WebEngine is not installed.\nPlease run: pip install PyQt6-WebEngine")
+            lbl = QLabel("PyQt6-WebEngine is not installed.\nRun: pip install PyQt6-WebEngine")
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.layout.addWidget(lbl)
+            self.lay.addWidget(lbl)
             return
-            
         self.web = QWebEngineView()
-        self.web.load(QUrl(self.file_url))
-        self.layout.addWidget(self.web)
-        
-    def closeEvent(self, event):
+        self.web.load(QUrl(self.fileUrl))
+        self.lay.addWidget(self.web)
+
+    def closeEvent(self, ev):
         if hasattr(self, 'player'):
             self.player.stop()
             self.player.setSource(QUrl(""))
         if hasattr(self, 'web') and self.web is not None:
             self.web.load(QUrl(""))
-            
-        super().closeEvent(event)
+        super().closeEvent(ev)
 
 
-class MediaHubApp(QMainWindow):
+# --- Main Application ---
+
+class MHApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.proxy = MediaHubProxy(port=18080)
+        self.proxy = MHProxy(port=18080)
         self.proxy.start()
-        self.client = None
-        self.current_folder_name = None
-        self.current_folder_pid = None
-        self.current_folder_key = None
-        self.current_files_map = {}
-        
+        self.cli = None
+        self.curFld = None
+        self.curPid = None
+        self.curKey = None
+        self.curFiles = {}
+
         self.setWindowTitle("MediaHub Desktop")
         self.resize(1000, 700)
         self.setStyleSheet("""
@@ -488,513 +439,469 @@ class MediaHubApp(QMainWindow):
             QListWidget::item:selected, QTableWidget::item:selected { background-color: #BB86FC; color: #000; }
             QHeaderView::section { background-color: #1E1E1E; color: #BB86FC; padding: 5px; border: none; font-weight: bold; }
             QTableWidget QTableCornerButton::section { background-color: #1E1E1E; }
+            QCheckBox { color: #E0E0E0; spacing: 6px; }
+            QCheckBox::indicator { width: 16px; height: 16px; }
         """)
-        
+
         self.stack = QStackedWidget()
         self.setCentralWidget(self.stack)
-        
-        self.init_login_ui()
-        self.init_main_ui()
-        
-        # Clean up any old plaintext credentials file from previous versions
-        self._cleanup_legacy_file()
+        self._initLog()
+        self._initMain()
 
-        # Try auto-login from keychain
-        creds = self.load_credentials()
-        if creds:
-            # Restore session from derived keys - no password needed
-            url = creds['url']
-            username = creds['username']
-            user_hash = creds['user_hash']
-            user_key = creds['user_key']
-            self.url_input.setText(url)
-            self.user_input.setText(username)
-            self.client = MediaHubClient(url, username, "")
-            self.client.set_user_auth(user_hash, user_key)
+        # auto-login from keyring
+        cred = self._loadCred()
+        if cred:
+            self.urlIn.setText(cred['url'])
+            self.userIn.setText(cred['user'])
+            self.autoChk.setChecked(True)
+            self.cli = MHClient(cred['url'], cred['user'], "")
+            self.cli.setAuth(cred['uHash'], cred['uKey'])
             self.stack.setCurrentIndex(1)
-            self.do_fetch_folders()
+            self.doFlds()
         else:
             self.stack.setCurrentIndex(0)
 
-    def _cleanup_legacy_file(self):
-        """Delete the old plaintext credentials file if it still exists."""
-        try:
-            if os.path.exists(_LEGACY_CREDS_FILE):
-                os.remove(_LEGACY_CREDS_FILE)
-        except Exception:
-            pass
+    # --- Keyring ---
 
-    def load_credentials(self):
-        """Load all session data from the OS keychain."""
-        if not KEYRING_AVAILABLE:
+    def _loadCred(self):
+        if not HAS_KEYRING:
             return None
         try:
-            raw = keyring.get_password(KEYRING_SERVICE, KEYRING_ACCOUNT)
+            raw = keyring.get_password(KR_SVC, KR_ACC)
             if not raw:
                 return None
-            data = json.loads(raw)
-            return {
-                'url':       data['url'],
-                'username':  data['username'],
-                'user_hash': data['user_hash'],
-                'user_key':  bytes.fromhex(data['user_key']),
-            }
+            d = json.loads(raw)
+            return {'url': d['url'], 'user': d['user'],
+                    'uHash': d['uHash'], 'uKey': bytes.fromhex(d['uKey'])}
         except Exception:
             return None
 
-    def save_credentials(self, url, username, user_hash, user_key):
-        """Store all session data in the OS keychain as a single JSON entry."""
-        if not KEYRING_AVAILABLE:
+    def _saveCred(self, url, user, uHash, uKey):
+        if not HAS_KEYRING:
             return
         try:
-            keyring.set_password(
-                KEYRING_SERVICE, KEYRING_ACCOUNT,
-                json.dumps({
-                    'url':       url,
-                    'username':  username,
-                    'user_hash': user_hash,
-                    'user_key':  user_key.hex(),
-                })
-            )
+            keyring.set_password(KR_SVC, KR_ACC, json.dumps({
+                'url': url, 'user': user,
+                'uHash': uHash, 'uKey': uKey.hex()}))
         except Exception:
             pass
 
-    def clear_credentials(self):
-        """Delete the keychain entry (and any legacy file)."""
-        if KEYRING_AVAILABLE:
+    def _clrCred(self):
+        if HAS_KEYRING:
             try:
-                keyring.delete_password(KEYRING_SERVICE, KEYRING_ACCOUNT)
+                keyring.delete_password(KR_SVC, KR_ACC)
             except Exception:
                 pass
-        self._cleanup_legacy_file()
 
-    def init_login_ui(self):
-        login_widget = QWidget()
-        layout = QVBoxLayout()
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
+    # --- Login UI ---
+
+    def _initLog(self):
+        w = QWidget()
+        lay = QVBoxLayout()
+        lay.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
         title = QLabel("MediaHub")
         title.setStyleSheet("font-size: 32px; font-weight: bold; color: #BB86FC; margin-bottom: 20px;")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
-        self.url_input = QLineEdit()
-        self.url_input.setPlaceholderText("Server Address (e.g., https://localhost:443)")
-        self.url_input.setFixedWidth(300)
-        
-        self.user_input = QLineEdit()
-        self.user_input.setPlaceholderText("Username")
-        self.user_input.setFixedWidth(300)
-        
-        self.pass_input = QLineEdit()
-        self.pass_input.setPlaceholderText("Password")
-        self.pass_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self.pass_input.setFixedWidth(300)
-        
-        self.login_btn = QPushButton("Login")
-        self.login_btn.setFixedWidth(300)
-        self.login_btn.clicked.connect(self.do_login)
-        
-        self.status_label = QLabel("")
-        self.status_label.setStyleSheet("color: #CF6679;")
-        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
-        layout.addWidget(title)
-        layout.addWidget(self.url_input)
-        layout.addWidget(self.user_input)
-        layout.addWidget(self.pass_input)
-        layout.addWidget(self.login_btn)
-        layout.addWidget(self.status_label)
-        
-        login_widget.setLayout(layout)
-        self.stack.addWidget(login_widget)
 
-    def init_main_ui(self):
-        main_widget = QWidget()
-        layout = QHBoxLayout()
-        
-        # Sidebar
-        sidebar = QWidget()
-        sidebar_layout = QVBoxLayout()
-        sidebar_layout.setContentsMargins(0,0,0,0)
-        sidebar.setFixedWidth(250)
-        
-        folder_label = QLabel("Folders")
-        folder_label.setStyleSheet("font-size: 18px; font-weight: bold; margin-bottom: 10px; color: #BB86FC;")
-        
-        self.folder_list = QListWidget()
-        self.folder_list.itemClicked.connect(self.on_folder_selected)
-        
-        btn_layout = QHBoxLayout()
-        self.new_folder_btn = QPushButton("New Folder")
-        self.new_folder_btn.clicked.connect(self.do_create_folder)
-        self.refresh_fld_btn = QPushButton("Refresh")
-        self.refresh_fld_btn.clicked.connect(self.do_fetch_folders)
-        btn_layout.addWidget(self.new_folder_btn)
-        btn_layout.addWidget(self.refresh_fld_btn)
-        
-        self.logout_btn = QPushButton("Logout")
-        self.logout_btn.setStyleSheet("background-color: #333; color: #CF6679; font-size: 12px; padding: 6px;")
-        self.logout_btn.clicked.connect(self.do_logout)
-        
-        sidebar_layout.addWidget(folder_label)
-        sidebar_layout.addWidget(self.folder_list)
-        sidebar_layout.addLayout(btn_layout)
-        sidebar_layout.addWidget(self.logout_btn)
-        sidebar.setLayout(sidebar_layout)
-        
-        # Main Area
-        content = QWidget()
-        content_layout = QVBoxLayout()
-        content_layout.setContentsMargins(15,0,0,0)
-        
-        self.current_folder_label = QLabel("Select a folder")
-        self.current_folder_label.setStyleSheet("font-size: 24px; font-weight: bold; margin-bottom: 10px;")
-        
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Search files...")
-        self.search_input.textChanged.connect(self.filter_files)
-        
-        self.file_table = QTableWidget(0, 3)
-        self.file_table.setHorizontalHeaderLabels(["", "Filename", "Size"])
-        self.file_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        self.file_table.setColumnWidth(0, 80)
-        self.file_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        self.file_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-        self.file_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.file_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.file_table.itemDoubleClicked.connect(self.do_view_file)
-        self.file_table.setSortingEnabled(True)
-        self.file_table.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
-        self.file_table.verticalHeader().setDefaultSectionSize(70)
-        self.file_table.verticalHeader().hide()
-        # Disable sorting on thumbnail column (col 0)
-        self.file_table.horizontalHeader().sectionClicked.connect(
-            lambda col: self.file_table.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder) if col == 0 else None
-        )
-        
-        action_layout = QHBoxLayout()
-        self.upload_btn = QPushButton("Upload Files")
-        self.upload_btn.clicked.connect(self.do_upload)
-        self.upload_dir_btn = QPushButton("Upload Directory")
-        self.upload_dir_btn.clicked.connect(self.do_upload_dir)
-        self.download_btn = QPushButton("Download Selected")
-        self.download_btn.clicked.connect(self.do_download)
-        self.view_btn = QPushButton("View File")
-        self.view_btn.clicked.connect(self.do_view_file)
-        
-        action_layout.addWidget(self.upload_btn)
-        action_layout.addWidget(self.upload_dir_btn)
-        action_layout.addWidget(self.download_btn)
-        action_layout.addWidget(self.view_btn)
-        action_layout.addStretch()
-        
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setVisible(False)
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setTextVisible(False)
-        self.progress_bar.setStyleSheet("""
+        self.urlIn = QLineEdit()
+        self.urlIn.setPlaceholderText("Server Address (e.g., https://localhost:443)")
+        self.urlIn.setFixedWidth(300)
+
+        self.userIn = QLineEdit()
+        self.userIn.setPlaceholderText("Username")
+        self.userIn.setFixedWidth(300)
+
+        self.passIn = QLineEdit()
+        self.passIn.setPlaceholderText("Password")
+        self.passIn.setEchoMode(QLineEdit.EchoMode.Password)
+        self.passIn.setFixedWidth(300)
+
+        self.autoChk = QCheckBox("Auto Login")
+        self.autoChk.setFixedWidth(300)
+
+        self.logBtn = QPushButton("Login")
+        self.logBtn.setFixedWidth(300)
+        self.logBtn.clicked.connect(self.doLogin)
+
+        self.statLbl = QLabel("")
+        self.statLbl.setStyleSheet("color: #CF6679;")
+        self.statLbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        lay.addWidget(title)
+        lay.addWidget(self.urlIn)
+        lay.addWidget(self.userIn)
+        lay.addWidget(self.passIn)
+        lay.addWidget(self.autoChk)
+        lay.addWidget(self.logBtn)
+        lay.addWidget(self.statLbl)
+        w.setLayout(lay)
+        self.stack.addWidget(w)
+
+    # --- Main UI ---
+
+    def _initMain(self):
+        w = QWidget()
+        lay = QHBoxLayout()
+
+        # sidebar
+        sb = QWidget()
+        sbLay = QVBoxLayout()
+        sbLay.setContentsMargins(0, 0, 0, 0)
+        sb.setFixedWidth(250)
+
+        fldLbl = QLabel("Folders")
+        fldLbl.setStyleSheet("font-size: 18px; font-weight: bold; margin-bottom: 10px; color: #BB86FC;")
+
+        self.fldList = QListWidget()
+        self.fldList.itemClicked.connect(self.onFldSel)
+
+        btnLay = QHBoxLayout()
+        newBtn = QPushButton("New Folder")
+        newBtn.clicked.connect(self.doMkFld)
+        refBtn = QPushButton("Refresh")
+        refBtn.clicked.connect(self.doFlds)
+        btnLay.addWidget(newBtn)
+        btnLay.addWidget(refBtn)
+
+        logoutBtn = QPushButton("Logout")
+        logoutBtn.setStyleSheet("background-color: #333; color: #CF6679; font-size: 12px; padding: 6px;")
+        logoutBtn.clicked.connect(self.doLogout)
+
+        sbLay.addWidget(fldLbl)
+        sbLay.addWidget(self.fldList)
+        sbLay.addLayout(btnLay)
+        sbLay.addWidget(logoutBtn)
+        sb.setLayout(sbLay)
+
+        # content
+        ct = QWidget()
+        ctLay = QVBoxLayout()
+        ctLay.setContentsMargins(15, 0, 0, 0)
+
+        self.curLbl = QLabel("Select a folder")
+        self.curLbl.setStyleSheet("font-size: 24px; font-weight: bold; margin-bottom: 10px;")
+
+        self.srchIn = QLineEdit()
+        self.srchIn.setPlaceholderText("Search files...")
+        self.srchIn.textChanged.connect(self.doFilter)
+
+        self.fileTbl = QTableWidget(0, 3)
+        self.fileTbl.setHorizontalHeaderLabels(["", "Filename", "Size"])
+        self.fileTbl.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        self.fileTbl.setColumnWidth(0, 80)
+        self.fileTbl.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        self.fileTbl.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        self.fileTbl.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.fileTbl.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.fileTbl.itemDoubleClicked.connect(self.doView)
+        self.fileTbl.setSortingEnabled(True)
+        self.fileTbl.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
+        self.fileTbl.verticalHeader().setDefaultSectionSize(70)
+        self.fileTbl.verticalHeader().hide()
+        self.fileTbl.horizontalHeader().sectionClicked.connect(
+            lambda c: self.fileTbl.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder) if c == 0 else None)
+
+        actLay = QHBoxLayout()
+        self.upBtn = QPushButton("Upload Files")
+        self.upBtn.clicked.connect(self.doUpload)
+        self.upDirBtn = QPushButton("Upload Directory")
+        self.upDirBtn.clicked.connect(self.doUpDir)
+        self.dnBtn = QPushButton("Download Selected")
+        self.dnBtn.clicked.connect(self.doDown)
+        self.viewBtn = QPushButton("View File")
+        self.viewBtn.clicked.connect(self.doView)
+        actLay.addWidget(self.upBtn)
+        actLay.addWidget(self.upDirBtn)
+        actLay.addWidget(self.dnBtn)
+        actLay.addWidget(self.viewBtn)
+        actLay.addStretch()
+
+        self.progBar = QProgressBar()
+        self.progBar.setVisible(False)
+        self.progBar.setRange(0, 100)
+        self.progBar.setTextVisible(False)
+        self.progBar.setStyleSheet("""
             QProgressBar { border: 1px solid #333; border-radius: 5px; background-color: #1E1E1E; height: 10px; }
             QProgressBar::chunk { background-color: #BB86FC; border-radius: 5px; }
         """)
-        self.upload_status_lbl = QLabel("")
-        self.upload_status_lbl.setVisible(False)
-        self.upload_status_lbl.setStyleSheet("color: #BB86FC; font-size: 12px;")
-        
-        upload_progress_layout = QVBoxLayout()
-        upload_progress_layout.setSpacing(2)
-        upload_progress_layout.addWidget(self.upload_status_lbl)
-        upload_progress_layout.addWidget(self.progress_bar)
-        
-        content_layout.addWidget(self.current_folder_label)
-        content_layout.addWidget(self.search_input)
-        content_layout.addWidget(self.file_table)
-        content_layout.addLayout(action_layout)
-        content_layout.addLayout(upload_progress_layout)
-        content.setLayout(content_layout)
-        
-        layout.addWidget(sidebar)
-        layout.addWidget(content)
-        main_widget.setLayout(layout)
-        self.stack.addWidget(main_widget)
+        self.upStatLbl = QLabel("")
+        self.upStatLbl.setVisible(False)
+        self.upStatLbl.setStyleSheet("color: #BB86FC; font-size: 12px;")
 
-    def filter_files(self, text):
-        import unicodedata
-        search_text = unicodedata.normalize('NFC', text).lower()
-        for row in range(self.file_table.rowCount()):
-            item = self.file_table.item(row, 1)  # column 1 = filename
-            if item:
-                item_text = unicodedata.normalize('NFC', item.text()).lower()
-                self.file_table.setRowHidden(row, search_text not in item_text)
+        progLay = QVBoxLayout()
+        progLay.setSpacing(2)
+        progLay.addWidget(self.upStatLbl)
+        progLay.addWidget(self.progBar)
 
-    def do_login(self):
-        url = self.url_input.text().strip()
-        user = self.user_input.text().strip()
-        pw = self.pass_input.text()
-        
+        ctLay.addWidget(self.curLbl)
+        ctLay.addWidget(self.srchIn)
+        ctLay.addWidget(self.fileTbl)
+        ctLay.addLayout(actLay)
+        ctLay.addLayout(progLay)
+        ct.setLayout(ctLay)
+
+        lay.addWidget(sb)
+        lay.addWidget(ct)
+        w.setLayout(lay)
+        self.stack.addWidget(w)
+
+    # --- Actions ---
+
+    def doFilter(self, text):
+        s = unicodedata.normalize('NFC', text).lower()
+        for r in range(self.fileTbl.rowCount()):
+            it = self.fileTbl.item(r, 1)
+            if it:
+                self.fileTbl.setRowHidden(r, s not in unicodedata.normalize('NFC', it.text()).lower())
+
+    def doLogin(self):
+        url = self.urlIn.text().strip()
+        user = self.userIn.text().strip()
+        pw = self.passIn.text()
         if not url or not user or not pw:
-            self.status_label.setText("Please fill all fields")
+            self.statLbl.setText("Please fill all fields")
             return
-            
-        self.login_btn.setEnabled(False)
-        self.status_label.setText("Authenticating...")
-        
-        self.client = MediaHubClient(url, user, pw)
-        self.worker = LoginWorker(self.client)
-        self.worker.success.connect(self.on_login_success)
-        self.worker.error.connect(self.on_login_error)
-        self.worker.start()
+        self.logBtn.setEnabled(False)
+        self.statLbl.setText("Authenticating...")
+        self.cli = MHClient(url, user, pw)
+        self._wk = WkLogin(self.cli)
+        self._wk.success.connect(self._onLogOk)
+        self._wk.error.connect(self._onLogErr)
+        self._wk.start()
 
-    def on_login_success(self):
-        # Save ONLY the derived keys to keychain - never the password
-        self.save_credentials(
-            self.url_input.text().strip(),
-            self.user_input.text().strip(),
-            self.client.user_hash,
-            self.client.user_key,
-        )
-        # Clear password from memory immediately
-        self.pass_input.clear()
+    def _onLogOk(self):
+        if self.autoChk.isChecked():
+            self._saveCred(self.urlIn.text().strip(), self.userIn.text().strip(),
+                           self.cli.uHash, self.cli.uKey)
+        self.passIn.clear()
         self.stack.setCurrentIndex(1)
-        self.do_fetch_folders()
+        self.doFlds()
 
-    def on_login_error(self, err):
-        self.login_btn.setEnabled(True)
-        self.status_label.setText(f"Error: {err}")
+    def _onLogErr(self, err):
+        self.logBtn.setEnabled(True)
+        self.statLbl.setText(f"Error: {err}")
 
-    def do_logout(self):
-        self.clear_credentials()
-        self.client = None
-        self.folder_list.clear()
-        self.file_table.setRowCount(0)
-        self.pass_input.clear()
+    def doLogout(self):
+        self._clrCred()
+        self.cli = None
+        self.fldList.clear()
+        self.fileTbl.setRowCount(0)
+        self.passIn.clear()
+        self.autoChk.setChecked(False)
         self.stack.setCurrentIndex(0)
-        self.login_btn.setEnabled(True)
-        self.status_label.setText("")
+        self.logBtn.setEnabled(True)
+        self.statLbl.setText("")
 
-    def do_fetch_folders(self):
-        self.folder_list.clear()
-        self.worker = FetchFoldersWorker(self.client)
-        self.worker.success.connect(self.on_folders_fetched)
-        self.worker.error.connect(lambda e: QMessageBox.critical(self, "Error", f"Failed to fetch folders: {e}"))
-        self.worker.start()
+    def doFlds(self):
+        self.fldList.clear()
+        self._wk = WkFlds(self.cli)
+        self._wk.success.connect(self._onFlds)
+        self._wk.error.connect(lambda e: QMessageBox.critical(self, "Error", f"Failed to fetch folders: {e}"))
+        self._wk.start()
 
-    def on_folders_fetched(self, folders):
-        self.folder_list.clear()
-        for f in folders.keys():
-            self.folder_list.addItem(f)
+    def _onFlds(self, flds):
+        self.fldList.clear()
+        for f in flds.keys():
+            self.fldList.addItem(f)
 
-    def do_create_folder(self):
+    def doMkFld(self):
         name, ok = QInputDialog.getText(self, "New Folder", "Folder Name:")
         if ok and name:
             try:
-                self.client.create_folder(name)
-                self.do_fetch_folders()
+                self.cli.mkFld(name)
+                self.doFlds()
             except Exception as e:
                 QMessageBox.critical(self, "Error", str(e))
 
-    def on_folder_selected(self, item):
-        self.current_folder_name = item.text()
-        self.current_folder_label.setText(f"Folder: {self.current_folder_name}")
-        self.file_table.setRowCount(0)
-        
-        self.worker = FetchFilesWorker(self.client, self.current_folder_name)
-        self.worker.success.connect(self.on_files_fetched)
-        self.worker.error.connect(lambda e: QMessageBox.critical(self, "Error", f"Failed to fetch files: {e}"))
-        self.worker.start()
+    def onFldSel(self, item):
+        self.curFld = item.text()
+        self.curLbl.setText(f"Folder: {self.curFld}")
+        self.fileTbl.setRowCount(0)
+        self._wk = WkFiles(self.cli, self.curFld)
+        self._wk.success.connect(self._onFiles)
+        self._wk.error.connect(lambda e: QMessageBox.critical(self, "Error", f"Failed to fetch files: {e}"))
+        self._wk.start()
 
-    def format_size(self, size):
-        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
-            if size < 1024.0:
-                return f"{size:.1f} {unit}" if unit != 'B' else f"{size} {unit}"
-            size /= 1024.0
-        return f"{size:.1f} PB"
+    def _fmtSize(self, sz):
+        for u in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if sz < 1024.0:
+                return f"{sz:.1f} {u}" if u != 'B' else f"{sz} {u}"
+            sz /= 1024.0
+        return f"{sz:.1f} PB"
 
-    def on_files_fetched(self, pid, key, files):
-        self.current_folder_pid = pid
-        self.current_folder_key = key
-        self.current_files_map = files
-        self.proxy.update_context(self.client, files)
-        self._thumb_workers = []  # keep references to prevent GC
-        
-        self.file_table.setSortingEnabled(False)
-        self.file_table.setRowCount(0)
-        from mediahub_core import Opsec
-        
-        IMAGE_EXTS = {'jpg', 'jpeg', 'png', 'gif', 'webp'}
-        VIDEO_EXTS = {'mp4', 'webm', 'mov', 'mkv'}
-        TEXT_EXTS  = {'txt', 'md', 'csv', 'py', 'json', 'log'}
-        PDF_EXTS   = {'pdf'}
-        
+    def _onFiles(self, pid, key, files):
+        self.curPid = pid
+        self.curKey = key
+        self.curFiles = files
+        self.proxy.updCtx(self.cli, files)
+        self._thumbWk = []
+
+        IMG = {'jpg', 'jpeg', 'png', 'gif', 'webp'}
+        VID = {'mp4', 'webm', 'mov', 'mkv'}
+        TXT = {'txt', 'md', 'csv', 'py', 'json', 'log'}
+
+        self.fileTbl.setSortingEnabled(False)
+        self.fileTbl.setRowCount(0)
+
         for name, info in files.items():
             sz = Opsec.DecodeInt(info[44:52], False)
-            row = self.file_table.rowCount()
-            self.file_table.insertRow(row)
-            self.file_table.setRowHeight(row, 70)
-            
-            # Placeholder thumbnail widget
-            thumb_lbl = QLabel()
-            thumb_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            row = self.fileTbl.rowCount()
+            self.fileTbl.insertRow(row)
+            self.fileTbl.setRowHeight(row, 70)
+
+            thLbl = QLabel()
+            thLbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             ext = name.rsplit('.', 1)[-1].lower() if '.' in name else ''
-            
-            if ext in IMAGE_EXTS | VIDEO_EXTS:
-                # Will be replaced by real thumbnail asynchronously
-                thumb_lbl.setText("⏳")
-                thumb_lbl.setStyleSheet("color:#888; font-size:22px;")
-                file_key = info[:44]
-                file_pid = self.client.get_obj_pid(file_key)
-                w = ThumbnailWorker(self.client, pid, file_pid, file_key, row)
-                w.success.connect(self.on_thumbnail_ready)
+
+            if ext in IMG | VID:
+                thLbl.setText("⏳")
+                thLbl.setStyleSheet("color:#888; font-size:22px;")
+                fk = info[:44]
+                fpid = self.cli.objPid(fk)
+                thLbl.setProperty("fpid", fpid)
+                w = WkThumb(self.cli, pid, fpid, fk)
+                w.success.connect(self._onThumb)
                 w.start()
-                self._thumb_workers.append(w)
-            elif ext in PDF_EXTS:
-                thumb_lbl.setText("📄")
-                thumb_lbl.setStyleSheet("font-size:32px;")
-            elif ext in TEXT_EXTS:
-                thumb_lbl.setText("📝")
-                thumb_lbl.setStyleSheet("font-size:32px;")
+                self._thumbWk.append(w)
+            elif ext == 'pdf':
+                thLbl.setText("📄"); thLbl.setStyleSheet("font-size:32px;")
+            elif ext in TXT:
+                thLbl.setText("📝"); thLbl.setStyleSheet("font-size:32px;")
             else:
-                thumb_lbl.setText("📁")
-                thumb_lbl.setStyleSheet("font-size:32px;")
-            
-            self.file_table.setCellWidget(row, 0, thumb_lbl)
-            
-            # Invisible dummy item for column 0 to allow sorting row selection
-            self.file_table.setItem(row, 0, SortableTableItem(""))
-            
-            name_item = SortableTableItem(name)
-            name_item.setData(Qt.ItemDataRole.UserRole, name.lower())
-            
-            size_item = SortableTableItem(self.format_size(sz))
-            size_item.setData(Qt.ItemDataRole.UserRole, sz)
-            
-            self.file_table.setItem(row, 1, name_item)
-            self.file_table.setItem(row, 2, size_item)
-            
-        self.file_table.setSortingEnabled(True)
-        # Re-apply filter if text exists
-        self.filter_files(self.search_input.text())
+                thLbl.setText("📁"); thLbl.setStyleSheet("font-size:32px;")
 
-    def on_thumbnail_ready(self, row, pixmap):
-        thumb_lbl = self.file_table.cellWidget(row, 0)
-        if thumb_lbl:
-            scaled = pixmap.scaled(68, 68, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-            thumb_lbl.setPixmap(scaled)
+            self.fileTbl.setCellWidget(row, 0, thLbl)
+            self.fileTbl.setItem(row, 0, SortItem(""))
 
-    def set_loading(self, loading=True):
-        self.upload_btn.setEnabled(not loading)
-        self.upload_dir_btn.setEnabled(not loading)
-        self.download_btn.setEnabled(not loading)
-        self.view_btn.setEnabled(not loading)
-        self.progress_bar.setVisible(loading)
-        self.upload_status_lbl.setVisible(loading)
-        if loading:
-            self.progress_bar.setRange(0, 100)
-            self.progress_bar.setValue(0)
-            self.upload_status_lbl.setText("Preparing...")
+            nItem = SortItem(name)
+            nItem.setData(Qt.ItemDataRole.UserRole, name.lower())
+            sItem = SortItem(self._fmtSize(sz))
+            sItem.setData(Qt.ItemDataRole.UserRole, sz)
 
-    def on_upload_progress(self, bytes_sent, total_bytes, speed_bps):
-        if total_bytes > 0:
-            pct = int(bytes_sent * 100 / total_bytes)
-            self.progress_bar.setValue(pct)
-            if speed_bps > 0:
-                speed_mb = speed_bps / (1024 * 1024)
-                self.upload_status_lbl.setText(f"Uploading... {pct}%  |  {speed_mb:.1f} MB/s")
+            self.fileTbl.setItem(row, 1, nItem)
+            self.fileTbl.setItem(row, 2, sItem)
+
+        self.fileTbl.setSortingEnabled(True)
+        self.doFilter(self.srchIn.text())
+
+    def _onThumb(self, fpid, raw):
+        # QPixmap must be created on GUI thread
+        pm = QPixmap.fromImage(QImage.fromData(raw))
+        if pm.isNull():
+            return
+        scaled = pm.scaled(68, 68, Qt.AspectRatioMode.KeepAspectRatio,
+                           Qt.TransformationMode.SmoothTransformation)
+        # find row by fpid to handle sorting correctly
+        for r in range(self.fileTbl.rowCount()):
+            lbl = self.fileTbl.cellWidget(r, 0)
+            if lbl and lbl.property("fpid") == fpid:
+                lbl.setPixmap(scaled)
+                break
+
+    def _setLoad(self, on=True):
+        self.upBtn.setEnabled(not on)
+        self.upDirBtn.setEnabled(not on)
+        self.dnBtn.setEnabled(not on)
+        self.viewBtn.setEnabled(not on)
+        self.progBar.setVisible(on)
+        self.upStatLbl.setVisible(on)
+        if on:
+            self.progBar.setRange(0, 100)
+            self.progBar.setValue(0)
+            self.upStatLbl.setText("Preparing...")
+
+    def _onUpProg(self, sent, total, speed):
+        if total > 0:
+            pct = int(sent * 100 / total)
+            self.progBar.setValue(pct)
+            if speed > 0:
+                self.upStatLbl.setText(f"Uploading... {pct}%  |  {speed / (1024*1024):.1f} MB/s")
             else:
-                self.upload_status_lbl.setText(f"Uploading... {pct}%")
+                self.upStatLbl.setText(f"Uploading... {pct}%")
 
-    def do_upload(self):
-        if not self.current_folder_name:
+    def doUpload(self):
+        if not self.curFld:
             QMessageBox.warning(self, "Warning", "Select a folder first")
             return
-            
         files, _ = QFileDialog.getOpenFileNames(self, "Select Files to Upload")
         if files:
-            self.set_loading(True)
-            self.worker = UploadWorker(self.client, self.current_folder_pid, self.current_folder_key, self.current_files_map, files)
-            self.worker.success.connect(self.on_upload_success)
-            self.worker.error.connect(self.on_op_error)
-            self.worker.progress.connect(self.on_upload_progress)
-            self.worker.start()
+            self._setLoad(True)
+            self._wk = WkUpload(self.cli, self.curPid, self.curKey, self.curFiles, files)
+            self._wk.success.connect(self._onUpDone)
+            self._wk.error.connect(self._onOpErr)
+            self._wk.progress.connect(self._onUpProg)
+            self._wk.start()
 
-    def do_upload_dir(self):
-        if not self.current_folder_name:
+    def doUpDir(self):
+        if not self.curFld:
             QMessageBox.warning(self, "Warning", "Select a folder first")
             return
-            
-        dir_path = QFileDialog.getExistingDirectory(self, "Select Directory to Upload")
-        if dir_path:
-            files = [os.path.join(dir_path, f) for f in os.listdir(dir_path) if os.path.isfile(os.path.join(dir_path, f))]
+        dp = QFileDialog.getExistingDirectory(self, "Select Directory to Upload")
+        if dp:
+            files = [os.path.join(dp, f) for f in os.listdir(dp) if os.path.isfile(os.path.join(dp, f))]
             if files:
-                self.set_loading(True)
-                self.worker = UploadWorker(self.client, self.current_folder_pid, self.current_folder_key, self.current_files_map, files)
-                self.worker.success.connect(self.on_upload_success)
-                self.worker.error.connect(self.on_op_error)
-                self.worker.progress.connect(self.on_upload_progress)
-                self.worker.start()
+                self._setLoad(True)
+                self._wk = WkUpload(self.cli, self.curPid, self.curKey, self.curFiles, files)
+                self._wk.success.connect(self._onUpDone)
+                self._wk.error.connect(self._onOpErr)
+                self._wk.progress.connect(self._onUpProg)
+                self._wk.start()
 
-    def on_upload_success(self):
-        self.set_loading(False)
-        self.upload_status_lbl.setVisible(False)
+    def _onUpDone(self):
+        self._setLoad(False)
+        self.upStatLbl.setVisible(False)
         QMessageBox.information(self, "Success", "Upload complete!")
-        self.on_folder_selected(self.folder_list.currentItem()) # refresh
+        self.onFldSel(self.fldList.currentItem())
 
-    def do_download(self):
-        if not self.current_folder_name:
+    def doDown(self):
+        if not self.curFld:
             QMessageBox.warning(self, "Warning", "Select a folder first")
             return
-            
-        selected_rows = self.file_table.selectionModel().selectedRows()
-        if not selected_rows:
+        sel = self.fileTbl.selectionModel().selectedRows()
+        if not sel:
             QMessageBox.warning(self, "Warning", "Select files to download")
             return
-            
-        out_dir = QFileDialog.getExistingDirectory(self, "Select Download Directory")
-        if out_dir:
-            self.set_loading(True)
-            # Just downloading the first selected one for now to keep it simple, or we can queue them
-            # We will just download the first one for demonstration
-            row = selected_rows[0].row()
-            file_name = self.file_table.item(row, 1).text()  # column 1 = filename
-            fl_info = self.current_files_map[file_name]
-            
-            self.worker = DownloadWorker(self.client, self.current_folder_pid, fl_info, file_name, out_dir)
-            self.worker.success.connect(self.on_download_success)
-            self.worker.error.connect(self.on_op_error)
-            self.worker.start()
+        outDir = QFileDialog.getExistingDirectory(self, "Select Download Directory")
+        if outDir:
+            self._setLoad(True)
+            row = sel[0].row()
+            name = self.fileTbl.item(row, 1).text()
+            flInfo = self.curFiles[name]
+            self._wk = WkDown(self.cli, self.curPid, flInfo, name, outDir)
+            self._wk.success.connect(self._onDnDone)
+            self._wk.error.connect(self._onOpErr)
+            self._wk.start()
 
-    def on_download_success(self, out_path):
-        self.set_loading(False)
-        QMessageBox.information(self, "Success", f"Downloaded to:\n{out_path}")
+    def _onDnDone(self, path):
+        self._setLoad(False)
+        QMessageBox.information(self, "Success", f"Downloaded to:\n{path}")
 
-    def do_view_file(self):
-        if not self.current_folder_name:
+    def doView(self):
+        if not self.curFld:
             QMessageBox.warning(self, "Warning", "Select a folder first")
             return
-            
-        selected_rows = self.file_table.selectionModel().selectedRows()
-        if not selected_rows:
+        sel = self.fileTbl.selectionModel().selectedRows()
+        if not sel:
             QMessageBox.warning(self, "Warning", "Select a file to view")
             return
-            
-        row = selected_rows[0].row()
-        file_name = self.file_table.item(row, 1).text()  # column 1 = filename
-        
-        encoded_name = urllib.parse.quote(file_name)
-        stream_url = f"http://127.0.0.1:18080/stream/{self.current_folder_pid}/{encoded_name}"
-        
-        self.viewer = ViewerWindow(stream_url, file_name, parent=self)
+        row = sel[0].row()
+        name = self.fileTbl.item(row, 1).text()
+        url = f"http://127.0.0.1:18080/stream/{self.curPid}/{urllib.parse.quote(name)}"
+        self.viewer = Viewer(url, name, parent=self)
         self.viewer.show()
 
-    def on_op_error(self, err):
-        self.set_loading(False)
+    def _onOpErr(self, err):
+        self._setLoad(False)
         QMessageBox.critical(self, "Error", str(err))
-        
-    def closeEvent(self, event):
+
+    def closeEvent(self, ev):
         self.proxy.stop()
-        super().closeEvent(event)
+        super().closeEvent(ev)
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = MediaHubApp()
-    window.show()
+    win = MHApp()
+    win.show()
     sys.exit(app.exec())

@@ -111,7 +111,7 @@ document.getElementById("btnImport").addEventListener("click", () => {
             const oldFldId = getObjPid(oldRaw);
             oldRaw.fill(0);
             try {
-                await fetch(`${SERVER}/api/storage/${oldFldId}/names`, { method: "DELETE" });
+                await fetch(`${SERVER}/api/storage/${oldFldId}/names`, { method: "DELETE", headers: { "X-User-Hash": usrHsh } });
             } catch (e) {
                 console.warn("Failed to delete old folder storage", e);
             }
@@ -260,11 +260,11 @@ document.getElementById("btnUpload").addEventListener("click", async () => {
                 }
             }
 
-            await fetch(`${SERVER}/api/media/${state.id}/${filePid}/dat`, { method: "POST", body: medBuf });
+            await fetch(`${SERVER}/api/media/${state.id}/${filePid}/dat`, { method: "POST", headers: { "X-User-Hash": usrHsh }, body: medBuf });
 
             if (thumb) {
                 const thmSm = new SymMaster("gcm1", fileKey.slice(0, 32));
-                await fetch(`${SERVER}/api/media/${state.id}/${filePid}/thumb`, { method: "POST", body: await thmSm.EnBin(new Uint8Array(await thumb.arrayBuffer())) });
+                await fetch(`${SERVER}/api/media/${state.id}/${filePid}/thumb`, { method: "POST", headers: { "X-User-Hash": usrHsh }, body: await thmSm.EnBin(new Uint8Array(await thumb.arrayBuffer())) });
             }
 
             // Save key to map.
@@ -284,7 +284,7 @@ document.getElementById("btnUpload").addEventListener("click", async () => {
         const um = rawMap(state.flsMap);
         const encoded = EncodeCfg(um);
         wipeMap(um);
-        await fetch(`${SERVER}/api/storage/${state.id}/names`, { method: "POST", body: await metSm.EnBin(encoded) });
+        await fetch(`${SERVER}/api/storage/${state.id}/names`, { method: "POST", headers: { "X-User-Hash": usrHsh }, body: await metSm.EnBin(encoded) });
         encoded.fill(0);
 
         fileIn.value = "";
@@ -302,7 +302,7 @@ document.getElementById("btnUpload").addEventListener("click", async () => {
 // Delete folder.
 document.getElementById("btnDeleteFolder").addEventListener("click", async () => {
     if (!confirm("Delete this folder?")) return;
-    await fetch(`${SERVER}/api/storage/${state.id}/names`, { method: "DELETE" });
+    await fetch(`${SERVER}/api/storage/${state.id}/names`, { method: "DELETE", headers: { "X-User-Hash": usrHsh } });
     delete state.fldMap[state.name]; await saveUsr(); loadUsr();
     document.getElementById("uploadContainer").classList.add("hidden"); document.getElementById("mediaContainer").classList.add("hidden");
 });

@@ -46,7 +46,20 @@ function getKind(name) {
 
 function getMime(name) {
     const ext = name.split('.').pop().toLowerCase();
-    return ext === 'pdf' ? 'application/pdf' : 'image/jpeg';
+    const mimeMap = {
+        'pdf': 'application/pdf',
+        'txt': 'text/plain',
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'gif': 'image/gif',
+        'webp': 'image/webp',
+        'mp4': 'video/mp4',
+        'webm': 'video/webm',
+        'mov': 'video/quicktime',
+        'mkv': 'video/x-matroska'
+    };
+    return mimeMap[ext] || 'application/octet-stream';
 }
 
 // Load and render file.
