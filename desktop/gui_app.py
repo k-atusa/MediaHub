@@ -704,14 +704,32 @@ class MHApp(QMainWindow):
         topLay = QHBoxLayout()
         topLay.setContentsMargins(15, 10, 15, 10)
 
+        def _icon(name):
+            return QIcon(os.path.join(os.path.dirname(__file__), "icons", f"{name}.svg"))
+
         # Action Buttons
+        self.newBtn = QPushButton("New Folder")
+        self.newBtn.setIcon(_icon("new-folder"))
+        self.newBtn.clicked.connect(self.doMkFld)
+        
+        self.refBtn = QPushButton("Refresh")
+        self.refBtn.setIcon(_icon("refresh"))
+        self.refBtn.clicked.connect(self.doFlds)
+        
         self.upBtn = QPushButton("Upload")
+        self.upBtn.setIcon(_icon("upload"))
         self.upBtn.clicked.connect(self.doUpload)
+        
         self.upDirBtn = QPushButton("Upload Dir")
+        self.upDirBtn.setIcon(_icon("folder-upload"))
         self.upDirBtn.clicked.connect(self.doUpDir)
+        
         self.dnBtn = QPushButton("Download")
+        self.dnBtn.setIcon(_icon("download"))
         self.dnBtn.clicked.connect(self.doDown)
+        
         self.viewBtn = QPushButton("View")
+        self.viewBtn.setIcon(_icon("view"))
         self.viewBtn.clicked.connect(self.doView)
 
         # Search Bar
@@ -720,12 +738,20 @@ class MHApp(QMainWindow):
         self.srchIn.setFixedWidth(200)
         self.srchIn.textChanged.connect(self.doFilter)
 
+        self.logoutBtn = QPushButton("Logout")
+        self.logoutBtn.setIcon(_icon("logout"))
+        self.logoutBtn.setStyleSheet("background-color: transparent; color: #FF453A; font-size: 13px; font-weight: 500; border: 1px solid rgba(255, 69, 58, 0.5);")
+        self.logoutBtn.clicked.connect(self.doLogout)
+
+        topLay.addWidget(self.newBtn)
+        topLay.addWidget(self.refBtn)
         topLay.addWidget(self.upBtn)
         topLay.addWidget(self.upDirBtn)
         topLay.addWidget(self.dnBtn)
         topLay.addWidget(self.viewBtn)
         topLay.addStretch()
         topLay.addWidget(self.srchIn)
+        topLay.addWidget(self.logoutBtn)
         topBar.setLayout(topLay)
 
         # --- Split Area ---
@@ -748,27 +774,8 @@ class MHApp(QMainWindow):
         self.fldList.itemClicked.connect(self.onFldSel)
         self.fldList.setStyleSheet("background: transparent; border: none;")
 
-        btnLay = QHBoxLayout()
-        newBtn = QPushButton("+")
-        newBtn.setFixedWidth(40)
-        newBtn.setStyleSheet("font-size: 24px; padding-bottom: 4px; font-weight: bold;")
-        newBtn.clicked.connect(self.doMkFld)
-        refBtn = QPushButton("⟳")
-        refBtn.setFixedWidth(40)
-        refBtn.setStyleSheet("font-size: 22px; padding-bottom: 2px; font-weight: bold;")
-        refBtn.clicked.connect(self.doFlds)
-        btnLay.addWidget(newBtn)
-        btnLay.addWidget(refBtn)
-        btnLay.addStretch()
-
-        logoutBtn = QPushButton("Logout")
-        logoutBtn.setStyleSheet("background-color: transparent; color: #FF453A; font-size: 13px; font-weight: 500; border: 1px solid rgba(255, 69, 58, 0.5);")
-        logoutBtn.clicked.connect(self.doLogout)
-
         sbLay.addWidget(fldLbl)
         sbLay.addWidget(self.fldList)
-        sbLay.addLayout(btnLay)
-        sbLay.addWidget(logoutBtn)
         sb.setLayout(sbLay)
 
         # Content Area
