@@ -59,26 +59,46 @@ class ClickSldr(QSlider):
 
 
 class ScaleLabel(QLabel):
+    zoomChanged = pyqtSignal(float)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._pm = None
         self._sc = 1.0
         self._off = QPointF(0, 0)
-        self._last = QPoint()
+        self._last = QPointF(0, 0)
+        from PyQt6.QtWidgets import QSizePolicy
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
     def setPixmap(self, pm):
         self._pm = pm
         self._sc = 1.0
         self._off = QPointF(0, 0)
+        self.zoomChanged.emit(self.totalScale())
         self.update()
+
+    def getFitScale(self):
+        if not self._pm or self._pm.width() <= 0 or self._pm.height() <= 0:
+            return 1.0
+        w_ratio = self.width() / self._pm.width()
+        h_ratio = self.height() / self._pm.height()
+        return min(w_ratio, h_ratio)
+
+    def totalScale(self):
+        return self.getFitScale() * self._sc
 
     def wheelEvent(self, ev):
         if not self._pm:
             return
         step = 1.1 if ev.angleDelta().y() > 0 else 0.9
         pos = ev.position()
-        self._off = pos - (pos - self._off) * step
+        cx = self.width() / 2.0
+        cy = self.height() / 2.0
+        mouse_from_center = pos - QPointF(cx, cy)
+        
+        self._off = mouse_from_center - (mouse_from_center - self._off) * step
         self._sc = max(0.1, min(self._sc * step, 10.0))
+        self.zoomChanged.emit(self.totalScale())
         self.update()
 
     def mousePressEvent(self, ev):
@@ -91,18 +111,62 @@ class ScaleLabel(QLabel):
             self._last = ev.position()
             self.update()
 
+    def resizeEvent(self, ev):
+        super().resizeEvent(ev)
+        if self._pm:
+            self.zoomChanged.emit(self.totalScale())
+
     def paintEvent(self, ev):
         if not self._pm:
             return
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-        sc = self._pm.scaled(self.size(), Qt.AspectRatioMode.KeepAspectRatio,
-                             Qt.TransformationMode.SmoothTransformation)
-        bx = (self.width() - sc.width()) / 2
-        by = (self.height() - sc.height()) / 2
-        p.translate(self._off)
-        p.scale(self._sc, self._sc)
-        p.drawPixmap(int(bx), int(by), sc)
+        
+        fit_scale = self.getFitScale()
+        total_scale = fit_scale * self._sc
+        
+        cx = self.width() / 2.0
+        cy = self.height() / 2.0
+        
+        p.translate(cx + self._off.x(), cy + self._off.y())
+        p.scale(total_scale, total_scale)
+        
+        px = -self._pm.width() / 2.0
+        py = -self._pm.height() / 2.0
+        
+        p.drawPixmap(QPointF(px, py), self._pm)
+
+    def zoomIn(self):
+        if not self._pm:
+            return
+        self.zoomTo(self._sc * 1.2)
+
+    def zoomOut(self):
+        if not self._pm:
+            return
+        self.zoomTo(self._sc / 1.2)
+
+    def zoomTo(self, target_sc):
+        target_sc = max(0.1, min(target_sc, 10.0))
+        self._off = self._off * (target_sc / self._sc)
+        self._sc = target_sc
+        self.zoomChanged.emit(self.totalScale())
+        self.update()
+
+    def resetZoom(self):
+        self._sc = 1.0
+        self._off = QPointF(0, 0)
+        self.zoomChanged.emit(self.totalScale())
+        self.update()
+
+    def originalSize(self):
+        if not self._pm:
+            return
+        fit_scale = self.getFitScale()
+        if fit_scale > 0:
+            self.zoomTo(1.0 / fit_scale)
+            self._off = QPointF(0, 0)
+            self.update()
 
 
 # --- Worker Threads ---
@@ -261,12 +325,47 @@ class Viewer(QMainWindow):
     def _showImg(self):
         import requests
         self.lbl = ScaleLabel()
-        self.lay.addWidget(self.lbl)
+        self.lay.addWidget(self.lbl, 1)
+
+        # zoom UI controls layout
+        ctrlLay = QHBoxLayout()
+        
+        zoomOutBtn = QPushButton("Zoom -")
+        zoomOutBtn.clicked.connect(self.lbl.zoomOut)
+        
+        zoomInBtn = QPushButton("Zoom +")
+        zoomInBtn.clicked.connect(self.lbl.zoomIn)
+        
+        fitBtn = QPushButton("Fit Screen")
+        fitBtn.clicked.connect(self.lbl.resetZoom)
+        
+        origBtn = QPushButton("100% (Original)")
+        origBtn.clicked.connect(self.lbl.originalSize)
+        
+        self.zoomLbl = QLabel("Zoom: 100%")
+        self.zoomLbl.setMinimumWidth(100)
+        self.zoomLbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        ctrlLay.addWidget(zoomOutBtn)
+        ctrlLay.addWidget(zoomInBtn)
+        ctrlLay.addWidget(fitBtn)
+        ctrlLay.addWidget(origBtn)
+        ctrlLay.addWidget(self.zoomLbl)
+        ctrlLay.addStretch()
+        
+        self.lay.addLayout(ctrlLay)
+        
+        # Connect signal to update zoom label
+        self.lbl.zoomChanged.connect(self._updateZoomLbl)
+
         try:
             res = requests.get(self.fileUrl)
             self.lbl.setPixmap(QPixmap.fromImage(QImage.fromData(res.content)))
         except Exception as e:
             self.lay.addWidget(QLabel(f"Failed to load image: {e}"))
+
+    def _updateZoomLbl(self, scale):
+        self.zoomLbl.setText(f"Zoom: {int(scale * 100)}%")
 
     def _showTxt(self):
         import requests
