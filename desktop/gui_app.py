@@ -7,9 +7,9 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                              QLabel, QLineEdit, QPushButton, QListWidget, QListWidgetItem,
                              QStackedWidget, QFileDialog, QMessageBox, QInputDialog, QTableWidget,
                              QTableWidgetItem, QHeaderView, QProgressBar, QTextEdit, QSlider,
-                             QStyle, QCheckBox)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl, QPoint, QPointF, QSize
-from PyQt6.QtGui import QFont, QIcon, QColor, QPixmap, QPainter, QImage, QShortcut, QKeySequence
+                             QStyle, QCheckBox, QStyledItemDelegate, QStyleOptionViewItem)
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl, QPoint, QPointF, QSize, QRectF
+from PyQt6.QtGui import QFont, QIcon, QColor, QPixmap, QPainter, QImage, QShortcut, QKeySequence, QPainterPath
 try:
     from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
     from PyQt6.QtMultimediaWidgets import QVideoWidget
@@ -35,6 +35,53 @@ except ImportError:
 KR_SVC = "mediahub"
 KR_ACC = "session"
 
+class RowSelectionDelegate(QStyledItemDelegate):
+    def paint(self, painter, option, index):
+        if option.state & QStyle.StateFlag.State_Selected:
+            painter.save()
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            
+            color = QColor(255, 255, 255, 38)
+            painter.setBrush(color)
+            painter.setPen(Qt.PenStyle.NoPen)
+            
+            rect = QRectF(option.rect)
+            bg_rect = rect.adjusted(0, 2, 0, -2)
+            path = QPainterPath()
+            radius = 4.0
+            
+            col = index.column()
+            col_count = index.model().columnCount()
+            
+            if col_count == 1:
+                path.addRoundedRect(bg_rect, radius, radius)
+            elif col == 0:
+                path.moveTo(bg_rect.topRight())
+                path.lineTo(bg_rect.topLeft() + QPointF(radius, 0))
+                path.arcTo(bg_rect.left(), bg_rect.top(), radius*2, radius*2, 90, 90)
+                path.lineTo(bg_rect.bottomLeft() - QPointF(0, radius))
+                path.arcTo(bg_rect.left(), bg_rect.bottom() - radius*2, radius*2, radius*2, 180, 90)
+                path.lineTo(bg_rect.bottomRight())
+                path.closeSubpath()
+            elif col == col_count - 1:
+                path.moveTo(bg_rect.topLeft())
+                path.lineTo(bg_rect.topRight() - QPointF(radius, 0))
+                path.arcTo(bg_rect.right() - radius*2, bg_rect.top(), radius*2, radius*2, 90, -90)
+                path.lineTo(bg_rect.bottomRight() - QPointF(0, radius))
+                path.arcTo(bg_rect.right() - radius*2, bg_rect.bottom() - radius*2, radius*2, radius*2, 0, -90)
+                path.lineTo(bg_rect.bottomLeft())
+                path.closeSubpath()
+            else:
+                path.addRect(bg_rect)
+                
+            painter.drawPath(path)
+            painter.restore()
+            
+            opt = QStyleOptionViewItem(option)
+            opt.state &= ~QStyle.StateFlag.State_Selected
+            super().paint(painter, opt, index)
+        else:
+            super().paint(painter, option, index)
 
 # --- Utility Widgets ---
 
@@ -324,7 +371,7 @@ class Viewer(QMainWindow):
         self.resize(800, 600)
         self.setStyleSheet("""
             QMainWindow { 
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #1a0b2e, stop:1 #001f3f); 
+                background-color: #2C2C2E; 
                 color: #FFFFFF; 
             }
             QWidget { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif; font-size: 13px; }
@@ -594,7 +641,8 @@ class MHApp(QMainWindow):
             QPushButton:disabled { background-color: rgba(0, 0, 0, 0.2); color: rgba(255, 255, 255, 0.3); border-color: transparent; }
             QListWidget, QTableWidget { background-color: rgba(0, 0, 0, 0.2); color: #FFFFFF; border: none; outline: 0; }
             QListWidget::item { padding: 6px 10px; border-radius: 4px; margin: 2px 4px; }
-            QListWidget::item:selected, QTableWidget::item:selected { background-color: rgba(255, 255, 255, 0.15); color: #FFFFFF; border-radius: 4px; }
+            QListWidget::item:selected { background-color: rgba(255, 255, 255, 0.15); color: #FFFFFF; border-radius: 4px; }
+            QTableWidget::item:selected { background-color: transparent; color: #FFFFFF; }
             QHeaderView::section { background-color: transparent; color: rgba(255, 255, 255, 0.7); padding: 4px 8px; border: none; border-bottom: 1px solid rgba(255, 255, 255, 0.1); font-weight: 500; }
             QTableWidget QTableCornerButton::section { background-color: transparent; }
             QCheckBox { color: #FFFFFF; spacing: 6px; }
@@ -815,6 +863,7 @@ class MHApp(QMainWindow):
         self.fileTbl.setHorizontalHeaderLabels(["", "Filename", "Size"])
         self.fileTbl.setStyleSheet("background-color: transparent; border: none;")
         self.fileTbl.setShowGrid(False)
+        self.fileTbl.setItemDelegate(RowSelectionDelegate(self.fileTbl))
         
         self.fileTbl.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
         self.fileTbl.setColumnWidth(0, 40)
