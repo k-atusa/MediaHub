@@ -5,3 +5,5 @@ __pycache__/
 server/certs/
 server/config/
 server/users/
+server/data
+server/server
