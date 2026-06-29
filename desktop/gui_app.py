@@ -8,8 +8,8 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                              QStackedWidget, QFileDialog, QMessageBox, QInputDialog, QTableWidget,
                              QTableWidgetItem, QHeaderView, QProgressBar, QTextEdit, QSlider,
                              QStyle, QCheckBox)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl, QPoint, QPointF, QEvent
-from PyQt6.QtGui import QFont, QIcon, QColor, QPixmap, QPainter, QImage
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl, QPoint, QPointF
+from PyQt6.QtGui import QFont, QIcon, QColor, QPixmap, QPainter, QImage, QShortcut, QKeySequence
 try:
     from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
     from PyQt6.QtMultimediaWidgets import QVideoWidget
@@ -318,6 +318,10 @@ class Viewer(QMainWindow):
         self.lay = QVBoxLayout(self.cw)
         self.lay.setContentsMargins(10, 10, 10, 10)
 
+        # space shortcut to close / toggle play
+        self.spaceShortcut = QShortcut(QKeySequence(Qt.Key.Key_Space), self)
+        self.spaceShortcut.activated.connect(self.onSpacePressed)
+
         ext = fileName.split('.')[-1].lower()
         if ext in ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']:
             self._showImg()
@@ -448,20 +452,21 @@ class Viewer(QMainWindow):
             else:
                 self.player.play()
 
-    def keyPressEvent(self, ev):
-        key = ev.key()
-        if key == Qt.Key.Key_Space:
-            if hasattr(self, 'player') and self.player is not None:
-                from PyQt6.QtMultimedia import QMediaPlayer
-                if self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
-                    self.player.pause()
-                    self._overlay("⏸  Paused")
-                else:
-                    self.player.play()
-                    self._overlay("▶  Playing")
+    def onSpacePressed(self):
+        if hasattr(self, 'player') and self.player is not None:
+            from PyQt6.QtMultimedia import QMediaPlayer
+            if self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
+                self.player.pause()
+                self._overlay("⏸  Paused")
             else:
-                self.close()
-        elif hasattr(self, 'player') and self.player is not None:
+                self.player.play()
+                self._overlay("▶  Playing")
+        else:
+            self.close()
+
+    def keyPressEvent(self, ev):
+        if hasattr(self, 'player') and self.player is not None:
+            key = ev.key()
             if key in (Qt.Key.Key_Up, Qt.Key.Key_Down):
                 v = self.volSldr.value() + (5 if key == Qt.Key.Key_Up else -5)
                 v = max(0, min(100, v))
@@ -605,13 +610,6 @@ class MHApp(QMainWindow):
             except Exception:
                 pass
 
-    def eventFilter(self, obj, event):
-        if obj is self.fileTbl and event.type() == QEvent.Type.KeyPress:
-            if event.key() == Qt.Key.Key_Space:
-                self.doView()
-                return True
-        return super().eventFilter(obj, event)
-
     # --- Login UI ---
 
     def _initLog(self):
@@ -706,8 +704,11 @@ class MHApp(QMainWindow):
         self.srchIn.textChanged.connect(self.doFilter)
 
         self.fileTbl = QTableWidget(0, 3)
-        self.fileTbl.installEventFilter(self)
         self.fileTbl.setHorizontalHeaderLabels(["", "Filename", "Size"])
+
+        self.tableSpaceShortcut = QShortcut(QKeySequence(Qt.Key.Key_Space), self.fileTbl)
+        self.tableSpaceShortcut.setContext(Qt.ShortcutContext.WidgetShortcut)
+        self.tableSpaceShortcut.activated.connect(self.doView)
         self.fileTbl.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
         self.fileTbl.setColumnWidth(0, 80)
         self.fileTbl.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
