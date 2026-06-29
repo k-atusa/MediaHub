@@ -487,7 +487,8 @@ class Viewer(QMainWindow):
             self._ovLbl.setWindowFlags(
                 Qt.WindowType.FramelessWindowHint |
                 Qt.WindowType.WindowStaysOnTopHint |
-                Qt.WindowType.Tool)
+                Qt.WindowType.Tool |
+                Qt.WindowType.WindowTransparentForInput)
             self._ovLbl.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
             self._ovLbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
             self._ovLbl.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
