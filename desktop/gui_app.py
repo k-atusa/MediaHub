@@ -86,6 +86,20 @@ class ScaleLabel(QLabel):
 
     def totalScale(self):
         return self.getFitScale() * self._sc
+    def _clampOff(self):
+        if not self._pm:
+            return
+        img_w = self._pm.width() * self.totalScale()
+        img_h = self._pm.height() * self.totalScale()
+        cx = self.width() / 2.0
+        cy = self.height() / 2.0
+        
+        max_x = max(0.0, (img_w / 2.0) - cx)
+        max_y = max(0.0, (img_h / 2.0) - cy)
+        
+        x = max(-max_x, min(self._off.x(), max_x))
+        y = max(-max_y, min(self._off.y(), max_y))
+        self._off = QPointF(x, y)
 
     def wheelEvent(self, ev):
         if not self._pm:
@@ -108,6 +122,7 @@ class ScaleLabel(QLabel):
         
         self._off = mouse_from_center - (mouse_from_center - self._off) * actual_step
         self._sc = new_sc
+        self._clampOff()
         self.zoomChanged.emit(self.totalScale())
         self.update()
 
@@ -119,11 +134,13 @@ class ScaleLabel(QLabel):
         if ev.buttons() & Qt.MouseButton.LeftButton:
             self._off += ev.position() - self._last
             self._last = ev.position()
+            self._clampOff()
             self.update()
 
     def resizeEvent(self, ev):
         super().resizeEvent(ev)
         if self._pm:
+            self._clampOff()
             self.zoomChanged.emit(self.totalScale())
 
     def paintEvent(self, ev):
@@ -160,6 +177,7 @@ class ScaleLabel(QLabel):
         target_sc = max(0.1, min(target_sc, 10.0))
         self._off = self._off * (target_sc / self._sc)
         self._sc = target_sc
+        self._clampOff()
         self.zoomChanged.emit(self.totalScale())
         self.update()
 
