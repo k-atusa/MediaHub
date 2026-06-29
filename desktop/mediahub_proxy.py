@@ -75,7 +75,8 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         mime = {
             "mp4": "video/mp4", "webm": "video/webm", "mov": "video/mp4",
             "mkv": "video/x-matroska", "png": "image/png", "jpg": "image/jpeg",
-            "pdf": "application/pdf"
+            "jpeg": "image/jpeg", "gif": "image/gif", "webp": "image/webp",
+            "svg": "image/svg+xml", "pdf": "application/pdf"
         }.get(ext, "application/octet-stream")
 
         if partial:

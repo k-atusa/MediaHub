@@ -319,7 +319,7 @@ class Viewer(QMainWindow):
         self.lay.setContentsMargins(10, 10, 10, 10)
 
         ext = fileName.split('.')[-1].lower()
-        if ext in ['png', 'jpg', 'jpeg', 'gif', 'webp']:
+        if ext in ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']:
             self._showImg()
         elif ext in ['mp4', 'webm', 'mov', 'mkv']:
             self._showVid()
@@ -846,7 +846,7 @@ class MHApp(QMainWindow):
         self.proxy.updCtx(self.cli, files)
         self._thumbWk = []
 
-        IMG = {'jpg', 'jpeg', 'png', 'gif', 'webp'}
+        IMG = {'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'}
         VID = {'mp4', 'webm', 'mov', 'mkv'}
         TXT = {'txt', 'md', 'csv', 'py', 'json', 'log'}
 
@@ -864,7 +864,10 @@ class MHApp(QMainWindow):
             ext = name.rsplit('.', 1)[-1].lower() if '.' in name else ''
 
             if ext in IMG | VID:
-                thLbl.setText("⏳")
+                if ext == 'svg':
+                    thLbl.setText("🎨")
+                else:
+                    thLbl.setText("⏳")
                 thLbl.setStyleSheet("color:#888; font-size:22px;")
                 fk = info[:44]
                 fpid = self.cli.objPid(fk)
