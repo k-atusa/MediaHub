@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                              QStackedWidget, QFileDialog, QMessageBox, QInputDialog, QTableWidget,
                              QTableWidgetItem, QHeaderView, QProgressBar, QTextEdit, QSlider,
                              QStyle, QCheckBox)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl, QPoint, QPointF
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl, QPoint, QPointF, QEvent
 from PyQt6.QtGui import QFont, QIcon, QColor, QPixmap, QPainter, QImage
 try:
     from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
@@ -449,27 +449,30 @@ class Viewer(QMainWindow):
                 self.player.play()
 
     def keyPressEvent(self, ev):
-        if not hasattr(self, 'player'):
-            super().keyPressEvent(ev)
-            return
         key = ev.key()
         if key == Qt.Key.Key_Space:
-            from PyQt6.QtMultimedia import QMediaPlayer
-            if self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
-                self.player.pause()
-                self._overlay("⏸  Paused")
+            if hasattr(self, 'player') and self.player is not None:
+                from PyQt6.QtMultimedia import QMediaPlayer
+                if self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
+                    self.player.pause()
+                    self._overlay("⏸  Paused")
+                else:
+                    self.player.play()
+                    self._overlay("▶  Playing")
             else:
-                self.player.play()
-                self._overlay("▶  Playing")
-        elif key in (Qt.Key.Key_Up, Qt.Key.Key_Down):
-            v = self.volSldr.value() + (5 if key == Qt.Key.Key_Up else -5)
-            v = max(0, min(100, v))
-            self.volSldr.setValue(v)
-            self._overlay(f"Volume: {v}%")
-        elif key in (Qt.Key.Key_Left, Qt.Key.Key_Right):
-            off = 10000 if key == Qt.Key.Key_Right else -10000
-            self.player.setPosition(max(0, min(self.player.duration(), self.player.position() + off)))
-            self._overlay(f"Seek: {'+10s' if off > 0 else '-10s'}")
+                self.close()
+        elif hasattr(self, 'player') and self.player is not None:
+            if key in (Qt.Key.Key_Up, Qt.Key.Key_Down):
+                v = self.volSldr.value() + (5 if key == Qt.Key.Key_Up else -5)
+                v = max(0, min(100, v))
+                self.volSldr.setValue(v)
+                self._overlay(f"Volume: {v}%")
+            elif key in (Qt.Key.Key_Left, Qt.Key.Key_Right):
+                off = 10000 if key == Qt.Key.Key_Right else -10000
+                self.player.setPosition(max(0, min(self.player.duration(), self.player.position() + off)))
+                self._overlay(f"Seek: {'+10s' if off > 0 else '-10s'}")
+            else:
+                super().keyPressEvent(ev)
         else:
             super().keyPressEvent(ev)
 
@@ -602,6 +605,13 @@ class MHApp(QMainWindow):
             except Exception:
                 pass
 
+    def eventFilter(self, obj, event):
+        if obj is self.fileTbl and event.type() == QEvent.Type.KeyPress:
+            if event.key() == Qt.Key.Key_Space:
+                self.doView()
+                return True
+        return super().eventFilter(obj, event)
+
     # --- Login UI ---
 
     def _initLog(self):
@@ -696,6 +706,7 @@ class MHApp(QMainWindow):
         self.srchIn.textChanged.connect(self.doFilter)
 
         self.fileTbl = QTableWidget(0, 3)
+        self.fileTbl.installEventFilter(self)
         self.fileTbl.setHorizontalHeaderLabels(["", "Filename", "Size"])
         self.fileTbl.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
         self.fileTbl.setColumnWidth(0, 80)
