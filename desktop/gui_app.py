@@ -305,12 +305,13 @@ class Viewer(QMainWindow):
         self.setWindowTitle(f"MediaHub - {fileName}")
         self.resize(800, 600)
         self.setStyleSheet("""
-            QMainWindow { background-color: #121212; color: #FFFFFF; }
-            QWidget { font-family: 'Inter', 'Segoe UI', sans-serif; font-size: 14px; }
-            QLabel { color: #E0E0E0; }
-            QTextEdit { background-color: #1E1E1E; color: #E0E0E0; border: 1px solid #333; padding: 10px; }
-            QPushButton { background-color: #BB86FC; color: #000; border: none; border-radius: 6px; padding: 10px 20px; font-weight: bold; }
-            QPushButton:hover { background-color: #9965f4; }
+            QMainWindow { background-color: #1E1E1E; color: #FFFFFF; }
+            QWidget { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif; font-size: 13px; }
+            QLabel { color: #FFFFFF; }
+            QTextEdit { background-color: #282828; color: #FFFFFF; border: 1px solid #3A3A3C; border-radius: 6px; padding: 10px; }
+            QPushButton { background-color: #3A3A3C; color: #FFFFFF; border: 1px solid #48484A; border-radius: 6px; padding: 6px 14px; font-weight: 500; }
+            QPushButton:hover { background-color: #48484A; border-color: #5C5C5E; }
+            QPushButton:pressed { background-color: #2C2C2E; border-color: #2C2C2E; }
         """)
 
         self.cw = QWidget()
@@ -545,20 +546,31 @@ class MHApp(QMainWindow):
         self.setWindowTitle("MediaHub Desktop")
         self.resize(1000, 700)
         self.setStyleSheet("""
-            QMainWindow { background-color: #121212; color: #FFFFFF; }
-            QWidget { font-family: 'Inter', 'Segoe UI', sans-serif; font-size: 14px; }
-            QLabel { color: #E0E0E0; }
-            QLineEdit { background-color: #1E1E1E; color: #FFF; border: 1px solid #333; border-radius: 6px; padding: 10px; }
-            QLineEdit:focus { border: 1px solid #BB86FC; }
-            QPushButton { background-color: #BB86FC; color: #000; border: none; border-radius: 6px; padding: 10px 20px; font-weight: bold; }
-            QPushButton:hover { background-color: #9965f4; }
-            QPushButton:disabled { background-color: #555; color: #888; }
-            QListWidget, QTableWidget { background-color: #1E1E1E; color: #E0E0E0; border: 1px solid #333; border-radius: 6px; }
-            QListWidget::item:selected, QTableWidget::item:selected { background-color: #BB86FC; color: #000; }
-            QHeaderView::section { background-color: #1E1E1E; color: #BB86FC; padding: 5px; border: none; font-weight: bold; }
+            QMainWindow { background-color: #1E1E1E; color: #FFFFFF; }
+            QWidget { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif; font-size: 13px; }
+            QLabel { color: #FFFFFF; }
+            QLineEdit { background-color: #282828; color: #FFFFFF; border: 1px solid #3A3A3C; border-radius: 6px; padding: 6px 10px; selection-background-color: #0A84FF; }
+            QLineEdit:focus { border: 1px solid #0A84FF; }
+            QPushButton { background-color: #0A84FF; color: #FFFFFF; border: none; border-radius: 6px; padding: 8px 16px; font-weight: 500; }
+            QPushButton:hover { background-color: #007AFF; }
+            QPushButton:pressed { background-color: #0062CC; }
+            QPushButton:disabled { background-color: #3A3A3C; color: #8E8E93; }
+            QListWidget, QTableWidget { background-color: #1E1E1E; color: #FFFFFF; border: 1px solid #3A3A3C; border-radius: 6px; outline: 0; }
+            QListWidget::item { padding: 6px 10px; border-radius: 4px; margin: 2px 4px; }
+            QListWidget::item:selected, QTableWidget::item:selected { background-color: #0A84FF; color: #FFFFFF; }
+            QHeaderView::section { background-color: #1E1E1E; color: #8E8E93; padding: 4px 8px; border: none; border-bottom: 1px solid #3A3A3C; font-weight: 500; }
             QTableWidget QTableCornerButton::section { background-color: #1E1E1E; }
-            QCheckBox { color: #E0E0E0; spacing: 6px; }
-            QCheckBox::indicator { width: 16px; height: 16px; }
+            QCheckBox { color: #FFFFFF; spacing: 6px; }
+            QCheckBox::indicator { width: 16px; height: 16px; border-radius: 4px; border: 1px solid #3A3A3C; background-color: #282828; }
+            QCheckBox::indicator:checked { background-color: #0A84FF; border-color: #0A84FF; }
+            QScrollBar:vertical { border: none; background: #1E1E1E; width: 10px; margin: 0px 0px 0px 0px; }
+            QScrollBar::handle:vertical { background: #555555; min-height: 20px; border-radius: 5px; }
+            QScrollBar::handle:vertical:hover { background: #777777; }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { border: none; background: none; height: 0px; }
+            QScrollBar:horizontal { border: none; background: #1E1E1E; height: 10px; margin: 0px 0px 0px 0px; }
+            QScrollBar::handle:horizontal { background: #555555; min-width: 20px; border-radius: 5px; }
+            QScrollBar::handle:horizontal:hover { background: #777777; }
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { border: none; background: none; width: 0px; }
         """)
 
         self.stack = QStackedWidget()
@@ -619,7 +631,7 @@ class MHApp(QMainWindow):
         lay.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         title = QLabel("MediaHub")
-        title.setStyleSheet("font-size: 32px; font-weight: bold; color: #BB86FC; margin-bottom: 20px;")
+        title.setStyleSheet("font-size: 32px; font-weight: bold; color: #FFFFFF; margin-bottom: 20px;")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.urlIn = QLineEdit()
@@ -643,7 +655,7 @@ class MHApp(QMainWindow):
         self.logBtn.clicked.connect(self.doLogin)
 
         self.statLbl = QLabel("")
-        self.statLbl.setStyleSheet("color: #CF6679;")
+        self.statLbl.setStyleSheet("color: #FF453A;")
         self.statLbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         lay.addWidget(title)
@@ -660,30 +672,74 @@ class MHApp(QMainWindow):
 
     def _initMain(self):
         w = QWidget()
-        lay = QHBoxLayout()
+        # Main layout is vertical (Top Bar + Split Content)
+        mainLay = QVBoxLayout()
+        mainLay.setContentsMargins(0, 0, 0, 0)
+        mainLay.setSpacing(0)
 
-        # sidebar
+        # --- Top Toolbar ---
+        topBar = QWidget()
+        topBar.setStyleSheet("background-color: rgba(255, 255, 255, 0.05); border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding: 10px;")
+        topLay = QHBoxLayout()
+        topLay.setContentsMargins(15, 10, 15, 10)
+
+        # Action Buttons
+        self.upBtn = QPushButton("Upload")
+        self.upBtn.clicked.connect(self.doUpload)
+        self.upDirBtn = QPushButton("Upload Dir")
+        self.upDirBtn.clicked.connect(self.doUpDir)
+        self.dnBtn = QPushButton("Download")
+        self.dnBtn.clicked.connect(self.doDown)
+        self.viewBtn = QPushButton("View")
+        self.viewBtn.clicked.connect(self.doView)
+
+        # Search Bar
+        self.srchIn = QLineEdit()
+        self.srchIn.setPlaceholderText("Search...")
+        self.srchIn.setFixedWidth(200)
+        self.srchIn.textChanged.connect(self.doFilter)
+
+        topLay.addWidget(self.upBtn)
+        topLay.addWidget(self.upDirBtn)
+        topLay.addWidget(self.dnBtn)
+        topLay.addWidget(self.viewBtn)
+        topLay.addStretch()
+        topLay.addWidget(self.srchIn)
+        topBar.setLayout(topLay)
+
+        # --- Split Area ---
+        splitWidget = QWidget()
+        splitLay = QHBoxLayout()
+        splitLay.setContentsMargins(0, 0, 0, 0)
+        splitLay.setSpacing(0)
+
+        # Sidebar
         sb = QWidget()
-        sbLay = QVBoxLayout()
-        sbLay.setContentsMargins(0, 0, 0, 0)
         sb.setFixedWidth(250)
+        sb.setStyleSheet("background-color: rgba(0, 0, 0, 0.2); border-right: 1px solid rgba(255, 255, 255, 0.1);")
+        sbLay = QVBoxLayout()
+        sbLay.setContentsMargins(10, 15, 10, 15)
 
-        fldLbl = QLabel("Folders")
-        fldLbl.setStyleSheet("font-size: 18px; font-weight: bold; margin-bottom: 10px; color: #BB86FC;")
+        fldLbl = QLabel("Favorites")
+        fldLbl.setStyleSheet("font-size: 13px; font-weight: 600; margin-bottom: 5px; margin-left: 5px; color: rgba(255, 255, 255, 0.6);")
 
         self.fldList = QListWidget()
         self.fldList.itemClicked.connect(self.onFldSel)
+        self.fldList.setStyleSheet("background: transparent; border: none;")
 
         btnLay = QHBoxLayout()
-        newBtn = QPushButton("New Folder")
+        newBtn = QPushButton("+")
+        newBtn.setFixedWidth(40)
         newBtn.clicked.connect(self.doMkFld)
-        refBtn = QPushButton("Refresh")
+        refBtn = QPushButton("⟳")
+        refBtn.setFixedWidth(40)
         refBtn.clicked.connect(self.doFlds)
         btnLay.addWidget(newBtn)
         btnLay.addWidget(refBtn)
+        btnLay.addStretch()
 
         logoutBtn = QPushButton("Logout")
-        logoutBtn.setStyleSheet("background-color: #333; color: #CF6679; font-size: 12px; padding: 6px;")
+        logoutBtn.setStyleSheet("background-color: transparent; color: #FF453A; font-size: 13px; font-weight: 500; border: 1px solid rgba(255, 69, 58, 0.5);")
         logoutBtn.clicked.connect(self.doLogout)
 
         sbLay.addWidget(fldLbl)
@@ -692,24 +748,23 @@ class MHApp(QMainWindow):
         sbLay.addWidget(logoutBtn)
         sb.setLayout(sbLay)
 
-        # content
+        # Content Area
         ct = QWidget()
+        ct.setStyleSheet("background-color: transparent;")
         ctLay = QVBoxLayout()
-        ctLay.setContentsMargins(15, 0, 0, 0)
+        ctLay.setContentsMargins(20, 15, 20, 20)
 
         self.curLbl = QLabel("Select a folder")
-        self.curLbl.setStyleSheet("font-size: 24px; font-weight: bold; margin-bottom: 10px;")
-
-        self.srchIn = QLineEdit()
-        self.srchIn.setPlaceholderText("Search files...")
-        self.srchIn.textChanged.connect(self.doFilter)
+        self.curLbl.setStyleSheet("font-size: 28px; font-weight: 700; color: #FFFFFF; margin-bottom: 10px; background: transparent; border: none;")
 
         self.fileTbl = QTableWidget(0, 3)
         self.fileTbl.setHorizontalHeaderLabels(["", "Filename", "Size"])
-
+        self.fileTbl.setStyleSheet("background-color: rgba(0, 0, 0, 0.1); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px;")
+        
         self.tableSpaceShortcut = QShortcut(QKeySequence(Qt.Key.Key_Space), self.fileTbl)
         self.tableSpaceShortcut.setContext(Qt.ShortcutContext.WidgetShortcut)
         self.tableSpaceShortcut.activated.connect(self.doView)
+        
         self.fileTbl.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
         self.fileTbl.setColumnWidth(0, 80)
         self.fileTbl.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
@@ -719,53 +774,34 @@ class MHApp(QMainWindow):
         self.fileTbl.itemDoubleClicked.connect(self.doView)
         self.fileTbl.setSortingEnabled(True)
         self.fileTbl.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
-        self.fileTbl.verticalHeader().setDefaultSectionSize(70)
+        self.fileTbl.verticalHeader().setDefaultSectionSize(60)
         self.fileTbl.verticalHeader().hide()
-        self.fileTbl.horizontalHeader().sectionClicked.connect(
-            lambda c: self.fileTbl.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder) if c == 0 else None)
-
-        actLay = QHBoxLayout()
-        self.upBtn = QPushButton("Upload Files")
-        self.upBtn.clicked.connect(self.doUpload)
-        self.upDirBtn = QPushButton("Upload Directory")
-        self.upDirBtn.clicked.connect(self.doUpDir)
-        self.dnBtn = QPushButton("Download Selected")
-        self.dnBtn.clicked.connect(self.doDown)
-        self.viewBtn = QPushButton("View File")
-        self.viewBtn.clicked.connect(self.doView)
-        actLay.addWidget(self.upBtn)
-        actLay.addWidget(self.upDirBtn)
-        actLay.addWidget(self.dnBtn)
-        actLay.addWidget(self.viewBtn)
-        actLay.addStretch()
 
         self.progBar = QProgressBar()
         self.progBar.setVisible(False)
         self.progBar.setRange(0, 100)
         self.progBar.setTextVisible(False)
         self.progBar.setStyleSheet("""
-            QProgressBar { border: 1px solid #333; border-radius: 5px; background-color: #1E1E1E; height: 10px; }
-            QProgressBar::chunk { background-color: #BB86FC; border-radius: 5px; }
+            QProgressBar { border: none; border-radius: 4px; background-color: rgba(0, 0, 0, 0.3); height: 8px; }
+            QProgressBar::chunk { background-color: #0A84FF; border-radius: 4px; }
         """)
         self.upStatLbl = QLabel("")
         self.upStatLbl.setVisible(False)
-        self.upStatLbl.setStyleSheet("color: #BB86FC; font-size: 12px;")
-
-        progLay = QVBoxLayout()
-        progLay.setSpacing(2)
-        progLay.addWidget(self.upStatLbl)
-        progLay.addWidget(self.progBar)
+        self.upStatLbl.setStyleSheet("color: #FFFFFF; font-size: 12px; font-weight: 500; background: transparent; border: none;")
 
         ctLay.addWidget(self.curLbl)
-        ctLay.addWidget(self.srchIn)
         ctLay.addWidget(self.fileTbl)
-        ctLay.addLayout(actLay)
-        ctLay.addLayout(progLay)
+        ctLay.addWidget(self.upStatLbl)
+        ctLay.addWidget(self.progBar)
         ct.setLayout(ctLay)
 
-        lay.addWidget(sb)
-        lay.addWidget(ct)
-        w.setLayout(lay)
+        splitLay.addWidget(sb)
+        splitLay.addWidget(ct)
+        splitWidget.setLayout(splitLay)
+
+        mainLay.addWidget(topBar)
+        mainLay.addWidget(splitWidget)
+        w.setLayout(mainLay)
         self.stack.addWidget(w)
 
     # --- Actions ---
