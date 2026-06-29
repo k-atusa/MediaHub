@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                              QStackedWidget, QFileDialog, QMessageBox, QInputDialog, QTableWidget,
                              QTableWidgetItem, QHeaderView, QProgressBar, QTextEdit, QSlider,
                              QStyle, QCheckBox)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl, QPoint, QPointF
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl, QPoint, QPointF, QSize
 from PyQt6.QtGui import QFont, QIcon, QColor, QPixmap, QPainter, QImage, QShortcut, QKeySequence
 try:
     from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
@@ -709,13 +709,13 @@ class MHApp(QMainWindow):
             return QIcon(os.path.join(os.path.dirname(__file__), "icons", f"{name}.svg"))
 
         # Action Buttons
-        self.newBtn = QPushButton("New Folder")
-        self.newBtn.setIcon(_icon("new-folder"))
-        self.newBtn.clicked.connect(self.doMkFld)
-        
         self.refBtn = QPushButton("Refresh")
         self.refBtn.setIcon(_icon("refresh"))
         self.refBtn.clicked.connect(self.doFlds)
+        
+        self.newBtn = QPushButton("New Folder")
+        self.newBtn.setIcon(_icon("new-folder"))
+        self.newBtn.clicked.connect(self.doMkFld)
         
         self.upBtn = QPushButton("Upload")
         self.upBtn.setIcon(_icon("upload"))
@@ -729,9 +729,10 @@ class MHApp(QMainWindow):
         self.dnBtn.setIcon(_icon("download"))
         self.dnBtn.clicked.connect(self.doDown)
         
-        self.viewBtn = QPushButton("View")
-        self.viewBtn.setIcon(_icon("view"))
-        self.viewBtn.clicked.connect(self.doView)
+        self.viewModeBtn = QPushButton("View")
+        self.viewModeBtn.setIcon(_icon("view"))
+        self.viewModeBtn.clicked.connect(self.doToggleViewMode)
+        self.isIconView = False
 
         # Search Bar
         self.srchIn = QLineEdit()
@@ -749,7 +750,7 @@ class MHApp(QMainWindow):
         topLay.addWidget(self.upBtn)
         topLay.addWidget(self.upDirBtn)
         topLay.addWidget(self.dnBtn)
-        topLay.addWidget(self.viewBtn)
+        topLay.addWidget(self.viewModeBtn)
         topLay.addStretch()
         topLay.addWidget(self.srchIn)
         topLay.addWidget(self.logoutBtn)
@@ -787,18 +788,16 @@ class MHApp(QMainWindow):
         ctLay.setContentsMargins(20, 15, 20, 20)
 
         self.curLbl = QLabel("Select a folder")
-        self.curLbl.setStyleSheet("font-size: 28px; font-weight: 700; color: #FFFFFF; margin-bottom: 10px; background: transparent; border: none;")
+        self.curLbl.setStyleSheet("font-size: 20px; font-weight: 700; color: #FFFFFF; margin-bottom: 10px; background: transparent; border: none;")
+
+        self.fileStack = QStackedWidget()
 
         self.fileTbl = QTableWidget(0, 3)
         self.fileTbl.setHorizontalHeaderLabels(["", "Filename", "Size"])
         self.fileTbl.setStyleSheet("background-color: transparent; border: none;")
         
-        self.tableSpaceShortcut = QShortcut(QKeySequence(Qt.Key.Key_Space), self.fileTbl)
-        self.tableSpaceShortcut.setContext(Qt.ShortcutContext.WidgetShortcut)
-        self.tableSpaceShortcut.activated.connect(self.doView)
-        
         self.fileTbl.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        self.fileTbl.setColumnWidth(0, 80)
+        self.fileTbl.setColumnWidth(0, 40)
         self.fileTbl.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.fileTbl.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         self.fileTbl.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -808,6 +807,21 @@ class MHApp(QMainWindow):
         self.fileTbl.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
         self.fileTbl.verticalHeader().setDefaultSectionSize(26)
         self.fileTbl.verticalHeader().hide()
+        
+        self.fileIconList = QListWidget()
+        self.fileIconList.setViewMode(QListWidget.ViewMode.IconMode)
+        self.fileIconList.setResizeMode(QListWidget.ResizeMode.Adjust)
+        self.fileIconList.setIconSize(QSize(64, 64))
+        self.fileIconList.setSpacing(10)
+        self.fileIconList.setStyleSheet("background-color: transparent; border: none; outline: 0;")
+        self.fileIconList.itemDoubleClicked.connect(self.doView)
+        
+        self.fileStack.addWidget(self.fileTbl)
+        self.fileStack.addWidget(self.fileIconList)
+
+        self.tableSpaceShortcut = QShortcut(QKeySequence(Qt.Key.Key_Space), self.fileStack)
+        self.tableSpaceShortcut.setContext(Qt.ShortcutContext.WidgetShortcut)
+        self.tableSpaceShortcut.activated.connect(self.doView)
 
         self.progBar = QProgressBar()
         self.progBar.setVisible(False)
@@ -822,7 +836,7 @@ class MHApp(QMainWindow):
         self.upStatLbl.setStyleSheet("color: #FFFFFF; font-size: 12px; font-weight: 500; background: transparent; border: none;")
 
         ctLay.addWidget(self.curLbl)
-        ctLay.addWidget(self.fileTbl)
+        ctLay.addWidget(self.fileStack)
         ctLay.addWidget(self.upStatLbl)
         ctLay.addWidget(self.progBar)
         ct.setLayout(ctLay)
@@ -838,12 +852,19 @@ class MHApp(QMainWindow):
 
     # --- Actions ---
 
+    def doToggleViewMode(self):
+        self.isIconView = not self.isIconView
+        self.fileStack.setCurrentIndex(1 if self.isIconView else 0)
+
     def doFilter(self, text):
         s = unicodedata.normalize('NFC', text).lower()
         for r in range(self.fileTbl.rowCount()):
             it = self.fileTbl.item(r, 1)
             if it:
                 self.fileTbl.setRowHidden(r, s not in unicodedata.normalize('NFC', it.text()).lower())
+        for i in range(self.fileIconList.count()):
+            it = self.fileIconList.item(i)
+            it.setHidden(s not in unicodedata.normalize('NFC', it.text()).lower())
 
     def doLogin(self):
         url = self.urlIn.text().strip()
@@ -877,6 +898,7 @@ class MHApp(QMainWindow):
         self.cli = None
         self.fldList.clear()
         self.fileTbl.setRowCount(0)
+        self.fileIconList.clear()
         self.passIn.clear()
         self.autoChk.setChecked(False)
         self.stack.setCurrentIndex(0)
@@ -906,8 +928,9 @@ class MHApp(QMainWindow):
 
     def onFldSel(self, item):
         self.curFld = item.text()
-        self.curLbl.setText(f"Folder: {self.curFld}")
+        self.curLbl.setText(self.curFld)
         self.fileTbl.setRowCount(0)
+        self.fileIconList.clear()
         self._wk = WkFiles(self.cli, self.curFld)
         self._wk.success.connect(self._onFiles)
         self._wk.error.connect(lambda e: QMessageBox.critical(self, "Error", f"Failed to fetch files: {e}"))
@@ -933,36 +956,45 @@ class MHApp(QMainWindow):
 
         self.fileTbl.setSortingEnabled(False)
         self.fileTbl.setRowCount(0)
+        self.fileIconList.clear()
 
         for name, info in files.items():
             sz = Opsec.DecodeInt(info[44:52], False)
             row = self.fileTbl.rowCount()
             self.fileTbl.insertRow(row)
-            self.fileTbl.setRowHeight(row, 70)
+            self.fileTbl.setRowHeight(row, 26)
 
             thLbl = QLabel()
             thLbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             ext = name.rsplit('.', 1)[-1].lower() if '.' in name else ''
+            
+            iconItem = QListWidgetItem(name)
+            iconItem.setData(Qt.ItemDataRole.UserRole, name.lower())
+            iconItem.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
             if ext in IMG | VID:
                 if ext == 'svg':
                     thLbl.setText("🎨")
                 else:
                     thLbl.setText("⏳")
-                thLbl.setStyleSheet("color:#888; font-size:22px;")
+                thLbl.setStyleSheet("color:#888; font-size:16px;")
                 fk = info[:44]
                 fpid = self.cli.objPid(fk)
                 thLbl.setProperty("fpid", fpid)
+                iconItem.setData(Qt.ItemDataRole.UserRole + 1, fpid)
                 w = WkThumb(self.cli, pid, fpid, fk)
                 w.success.connect(self._onThumb)
                 w.start()
                 self._thumbWk.append(w)
             elif ext == 'pdf':
-                thLbl.setText("📄"); thLbl.setStyleSheet("font-size:32px;")
+                thLbl.setText("📄"); thLbl.setStyleSheet("font-size:18px;")
+                iconItem.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
             elif ext in TXT:
-                thLbl.setText("📝"); thLbl.setStyleSheet("font-size:32px;")
+                thLbl.setText("📝"); thLbl.setStyleSheet("font-size:18px;")
+                iconItem.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
             else:
-                thLbl.setText("📁"); thLbl.setStyleSheet("font-size:32px;")
+                thLbl.setText("📁"); thLbl.setStyleSheet("font-size:18px;")
+                iconItem.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DirIcon))
 
             self.fileTbl.setCellWidget(row, 0, thLbl)
             self.fileTbl.setItem(row, 0, SortItem(""))
@@ -974,8 +1006,10 @@ class MHApp(QMainWindow):
 
             self.fileTbl.setItem(row, 1, nItem)
             self.fileTbl.setItem(row, 2, sItem)
+            self.fileIconList.addItem(iconItem)
 
         self.fileTbl.setSortingEnabled(True)
+        self.fileIconList.sortItems()
         self.doFilter(self.srchIn.text())
 
     def _onThumb(self, fpid, raw):
@@ -983,20 +1017,26 @@ class MHApp(QMainWindow):
         pm = QPixmap.fromImage(QImage.fromData(raw))
         if pm.isNull():
             return
-        scaled = pm.scaled(68, 68, Qt.AspectRatioMode.KeepAspectRatio,
+        scaled = pm.scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio,
                            Qt.TransformationMode.SmoothTransformation)
-        # find row by fpid to handle sorting correctly
         for r in range(self.fileTbl.rowCount()):
             lbl = self.fileTbl.cellWidget(r, 0)
             if lbl and lbl.property("fpid") == fpid:
                 lbl.setPixmap(scaled)
+                break
+                
+        scaled_large = pm.scaled(64, 64, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        for i in range(self.fileIconList.count()):
+            it = self.fileIconList.item(i)
+            if it.data(Qt.ItemDataRole.UserRole + 1) == fpid:
+                it.setIcon(QIcon(scaled_large))
                 break
 
     def _setLoad(self, on=True):
         self.upBtn.setEnabled(not on)
         self.upDirBtn.setEnabled(not on)
         self.dnBtn.setEnabled(not on)
-        self.viewBtn.setEnabled(not on)
+        self.viewModeBtn.setEnabled(not on)
         self.progBar.setVisible(on)
         self.upStatLbl.setVisible(on)
         if on:
