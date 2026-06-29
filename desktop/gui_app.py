@@ -314,19 +314,19 @@ class Viewer(QMainWindow):
             QTextEdit { 
                 background-color: rgba(0, 0, 0, 0.4); 
                 color: #FFFFFF; 
-                border: 1px solid rgba(255, 255, 255, 0.15); 
+                border: 1px solid #3A3A3C; 
                 border-radius: 12px; 
                 padding: 10px; 
             }
             QPushButton { 
                 background-color: rgba(255, 255, 255, 0.1); 
                 color: #FFFFFF; 
-                border: 1px solid rgba(255, 255, 255, 0.2); 
+                border: 1px solid #48484A; 
                 border-radius: 8px; 
                 padding: 6px 14px; 
                 font-weight: 500; 
             }
-            QPushButton:hover { background-color: rgba(255, 255, 255, 0.2); border-color: rgba(255, 255, 255, 0.4); }
+            QPushButton:hover { background-color: rgba(255, 255, 255, 0.2); border-color: #5C5C5E; }
             QPushButton:pressed { background-color: rgba(255, 255, 255, 0.05); }
         """)
 
@@ -568,10 +568,10 @@ class MHApp(QMainWindow):
             }
             QWidget { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif; font-size: 13px; }
             QLabel { color: #FFFFFF; }
-            QLineEdit { background-color: rgba(0, 0, 0, 0.4); color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; padding: 6px 10px; selection-background-color: rgba(255, 255, 255, 0.3); }
-            QLineEdit:focus { border: 1px solid rgba(255, 255, 255, 0.5); background-color: rgba(0, 0, 0, 0.6); }
-            QPushButton { background-color: rgba(255, 255, 255, 0.1); color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; padding: 8px 16px; font-weight: 500; }
-            QPushButton:hover { background-color: rgba(255, 255, 255, 0.2); border-color: rgba(255, 255, 255, 0.4); }
+            QLineEdit { background-color: rgba(0, 0, 0, 0.4); color: #FFFFFF; border: 1px solid #3A3A3C; border-radius: 8px; padding: 6px 10px; selection-background-color: rgba(255, 255, 255, 0.3); }
+            QLineEdit:focus { border: 1px solid #0A84FF; background-color: rgba(0, 0, 0, 0.6); }
+            QPushButton { background-color: rgba(255, 255, 255, 0.1); color: #FFFFFF; border: 1px solid #48484A; border-radius: 8px; padding: 8px 16px; font-weight: 500; }
+            QPushButton:hover { background-color: rgba(255, 255, 255, 0.2); border-color: #5C5C5E; }
             QPushButton:pressed { background-color: rgba(255, 255, 255, 0.05); }
             QPushButton:disabled { background-color: rgba(0, 0, 0, 0.2); color: rgba(255, 255, 255, 0.3); border-color: transparent; }
             QListWidget, QTableWidget { background-color: rgba(0, 0, 0, 0.2); color: #FFFFFF; border: none; outline: 0; }
@@ -751,9 +751,11 @@ class MHApp(QMainWindow):
         btnLay = QHBoxLayout()
         newBtn = QPushButton("+")
         newBtn.setFixedWidth(40)
+        newBtn.setStyleSheet("font-size: 24px; padding-bottom: 4px; font-weight: bold;")
         newBtn.clicked.connect(self.doMkFld)
         refBtn = QPushButton("⟳")
         refBtn.setFixedWidth(40)
+        refBtn.setStyleSheet("font-size: 22px; padding-bottom: 2px; font-weight: bold;")
         refBtn.clicked.connect(self.doFlds)
         btnLay.addWidget(newBtn)
         btnLay.addWidget(refBtn)
