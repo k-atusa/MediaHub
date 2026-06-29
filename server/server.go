@@ -39,17 +39,22 @@ func initEnv() {
 	os.Chdir(filepath.Dir(realPath))
 
 	// set default value
-	configPath := "./config.json"
+	configPath := "./config/config.json"
 	cfg = Config{
 		StorageDir: "./",
 		Port:       "443",
-		CertFile:   "./cert.pem",
-		KeyFile:    "./key.pem",
+		CertFile:   "./certs/cert.pem",
+		KeyFile:    "./certs/key.pem",
 		InviteCode: "",
 		Notice:     "",
 	}
 
 	// load config, make new if not exists
+	configDir := filepath.Dir(configPath)
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		log.Printf("failed to create config directory: %v", err)
+	}
+
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		file, _ := json.MarshalIndent(cfg, "", "  ")
 		os.WriteFile(configPath, file, 0644)
@@ -65,6 +70,11 @@ func initEnv() {
 	os.MkdirAll("./public", 0755)
 
 	// make certificate if not exists
+	certDir := filepath.Dir(cfg.CertFile)
+	if err := os.MkdirAll(certDir, 0755); err != nil {
+		log.Printf("failed to create certs directory: %v", err)
+	}
+
 	if _, err := os.Stat(cfg.CertFile); os.IsNotExist(err) {
 		log.Println("making self-signed certificate")
 		makeCert(cfg.CertFile, cfg.KeyFile)

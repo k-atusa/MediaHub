@@ -22,9 +22,11 @@ project WHY(Web Hub Yard): Media Hub
 
 ```python
 server
-config.json
-cert.pem
-key.pem
+config/
+  config.json
+certs/
+  cert.pem
+  key.pem
 users/
   ...
 data/
