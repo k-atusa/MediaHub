@@ -586,7 +586,7 @@ class MHApp(QMainWindow):
             }
             QWidget { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif; font-size: 13px; }
             QLabel { color: #FFFFFF; }
-            QLineEdit { background-color: rgba(0, 0, 0, 0.4); color: #FFFFFF; border: 1px solid #3A3A3C; border-radius: 8px; padding: 6px 10px; selection-background-color: rgba(255, 255, 255, 0.3); }
+            QLineEdit { background-color: rgba(0, 0, 0, 0.4); color: #FFFFFF; border: 1px solid #3A3A3C; border-radius: 8px; padding: 7px 10px; selection-background-color: rgba(255, 255, 255, 0.3); }
             QLineEdit:focus { border: 1px solid #0A84FF; background-color: rgba(0, 0, 0, 0.6); }
             QPushButton { background-color: rgba(255, 255, 255, 0.1); color: #FFFFFF; border: 1px solid #48484A; border-radius: 8px; padding: 8px 16px; font-weight: 500; }
             QPushButton:hover { background-color: rgba(255, 255, 255, 0.2); border-color: #5C5C5E; }
@@ -755,6 +755,7 @@ class MHApp(QMainWindow):
         # Search Bar
         self.srchIn = QLineEdit()
         self.srchIn.setPlaceholderText("Search...")
+        self.srchIn.addAction(_icon("search"), QLineEdit.ActionPosition.LeadingPosition)
         self.srchIn.setFixedWidth(200)
         self.srchIn.textChanged.connect(self.doFilter)
 
@@ -788,7 +789,7 @@ class MHApp(QMainWindow):
         sbLay = QVBoxLayout()
         sbLay.setContentsMargins(10, 15, 10, 15)
 
-        fldLbl = QLabel("Favorites")
+        fldLbl = QLabel("Folders")
         fldLbl.setStyleSheet("font-size: 13px; font-weight: 600; margin-bottom: 5px; margin-left: 5px; color: rgba(255, 255, 255, 0.6);")
 
         self.fldList = QListWidget()
