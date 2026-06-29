@@ -90,14 +90,24 @@ class ScaleLabel(QLabel):
     def wheelEvent(self, ev):
         if not self._pm:
             return
-        step = 1.1 if ev.angleDelta().y() > 0 else 0.9
+        delta = ev.angleDelta().y()
+        if delta == 0:
+            return
+        
+        import math
+        step = math.exp(delta * 0.0008)
+        
         pos = ev.position()
         cx = self.width() / 2.0
         cy = self.height() / 2.0
         mouse_from_center = pos - QPointF(cx, cy)
         
-        self._off = mouse_from_center - (mouse_from_center - self._off) * step
-        self._sc = max(0.1, min(self._sc * step, 10.0))
+        old_sc = self._sc
+        new_sc = max(0.1, min(old_sc * step, 10.0))
+        actual_step = new_sc / old_sc
+        
+        self._off = mouse_from_center - (mouse_from_center - self._off) * actual_step
+        self._sc = new_sc
         self.zoomChanged.emit(self.totalScale())
         self.update()
 
