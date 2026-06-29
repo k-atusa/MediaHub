@@ -700,7 +700,8 @@ class MHApp(QMainWindow):
 
         # --- Top Toolbar ---
         topBar = QWidget()
-        topBar.setStyleSheet("background-color: rgba(255, 255, 255, 0.05); border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding: 10px;")
+        topBar.setObjectName("topBar")
+        topBar.setStyleSheet("#topBar { background-color: rgba(255, 255, 255, 0.05); border-bottom: 1px solid rgba(255, 255, 255, 0.1); }")
         topLay = QHBoxLayout()
         topLay.setContentsMargins(15, 10, 15, 10)
 
@@ -762,8 +763,9 @@ class MHApp(QMainWindow):
 
         # Sidebar
         sb = QWidget()
+        sb.setObjectName("sideBar")
         sb.setFixedWidth(250)
-        sb.setStyleSheet("background-color: rgba(0, 0, 0, 0.2); border-right: 1px solid rgba(255, 255, 255, 0.1);")
+        sb.setStyleSheet("#sideBar { background-color: rgba(0, 0, 0, 0.2); border-right: 1px solid rgba(255, 255, 255, 0.1); }")
         sbLay = QVBoxLayout()
         sbLay.setContentsMargins(10, 15, 10, 15)
 
