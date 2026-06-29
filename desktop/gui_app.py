@@ -581,7 +581,7 @@ class MHApp(QMainWindow):
         self.resize(1000, 700)
         self.setStyleSheet("""
             QMainWindow { 
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #1a0b2e, stop:0.5 #160a2b, stop:1 #001f3f); 
+                background-color: #2C2C2E; 
                 color: #FFFFFF; 
             }
             QWidget { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif; font-size: 13px; }
@@ -814,6 +814,7 @@ class MHApp(QMainWindow):
         self.fileTbl = QTableWidget(0, 3)
         self.fileTbl.setHorizontalHeaderLabels(["", "Filename", "Size"])
         self.fileTbl.setStyleSheet("background-color: transparent; border: none;")
+        self.fileTbl.setShowGrid(False)
         
         self.fileTbl.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
         self.fileTbl.setColumnWidth(0, 40)
