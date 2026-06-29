@@ -305,13 +305,29 @@ class Viewer(QMainWindow):
         self.setWindowTitle(f"MediaHub - {fileName}")
         self.resize(800, 600)
         self.setStyleSheet("""
-            QMainWindow { background-color: #1E1E1E; color: #FFFFFF; }
+            QMainWindow { 
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #1a0b2e, stop:1 #001f3f); 
+                color: #FFFFFF; 
+            }
             QWidget { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif; font-size: 13px; }
             QLabel { color: #FFFFFF; }
-            QTextEdit { background-color: #282828; color: #FFFFFF; border: 1px solid #3A3A3C; border-radius: 6px; padding: 10px; }
-            QPushButton { background-color: #3A3A3C; color: #FFFFFF; border: 1px solid #48484A; border-radius: 6px; padding: 6px 14px; font-weight: 500; }
-            QPushButton:hover { background-color: #48484A; border-color: #5C5C5E; }
-            QPushButton:pressed { background-color: #2C2C2E; border-color: #2C2C2E; }
+            QTextEdit { 
+                background-color: rgba(0, 0, 0, 0.4); 
+                color: #FFFFFF; 
+                border: 1px solid rgba(255, 255, 255, 0.15); 
+                border-radius: 12px; 
+                padding: 10px; 
+            }
+            QPushButton { 
+                background-color: rgba(255, 255, 255, 0.1); 
+                color: #FFFFFF; 
+                border: 1px solid rgba(255, 255, 255, 0.2); 
+                border-radius: 8px; 
+                padding: 6px 14px; 
+                font-weight: 500; 
+            }
+            QPushButton:hover { background-color: rgba(255, 255, 255, 0.2); border-color: rgba(255, 255, 255, 0.4); }
+            QPushButton:pressed { background-color: rgba(255, 255, 255, 0.05); }
         """)
 
         self.cw = QWidget()
@@ -546,31 +562,36 @@ class MHApp(QMainWindow):
         self.setWindowTitle("MediaHub Desktop")
         self.resize(1000, 700)
         self.setStyleSheet("""
-            QMainWindow { background-color: #1E1E1E; color: #FFFFFF; }
+            QMainWindow { 
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #1a0b2e, stop:0.5 #160a2b, stop:1 #001f3f); 
+                color: #FFFFFF; 
+            }
             QWidget { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif; font-size: 13px; }
             QLabel { color: #FFFFFF; }
-            QLineEdit { background-color: #282828; color: #FFFFFF; border: 1px solid #3A3A3C; border-radius: 6px; padding: 6px 10px; selection-background-color: #0A84FF; }
-            QLineEdit:focus { border: 1px solid #0A84FF; }
-            QPushButton { background-color: #0A84FF; color: #FFFFFF; border: none; border-radius: 6px; padding: 8px 16px; font-weight: 500; }
-            QPushButton:hover { background-color: #007AFF; }
-            QPushButton:pressed { background-color: #0062CC; }
-            QPushButton:disabled { background-color: #3A3A3C; color: #8E8E93; }
-            QListWidget, QTableWidget { background-color: #1E1E1E; color: #FFFFFF; border: 1px solid #3A3A3C; border-radius: 6px; outline: 0; }
+            QLineEdit { background-color: rgba(0, 0, 0, 0.4); color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; padding: 6px 10px; selection-background-color: rgba(255, 255, 255, 0.3); }
+            QLineEdit:focus { border: 1px solid rgba(255, 255, 255, 0.5); background-color: rgba(0, 0, 0, 0.6); }
+            QPushButton { background-color: rgba(255, 255, 255, 0.1); color: #FFFFFF; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; padding: 8px 16px; font-weight: 500; }
+            QPushButton:hover { background-color: rgba(255, 255, 255, 0.2); border-color: rgba(255, 255, 255, 0.4); }
+            QPushButton:pressed { background-color: rgba(255, 255, 255, 0.05); }
+            QPushButton:disabled { background-color: rgba(0, 0, 0, 0.2); color: rgba(255, 255, 255, 0.3); border-color: transparent; }
+            QListWidget, QTableWidget { background-color: rgba(0, 0, 0, 0.2); color: #FFFFFF; border: none; outline: 0; }
             QListWidget::item { padding: 6px 10px; border-radius: 4px; margin: 2px 4px; }
-            QListWidget::item:selected, QTableWidget::item:selected { background-color: #0A84FF; color: #FFFFFF; }
-            QHeaderView::section { background-color: #1E1E1E; color: #8E8E93; padding: 4px 8px; border: none; border-bottom: 1px solid #3A3A3C; font-weight: 500; }
-            QTableWidget QTableCornerButton::section { background-color: #1E1E1E; }
+            QListWidget::item:selected, QTableWidget::item:selected { background-color: rgba(255, 255, 255, 0.15); color: #FFFFFF; border-radius: 4px; }
+            QHeaderView::section { background-color: transparent; color: rgba(255, 255, 255, 0.7); padding: 4px 8px; border: none; border-bottom: 1px solid rgba(255, 255, 255, 0.1); font-weight: 500; }
+            QTableWidget QTableCornerButton::section { background-color: transparent; }
             QCheckBox { color: #FFFFFF; spacing: 6px; }
-            QCheckBox::indicator { width: 16px; height: 16px; border-radius: 4px; border: 1px solid #3A3A3C; background-color: #282828; }
-            QCheckBox::indicator:checked { background-color: #0A84FF; border-color: #0A84FF; }
-            QScrollBar:vertical { border: none; background: #1E1E1E; width: 10px; margin: 0px 0px 0px 0px; }
-            QScrollBar::handle:vertical { background: #555555; min-height: 20px; border-radius: 5px; }
-            QScrollBar::handle:vertical:hover { background: #777777; }
+            QCheckBox::indicator { width: 16px; height: 16px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.2); background-color: rgba(0, 0, 0, 0.3); }
+            QCheckBox::indicator:checked { background-color: rgba(255, 255, 255, 0.3); border-color: rgba(255, 255, 255, 0.5); }
+            QScrollBar:vertical { border: none; background: transparent; width: 8px; margin: 0px 0px 0px 0px; }
+            QScrollBar::handle:vertical { background: rgba(255, 255, 255, 0.2); min-height: 20px; border-radius: 4px; }
+            QScrollBar::handle:vertical:hover { background: rgba(255, 255, 255, 0.4); }
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { border: none; background: none; height: 0px; }
-            QScrollBar:horizontal { border: none; background: #1E1E1E; height: 10px; margin: 0px 0px 0px 0px; }
-            QScrollBar::handle:horizontal { background: #555555; min-width: 20px; border-radius: 5px; }
-            QScrollBar::handle:horizontal:hover { background: #777777; }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: none; border: none; }
+            QScrollBar:horizontal { border: none; background: transparent; height: 8px; margin: 0px 0px 0px 0px; }
+            QScrollBar::handle:horizontal { background: rgba(255, 255, 255, 0.2); min-width: 20px; border-radius: 4px; }
+            QScrollBar::handle:horizontal:hover { background: rgba(255, 255, 255, 0.4); }
             QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { border: none; background: none; width: 0px; }
+            QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal { background: none; border: none; }
         """)
 
         self.stack = QStackedWidget()
@@ -759,7 +780,7 @@ class MHApp(QMainWindow):
 
         self.fileTbl = QTableWidget(0, 3)
         self.fileTbl.setHorizontalHeaderLabels(["", "Filename", "Size"])
-        self.fileTbl.setStyleSheet("background-color: rgba(0, 0, 0, 0.1); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px;")
+        self.fileTbl.setStyleSheet("background-color: transparent; border: none;")
         
         self.tableSpaceShortcut = QShortcut(QKeySequence(Qt.Key.Key_Space), self.fileTbl)
         self.tableSpaceShortcut.setContext(Qt.ShortcutContext.WidgetShortcut)
@@ -774,7 +795,7 @@ class MHApp(QMainWindow):
         self.fileTbl.itemDoubleClicked.connect(self.doView)
         self.fileTbl.setSortingEnabled(True)
         self.fileTbl.horizontalHeader().setSortIndicator(-1, Qt.SortOrder.AscendingOrder)
-        self.fileTbl.verticalHeader().setDefaultSectionSize(60)
+        self.fileTbl.verticalHeader().setDefaultSectionSize(26)
         self.fileTbl.verticalHeader().hide()
 
         self.progBar = QProgressBar()
