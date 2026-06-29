@@ -370,7 +370,7 @@ class Viewer(QMainWindow):
         self.setWindowTitle(f"MediaHub - {fileName}")
         self.resize(800, 600)
         self.setStyleSheet("""
-            QMainWindow { 
+            QMainWindow, #viewerCw { 
                 background-color: #2C2C2E; 
                 color: #FFFFFF; 
             }
@@ -396,6 +396,7 @@ class Viewer(QMainWindow):
         """)
 
         self.cw = QWidget()
+        self.cw.setObjectName("viewerCw")
         self.setCentralWidget(self.cw)
         self.lay = QVBoxLayout(self.cw)
         self.lay.setContentsMargins(10, 10, 10, 10)
@@ -639,7 +640,7 @@ class MHApp(QMainWindow):
             QPushButton:hover { background-color: rgba(255, 255, 255, 0.2); border-color: #5C5C5E; }
             QPushButton:pressed { background-color: rgba(255, 255, 255, 0.05); }
             QPushButton:disabled { background-color: rgba(0, 0, 0, 0.2); color: rgba(255, 255, 255, 0.3); border-color: transparent; }
-            QListWidget, QTableWidget { background-color: rgba(0, 0, 0, 0.2); color: #FFFFFF; border: none; outline: 0; }
+            QListWidget, QTableWidget { background-color: rgba(0, 0, 0, 0.2); color: #FFFFFF; border: none; outline: 0; selection-background-color: transparent; }
             QListWidget::item { padding: 6px 10px; border-radius: 4px; margin: 2px 4px; }
             QListWidget::item:selected { background-color: rgba(255, 255, 255, 0.15); color: #FFFFFF; border-radius: 4px; }
             QTableWidget::item:selected { background-color: transparent; color: #FFFFFF; }
@@ -1086,7 +1087,7 @@ class MHApp(QMainWindow):
         pm = QPixmap.fromImage(QImage.fromData(raw))
         if pm.isNull():
             return
-        scaled = pm.scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio,
+        scaled = pm.scaled(18, 18, Qt.AspectRatioMode.KeepAspectRatio,
                            Qt.TransformationMode.SmoothTransformation)
         for r in range(self.fileTbl.rowCount()):
             lbl = self.fileTbl.cellWidget(r, 0)
