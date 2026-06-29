@@ -820,7 +820,7 @@ class MHApp(QMainWindow):
         self.fileStack.addWidget(self.fileIconList)
 
         self.tableSpaceShortcut = QShortcut(QKeySequence(Qt.Key.Key_Space), self.fileStack)
-        self.tableSpaceShortcut.setContext(Qt.ShortcutContext.WidgetShortcut)
+        self.tableSpaceShortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
         self.tableSpaceShortcut.activated.connect(self.doView)
 
         self.progBar = QProgressBar()
