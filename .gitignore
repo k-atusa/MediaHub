@@ -8,3 +8,4 @@ server/users/
 server/data
 server/server
 macOS/
+.DS_Store
