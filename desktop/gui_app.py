@@ -405,6 +405,10 @@ class Viewer(QMainWindow):
         self.spaceShortcut = QShortcut(QKeySequence(Qt.Key.Key_Space), self)
         self.spaceShortcut.activated.connect(self.onSpacePressed)
 
+        # esc shortcut to close viewer (works regardless of IME)
+        self.escShortcut = QShortcut(QKeySequence(Qt.Key.Key_Escape), self)
+        self.escShortcut.activated.connect(self.close)
+
         self.ext = fileName.split('.')[-1].lower()
         if self.ext in ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']:
             self._showImg()
