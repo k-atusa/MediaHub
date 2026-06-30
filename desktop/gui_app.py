@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                              QTableWidgetItem, QHeaderView, QProgressBar, QTextEdit, QSlider,
                              QStyle, QCheckBox, QStyledItemDelegate, QStyleOptionViewItem)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl, QPoint, QPointF, QSize, QRectF, QTimer
-from PyQt6.QtGui import QFont, QIcon, QColor, QPixmap, QPainter, QImage, QShortcut, QKeySequence, QPainterPath
+from PyQt6.QtGui import QFont, QIcon, QColor, QPixmap, QPainter, QImage, QShortcut, QKeySequence, QPainterPath, QFontDatabase
 try:
     from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
     from PyQt6.QtMultimediaWidgets import QVideoWidget
@@ -402,7 +402,7 @@ class Viewer(QMainWindow):
                 background-color: #2C2C2E; 
                 color: #FFFFFF; 
             }
-            QWidget { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif; font-size: 13px; }
+            QWidget { font-family: 'Pretendard Variable', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif; font-size: 13px; }
             QLabel { color: #FFFFFF; }
             QTextEdit { 
                 background-color: rgba(0, 0, 0, 0.4); 
@@ -713,7 +713,7 @@ class MHApp(QMainWindow):
                 background-color: #2C2C2E; 
                 color: #FFFFFF; 
             }
-            QWidget { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif; font-size: 13px; }
+            QWidget { font-family: 'Pretendard Variable', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif; font-size: 13px; }
             QLabel { color: #FFFFFF; }
             QLineEdit { background-color: rgba(0, 0, 0, 0.4); color: #FFFFFF; border: 1px solid #3A3A3C; border-radius: 8px; padding: 7px 10px; selection-background-color: rgba(255, 255, 255, 0.3); }
             QLineEdit:focus { border: 1px solid #0A84FF; background-color: rgba(0, 0, 0, 0.6); }
@@ -1300,6 +1300,13 @@ class MHApp(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    
+    font_path = os.path.join(os.path.dirname(__file__), "fonts", "PretendardVariable.ttf")
+    font_id = QFontDatabase.addApplicationFont(font_path)
+    if font_id != -1:
+        font_family = QFontDatabase.applicationFontFamilies(font_id)[0]
+        app.setFont(QFont(font_family, 13))
+        
     win = MHApp()
     win.show()
     sys.exit(app.exec())
