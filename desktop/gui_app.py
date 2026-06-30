@@ -567,17 +567,38 @@ class Viewer(QMainWindow):
                 super().keyPressEvent(ev)
         else:
             if hasattr(self, 'ext') and self.ext not in ['mp4', 'webm', 'mov', 'mkv']:
-                if ev.key() in (Qt.Key.Key_Up, Qt.Key.Key_Down):
+                if ev.key() in (Qt.Key.Key_Up, Qt.Key.Key_Down, Qt.Key.Key_Left, Qt.Key.Key_Right):
                     p = self.parent()
-                    if p and hasattr(p, 'fileTbl'):
-                        tbl = p.fileTbl
-                        sel = tbl.selectionModel().selectedRows()
-                        if sel:
-                            row = sel[0].row()
-                            new_row = row - 1 if ev.key() == Qt.Key.Key_Up else row + 1
-                            if 0 <= new_row < tbl.rowCount():
-                                tbl.selectRow(new_row)
-                                QTimer.singleShot(0, p.doView)
+                    if p and hasattr(p, 'fileStack'):
+                        new_row = None
+                        if p.fileStack.currentIndex() == 0:
+                            tbl = p.fileTbl
+                            sel = tbl.selectionModel().selectedRows()
+                            if sel and ev.key() in (Qt.Key.Key_Up, Qt.Key.Key_Down):
+                                r = sel[0].row()
+                                new_row = r - 1 if ev.key() == Qt.Key.Key_Up else r + 1
+                                if 0 <= new_row < tbl.rowCount():
+                                    tbl.selectRow(new_row)
+                                    QTimer.singleShot(0, p.doView)
+                        else:
+                            lst = p.fileIconList
+                            sel = lst.selectedItems()
+                            if sel:
+                                curr = sel[0]
+                                r = lst.row(curr)
+                                cols = max(1, lst.viewport().width() // lst.gridSize().width())
+                                if ev.key() == Qt.Key.Key_Left:
+                                    new_row = r - 1
+                                elif ev.key() == Qt.Key.Key_Right:
+                                    new_row = r + 1
+                                elif ev.key() == Qt.Key.Key_Up:
+                                    new_row = r - cols
+                                elif ev.key() == Qt.Key.Key_Down:
+                                    new_row = r + cols
+                                
+                                if new_row is not None and 0 <= new_row < lst.count():
+                                    lst.setCurrentRow(new_row)
+                                    QTimer.singleShot(0, p.doView)
                     return
             super().keyPressEvent(ev)
 
@@ -635,6 +656,16 @@ class Viewer(QMainWindow):
 
 # --- Main Application ---
 
+def _emojiIcon(text):
+    pm = QPixmap(64, 64)
+    pm.fill(Qt.GlobalColor.transparent)
+    p = QPainter(pm)
+    font = p.font()
+    font.setPointSize(36)
+    p.setFont(font)
+    p.drawText(pm.rect(), Qt.AlignmentFlag.AlignCenter, text)
+    p.end()
+    return QIcon(pm)
 
 class MHApp(QMainWindow):
     def __init__(self):
@@ -1066,11 +1097,11 @@ class MHApp(QMainWindow):
             iconItem.setData(Qt.ItemDataRole.UserRole, name.lower())
             iconItem.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
 
-            if ext in IMG | VID:
-                if ext == 'svg':
-                    thLbl.setText("🎨")
-                else:
-                    thLbl.setText("⏳")
+            if ext == 'svg':
+                thLbl.setText("🎨"); thLbl.setStyleSheet("font-size:18px;")
+                iconItem.setIcon(_emojiIcon("🎨"))
+            elif ext in IMG | VID:
+                thLbl.setText("⏳")
                 thLbl.setStyleSheet("color:#888; font-size:16px;")
                 fk = info[:44]
                 fpid = self.cli.objPid(fk)
@@ -1082,13 +1113,13 @@ class MHApp(QMainWindow):
                 self._thumbWk.append(w)
             elif ext == 'pdf':
                 thLbl.setText("📄"); thLbl.setStyleSheet("font-size:18px;")
-                iconItem.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
+                iconItem.setIcon(_emojiIcon("📄"))
             elif ext in TXT:
                 thLbl.setText("📝"); thLbl.setStyleSheet("font-size:18px;")
-                iconItem.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileIcon))
+                iconItem.setIcon(_emojiIcon("📝"))
             else:
                 thLbl.setText("📁"); thLbl.setStyleSheet("font-size:18px;")
-                iconItem.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DirIcon))
+                iconItem.setIcon(_emojiIcon("📁"))
 
             self.fileTbl.setCellWidget(row, 0, thLbl)
             self.fileTbl.setItem(row, 0, SortItem(""))
