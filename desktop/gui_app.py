@@ -903,6 +903,8 @@ class MHApp(QMainWindow):
         self.fileIconList = QListWidget()
         self.fileIconList.setViewMode(QListWidget.ViewMode.IconMode)
         self.fileIconList.setResizeMode(QListWidget.ResizeMode.Adjust)
+        self.fileIconList.setMovement(QListWidget.Movement.Static)
+        self.fileIconList.setGridSize(QSize(120, 100))
         self.fileIconList.setIconSize(QSize(64, 64))
         self.fileIconList.setSpacing(10)
         self.fileIconList.setStyleSheet("background-color: transparent; border: none; outline: 0;")
@@ -1206,12 +1208,19 @@ class MHApp(QMainWindow):
         if not self.curFld:
             QMessageBox.warning(self, "Warning", "Select a folder first")
             return
-        sel = self.fileTbl.selectionModel().selectedRows()
-        if not sel:
-            QMessageBox.warning(self, "Warning", "Select a file to view")
-            return
-        row = sel[0].row()
-        name = self.fileTbl.item(row, 1).text()
+        if self.fileStack.currentIndex() == 0:
+            sel = self.fileTbl.selectionModel().selectedRows()
+            if not sel:
+                QMessageBox.warning(self, "Warning", "Select a file to view")
+                return
+            row = sel[0].row()
+            name = self.fileTbl.item(row, 1).text()
+        else:
+            sel = self.fileIconList.selectedItems()
+            if not sel:
+                QMessageBox.warning(self, "Warning", "Select a file to view")
+                return
+            name = sel[0].text()
         url = f"http://127.0.0.1:18080/stream/{self.curPid}/{urllib.parse.quote(name)}"
         
         if hasattr(self, 'viewer') and self.viewer:
