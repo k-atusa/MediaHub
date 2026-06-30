@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                              QStackedWidget, QFileDialog, QMessageBox, QInputDialog, QTableWidget,
                              QTableWidgetItem, QHeaderView, QProgressBar, QTextEdit, QSlider,
                              QStyle, QCheckBox, QStyledItemDelegate, QStyleOptionViewItem)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl, QPoint, QPointF, QSize, QRectF
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QUrl, QPoint, QPointF, QSize, QRectF, QTimer
 from PyQt6.QtGui import QFont, QIcon, QColor, QPixmap, QPainter, QImage, QShortcut, QKeySequence, QPainterPath
 try:
     from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
@@ -405,14 +405,14 @@ class Viewer(QMainWindow):
         self.spaceShortcut = QShortcut(QKeySequence(Qt.Key.Key_Space), self)
         self.spaceShortcut.activated.connect(self.onSpacePressed)
 
-        ext = fileName.split('.')[-1].lower()
-        if ext in ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']:
+        self.ext = fileName.split('.')[-1].lower()
+        if self.ext in ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']:
             self._showImg()
-        elif ext in ['mp4', 'webm', 'mov', 'mkv']:
+        elif self.ext in ['mp4', 'webm', 'mov', 'mkv']:
             self._showVid()
-        elif ext in ['txt', 'md', 'csv', 'py', 'json', 'log']:
+        elif self.ext in ['txt', 'md', 'csv', 'py', 'json', 'log']:
             self._showTxt()
-        elif ext == 'pdf':
+        elif self.ext == 'pdf':
             self._showPdf()
         else:
             lbl = QLabel("Unsupported file type for internal viewer.")
@@ -562,6 +562,19 @@ class Viewer(QMainWindow):
             else:
                 super().keyPressEvent(ev)
         else:
+            if hasattr(self, 'ext') and self.ext not in ['mp4', 'webm', 'mov', 'mkv']:
+                if ev.key() in (Qt.Key.Key_Up, Qt.Key.Key_Down):
+                    p = self.parent()
+                    if p and hasattr(p, 'fileTbl'):
+                        tbl = p.fileTbl
+                        sel = tbl.selectionModel().selectedRows()
+                        if sel:
+                            row = sel[0].row()
+                            new_row = row - 1 if ev.key() == Qt.Key.Key_Up else row + 1
+                            if 0 <= new_row < tbl.rowCount():
+                                tbl.selectRow(new_row)
+                                QTimer.singleShot(0, p.doView)
+                    return
             super().keyPressEvent(ev)
 
     def _overlay(self, text):
@@ -613,6 +626,7 @@ class Viewer(QMainWindow):
 
 
 # --- Main Application ---
+
 
 class MHApp(QMainWindow):
     def __init__(self):
@@ -1191,6 +1205,11 @@ class MHApp(QMainWindow):
         row = sel[0].row()
         name = self.fileTbl.item(row, 1).text()
         url = f"http://127.0.0.1:18080/stream/{self.curPid}/{urllib.parse.quote(name)}"
+        
+        if hasattr(self, 'viewer') and self.viewer:
+            self.viewer.close()
+            self.viewer.deleteLater()
+            
         self.viewer = Viewer(url, name, parent=self)
         self.viewer.show()
 
