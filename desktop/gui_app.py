@@ -148,6 +148,34 @@ class ScaleLabel(QLabel):
         y = max(-max_y, min(self._off.y(), max_y))
         self._off = QPointF(x, y)
 
+    def event(self, ev):
+        from PyQt6.QtCore import QEvent, Qt
+        if ev.type() == QEvent.Type.NativeGesture:
+            if ev.gestureType() == Qt.NativeGestureType.ZoomNativeGesture:
+                if not self._pm:
+                    return True
+                
+                step = 1.0 + ev.value()
+                if step <= 0.01:
+                    step = 0.01
+                
+                pos = ev.position()
+                cx = self.width() / 2.0
+                cy = self.height() / 2.0
+                mouse_from_center = pos - QPointF(cx, cy)
+                
+                old_sc = self._sc
+                new_sc = max(0.1, min(old_sc * step, 10.0))
+                actual_step = new_sc / old_sc
+                
+                self._off = mouse_from_center - (mouse_from_center - self._off) * actual_step
+                self._sc = new_sc
+                self._clampOff()
+                self.zoomChanged.emit(self.totalScale())
+                self.update()
+                return True
+        return super().event(ev)
+
     def wheelEvent(self, ev):
         if not self._pm:
             return
