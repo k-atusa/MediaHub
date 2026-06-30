@@ -621,6 +621,10 @@ class Viewer(QMainWindow):
         self.lay.addWidget(self.web)
 
     def closeEvent(self, ev):
+        if hasattr(self, '_ovLbl') and self._ovLbl is not None:
+            self._ovLbl.hide()
+            self._ovLbl.deleteLater()
+            self._ovLbl = None
         if hasattr(self, 'player'):
             self.player.stop()
             self.player.setSource(QUrl(""))
