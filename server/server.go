@@ -131,7 +131,11 @@ func serveUser(w http.ResponseWriter, r *http.Request) {
 		os.MkdirAll(filepath.Dir(path), 0700)
 		save(w, r, path)
 	case http.MethodDelete: // delete userdata
-		os.Remove(path)
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			time.Sleep(1500 * time.Millisecond)
+		} else {
+			os.Remove(path)
+		}
 		w.WriteHeader(http.StatusOK)
 	default:
 		postError(w, "Method Not Allowed", http.StatusMethodNotAllowed)
@@ -227,7 +231,11 @@ func serveMedia(w http.ResponseWriter, r *http.Request) {
 		os.MkdirAll(filepath.Dir(path), 0755)
 		save(w, r, path)
 	case http.MethodDelete: // delete media file
-		os.Remove(path)
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			time.Sleep(1500 * time.Millisecond)
+		} else {
+			os.Remove(path)
+		}
 		w.WriteHeader(http.StatusOK)
 	default:
 		postError(w, "Method Not Allowed", http.StatusMethodNotAllowed)
