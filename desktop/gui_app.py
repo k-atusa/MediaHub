@@ -595,6 +595,13 @@ class Viewer(QMainWindow):
                 super().keyPressEvent(ev)
         else:
             if hasattr(self, 'ext') and self.ext not in ['mp4', 'webm', 'mov', 'mkv']:
+                if self.ext == 'pdf' and ev.key() == Qt.Key.Key_Left:
+                    self._prevPdfPage()
+                    return
+                if self.ext == 'pdf' and ev.key() == Qt.Key.Key_Right:
+                    self._nextPdfPage()
+                    return
+                    
                 if ev.key() in (Qt.Key.Key_Up, Qt.Key.Key_Down, Qt.Key.Key_Left, Qt.Key.Key_Right):
                     p = self.parent()
                     if p and hasattr(p, 'fileStack'):
@@ -660,14 +667,93 @@ class Viewer(QMainWindow):
         self._ovTimer.start(1500)
 
     def _showPdf(self):
-        if QWebEngineView is None:
-            lbl = QLabel("PyQt6-WebEngine is not installed.\nRun: pip install PyQt6-WebEngine")
+        import requests
+        try:
+            import fitz
+        except ImportError:
+            lbl = QLabel("PyMuPDF (fitz) is not installed.\nRun: pip install PyMuPDF")
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.lay.addWidget(lbl)
             return
-        self.web = QWebEngineView()
-        self.web.load(QUrl(self.fileUrl))
-        self.lay.addWidget(self.web)
+
+        self.pdfDoc = None
+        self.pdfPage = 0
+        
+        try:
+            res = requests.get(self.fileUrl)
+            self.pdfDoc = fitz.open(stream=res.content, filetype="pdf")
+        except Exception as e:
+            lbl = QLabel(f"Failed to load PDF: {e}")
+            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.lay.addWidget(lbl)
+            return
+
+        if not self.pdfDoc or self.pdfDoc.page_count == 0:
+            lbl = QLabel("PDF is empty or invalid.")
+            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.lay.addWidget(lbl)
+            return
+
+        self.lbl = ScaleLabel()
+        self.lay.addWidget(self.lbl, 1)
+
+        ctrlLay = QHBoxLayout()
+        zoomOutBtn = QPushButton("Zoom -")
+        zoomOutBtn.clicked.connect(self.lbl.zoomOut)
+        zoomInBtn = QPushButton("Zoom +")
+        zoomInBtn.clicked.connect(self.lbl.zoomIn)
+        fitBtn = QPushButton("Fit Screen")
+        fitBtn.clicked.connect(self.lbl.resetZoom)
+        
+        self.zoomLbl = QLabel("Zoom: 100%")
+        self.zoomLbl.setMinimumWidth(80)
+        self.zoomLbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        prevBtn = QPushButton("Prev Page")
+        prevBtn.clicked.connect(self._prevPdfPage)
+        
+        nextBtn = QPushButton("Next Page")
+        nextBtn.clicked.connect(self._nextPdfPage)
+        
+        self.pageLbl = QLabel(f"Page: 1 / {self.pdfDoc.page_count}")
+        self.pageLbl.setMinimumWidth(100)
+        self.pageLbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        ctrlLay.addWidget(zoomOutBtn)
+        ctrlLay.addWidget(zoomInBtn)
+        ctrlLay.addWidget(fitBtn)
+        ctrlLay.addWidget(self.zoomLbl)
+        ctrlLay.addStretch()
+        ctrlLay.addWidget(prevBtn)
+        ctrlLay.addWidget(self.pageLbl)
+        ctrlLay.addWidget(nextBtn)
+        
+        self.lay.addLayout(ctrlLay)
+        self.lbl.zoomChanged.connect(self._updateZoomLbl)
+        self._renderPdfPage()
+
+    def _renderPdfPage(self):
+        import fitz
+        if not hasattr(self, 'pdfDoc') or not self.pdfDoc: return
+        page = self.pdfDoc.load_page(self.pdfPage)
+        mat = fitz.Matrix(2.0, 2.0)
+        pix = page.get_pixmap(matrix=mat)
+        
+        from PyQt6.QtGui import QImage, QPixmap
+        fmt = QImage.Format.Format_RGBA8888 if pix.alpha else QImage.Format.Format_RGB888
+        img = QImage(pix.samples, pix.width, pix.height, pix.stride, fmt)
+        self.lbl.setPixmap(QPixmap.fromImage(img))
+        self.pageLbl.setText(f"Page: {self.pdfPage + 1} / {self.pdfDoc.page_count}")
+        
+    def _prevPdfPage(self):
+        if hasattr(self, 'pdfDoc') and self.pdfDoc and self.pdfPage > 0:
+            self.pdfPage -= 1
+            self._renderPdfPage()
+            
+    def _nextPdfPage(self):
+        if hasattr(self, 'pdfDoc') and self.pdfDoc and self.pdfPage < self.pdfDoc.page_count - 1:
+            self.pdfPage += 1
+            self._renderPdfPage()
 
     def closeEvent(self, ev):
         if hasattr(self, '_ovLbl') and self._ovLbl is not None:
@@ -679,6 +765,9 @@ class Viewer(QMainWindow):
             self.player.setSource(QUrl(""))
         if hasattr(self, 'web') and self.web is not None:
             self.web.load(QUrl(""))
+        if hasattr(self, 'pdfDoc') and self.pdfDoc is not None:
+            self.pdfDoc.close()
+            self.pdfDoc = None
         super().closeEvent(ev)
 
 
