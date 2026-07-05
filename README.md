@@ -8,7 +8,6 @@ project WHY(Web Hub Yard): Media Hub
 
 - Make your folder and upload files. You can share your folder with others.
 - MediaHub supports views of text, pdf, image, and video.
-- File bigger than 500MB is hard to process. Consider cutting media before uploading with ffmpeg.
 - System does not care about concurrency: **Each user must upload after other user's session is cleared.**
 - Focus of MediaHub is lightweight media share/watch. Making your own backup drive with other service is recommended.
 
@@ -16,8 +15,7 @@ project WHY(Web Hub Yard): Media Hub
 
 - All cryptographic works on client browser memory, based on project USAG.
 - Server holds userdata, filenames, thumbnails, media encrypted.
-- userdata is Map[folderName]folderKey, and Hash(folderKey)[0:16] is Physical ID.
-- filenames is Map[fileName]fileKey, and Hash(fileKey)[0:16] is Physical ID.
+- userdata is Map[folderName]folderKey, and filenames is Map[fileName]fileKey.
 - userdata is encrypted with userKey. filenames is encrypted with folderKey. Thumbnails and media are encrypted with fileKey.
 
 ```python
@@ -34,6 +32,15 @@ data/
 public/
   ...
 ```
+
+| Option | Type | Info | 정보 |
+| :-- | :-- | :-- | :-- |
+| storage | string | data storage path | 데이터 저장폴더 경로 |
+| port | int | HTTPS server port | HTTPS 서버 포트 |
+| cert | string | TLS certificate path | TLS 인증서 파일 경로 |
+| key | string | TLS keyfile path | TLS 키 파일 경로 |
+| invite | string | invitation auth code | 가입 권한 코드 |
+| notice | string | public notification | 접속 시 보이는 공지 |
 
 ## Limitation
 
