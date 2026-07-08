@@ -59,7 +59,8 @@ export function genkey(data: Buffer, lbl: string, size: number): Buffer {
 }
 
 export function mkiv(g: Buffer, c: number): Buffer {
-	const iv = Buffer.from(g);
+	const iv = Buffer.alloc(12);
+	g.copy(iv, 0, 0, 12);
 	const cb = Buffer.alloc(8);
 	// Since JS numbers are doubles, c might be up to 2^53. BigInt safely handles it.
 	cb.writeBigUInt64LE(BigInt(c), 0);

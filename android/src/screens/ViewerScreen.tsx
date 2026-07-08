@@ -12,244 +12,244 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Separate component to isolate video hooks
 const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
-    const theme = useTheme();
-    const [showControls, setShowControls] = useState(true);
-    const [lastTapLeft, setLastTapLeft] = useState(0);
-    const [lastTapRight, setLastTapRight] = useState(0);
-    const [progressBarWidth, setProgressBarWidth] = useState(1);
-    
-    const leftArrowOpacity = useRef(new Animated.Value(0)).current;
-    const rightArrowOpacity = useRef(new Animated.Value(0)).current;
-    const controlsOpacity = useRef(new Animated.Value(1)).current;
-    const controlsTimer = useRef<NodeJS.Timeout | null>(null);
+	const theme = useTheme();
+	const [showControls, setShowControls] = useState(true);
+	const [lastTapLeft, setLastTapLeft] = useState(0);
+	const [lastTapRight, setLastTapRight] = useState(0);
+	const [progressBarWidth, setProgressBarWidth] = useState(1);
 
-    const player = useVideoPlayer(localUri, p => {
-        p.loop = true;
-    });
+	const leftArrowOpacity = useRef(new Animated.Value(0)).current;
+	const rightArrowOpacity = useRef(new Animated.Value(0)).current;
+	const controlsOpacity = useRef(new Animated.Value(1)).current;
+	const controlsTimer = useRef<NodeJS.Timeout | null>(null);
 
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [currentTime, setCurrentTime] = useState(0);
-    const [duration, setDuration] = useState(0);
+	const player = useVideoPlayer(localUri, p => {
+		p.loop = true;
+	});
 
-    useEventListener(player, 'playingChange', ({ isPlaying }) => {
-        setIsPlaying(isPlaying);
-    });
+	const [isPlaying, setIsPlaying] = useState(false);
+	const [currentTime, setCurrentTime] = useState(0);
+	const [duration, setDuration] = useState(0);
 
-    useEventListener(player, 'timeUpdate', ({ currentTime }) => {
-        setCurrentTime(currentTime);
-    });
+	useEventListener(player, 'playingChange', ({ isPlaying }) => {
+		setIsPlaying(isPlaying);
+	});
 
-    useEventListener(player, 'sourceLoad', ({ duration }) => {
-        setDuration(duration);
-    });
+	useEventListener(player, 'timeUpdate', ({ currentTime }) => {
+		setCurrentTime(currentTime);
+	});
 
-    useEffect(() => {
-        if (localUri && player) {
-            player.play();
-            resetControlsTimer();
-        }
-        return () => {
-            if (controlsTimer.current) clearTimeout(controlsTimer.current);
-        };
-    }, [localUri, player]);
+	useEventListener(player, 'sourceLoad', ({ duration }) => {
+		setDuration(duration);
+	});
 
-    const resetControlsTimer = () => {
-        if (controlsTimer.current) clearTimeout(controlsTimer.current);
-        controlsTimer.current = setTimeout(() => {
-            if (player.playing) {
-                hideControlsAnimated();
-            }
-        }, 3500);
-    };
+	useEffect(() => {
+		if (localUri && player) {
+			player.play();
+			resetControlsTimer();
+		}
+		return () => {
+			if (controlsTimer.current) clearTimeout(controlsTimer.current);
+		};
+	}, [localUri, player]);
 
-    const showControlsAnimated = () => {
-        setShowControls(true);
-        Animated.timing(controlsOpacity, { toValue: 1, duration: 250, useNativeDriver: true }).start(() => resetControlsTimer());
-    };
+	const resetControlsTimer = () => {
+		if (controlsTimer.current) clearTimeout(controlsTimer.current);
+		controlsTimer.current = setTimeout(() => {
+			if (player.playing) {
+				hideControlsAnimated();
+			}
+		}, 3500);
+	};
 
-    const hideControlsAnimated = () => {
-        Animated.timing(controlsOpacity, { toValue: 0, duration: 250, useNativeDriver: true }).start(() => setShowControls(false));
-    };
+	const showControlsAnimated = () => {
+		setShowControls(true);
+		Animated.timing(controlsOpacity, { toValue: 1, duration: 250, useNativeDriver: true }).start(() => resetControlsTimer());
+	};
 
-    const toggleControls = () => {
-        if (showControls) hideControlsAnimated();
-        else showControlsAnimated();
-    };
+	const hideControlsAnimated = () => {
+		Animated.timing(controlsOpacity, { toValue: 0, duration: 250, useNativeDriver: true }).start(() => setShowControls(false));
+	};
 
-    const handleLeftDoubleTap = () => {
-        const now = Date.now();
-        if (now - lastTapLeft < 300) {
-            player.currentTime = Math.max(0, currentTime - 10);
-            triggerDoubleTapAnimation(leftArrowOpacity);
-            resetControlsTimer();
-        } else {
-            toggleControls();
-        }
-        setLastTapLeft(now);
-    };
+	const toggleControls = () => {
+		if (showControls) hideControlsAnimated();
+		else showControlsAnimated();
+	};
 
-    const handleRightDoubleTap = () => {
-        const now = Date.now();
-        if (now - lastTapRight < 300) {
-            player.currentTime = Math.min(duration, currentTime + 10);
-            triggerDoubleTapAnimation(rightArrowOpacity);
-            resetControlsTimer();
-        } else {
-            toggleControls();
-        }
-        setLastTapRight(now);
-    };
+	const handleLeftDoubleTap = () => {
+		const now = Date.now();
+		if (now - lastTapLeft < 300) {
+			player.currentTime = Math.max(0, currentTime - 10);
+			triggerDoubleTapAnimation(leftArrowOpacity);
+			resetControlsTimer();
+		} else {
+			toggleControls();
+		}
+		setLastTapLeft(now);
+	};
 
-    const triggerDoubleTapAnimation = (opacityVar: Animated.Value) => {
-        opacityVar.setValue(0);
-        Animated.sequence([
-            Animated.timing(opacityVar, { toValue: 1, duration: 150, useNativeDriver: true }),
-            Animated.timing(opacityVar, { toValue: 0, duration: 300, delay: 200, useNativeDriver: true })
-        ]).start();
-    };
+	const handleRightDoubleTap = () => {
+		const now = Date.now();
+		if (now - lastTapRight < 300) {
+			player.currentTime = Math.min(duration, currentTime + 10);
+			triggerDoubleTapAnimation(rightArrowOpacity);
+			resetControlsTimer();
+		} else {
+			toggleControls();
+		}
+		setLastTapRight(now);
+	};
 
-    const handleProgressBarPress = (event: GestureResponderEvent) => {
-        const ratio = Math.max(0, Math.min(1, event.nativeEvent.locationX / progressBarWidth));
-        player.currentTime = ratio * duration;
-        resetControlsTimer();
-    };
+	const triggerDoubleTapAnimation = (opacityVar: Animated.Value) => {
+		opacityVar.setValue(0);
+		Animated.sequence([
+			Animated.timing(opacityVar, { toValue: 1, duration: 150, useNativeDriver: true }),
+			Animated.timing(opacityVar, { toValue: 0, duration: 300, delay: 200, useNativeDriver: true })
+		]).start();
+	};
 
-    const formatTime = (seconds: number) => {
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-    };
+	const handleProgressBarPress = (event: GestureResponderEvent) => {
+		const ratio = Math.max(0, Math.min(1, event.nativeEvent.locationX / progressBarWidth));
+		player.currentTime = ratio * duration;
+		resetControlsTimer();
+	};
 
-    const progressRatio = duration > 0 ? currentTime / duration : 0;
+	const formatTime = (seconds: number) => {
+		const mins = Math.floor(seconds / 60);
+		const secs = Math.floor(seconds % 60);
+		return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+	};
 
-    return (
-        <View style={styles.videoContainer}>
-            <VideoView style={styles.media} player={player} nativeControls={false} />
-            <View style={styles.tapOverlay}>
-                <TouchableWithoutFeedback onPress={handleLeftDoubleTap}>
-                    <View style={styles.tapZone}>
-                        <Animated.View style={[styles.arrowContainer, { opacity: leftArrowOpacity }]}>
-                            <View style={styles.circleFeedback}>
-                                <IconButton icon="rewind" iconColor="white" size={32} />
-                                <Text style={styles.arrowText}>-10s</Text>
-                            </View>
-                        </Animated.View>
-                    </View>
-                </TouchableWithoutFeedback>
-                <TouchableWithoutFeedback onPress={handleRightDoubleTap}>
-                    <View style={styles.tapZone}>
-                        <Animated.View style={[styles.arrowContainer, { opacity: rightArrowOpacity }]}>
-                            <View style={styles.circleFeedback}>
-                                <IconButton icon="fast-forward" iconColor="white" size={32} />
-                                <Text style={styles.arrowText}>+10s</Text>
-                            </View>
-                        </Animated.View>
-                    </View>
-                </TouchableWithoutFeedback>
-            </View>
-            {showControls && (
-                <Animated.View style={[styles.controlsOverlay, { opacity: controlsOpacity }]}>
-                    <View style={styles.topControlRow}>
-                        <IconButton icon="chevron-down" iconColor="white" size={30} onPress={() => navigation.goBack()} />
-                        <Text style={styles.videoTitle} numberOfLines={1}>{file.name}</Text>
-                    </View>
-                    <View style={styles.centerControlRow}>
-                        <TouchableOpacity style={styles.playPauseCircle} onPress={() => {
-                            isPlaying ? player.pause() : player.play();
-                            resetControlsTimer();
-                        }}>
-                            <IconButton icon={isPlaying ? "pause" : "play"} iconColor="white" size={48} />
-                        </TouchableOpacity>
-                    </View>
-                    <View style={styles.bottomControlRow}>
-                        <View style={styles.progressBarWrapper} onLayout={(e) => setProgressBarWidth(e.nativeEvent.layout.width)}>
-                            <TouchableWithoutFeedback onPress={handleProgressBarPress}>
-                                <View style={styles.progressBarBg}>
-                                    <View style={[styles.progressBarFill, { width: `${progressRatio * 100}%`, backgroundColor: theme.colors.primary }]} />
-                                    <View style={[styles.progressBarHandle, { left: `${progressRatio * 100}%`, backgroundColor: theme.colors.primary }]} />
-                                </View>
-                            </TouchableWithoutFeedback>
-                        </View>
-                        <View style={styles.timeRow}>
-                            <Text style={styles.timeText}>{formatTime(currentTime)} / {formatTime(duration)}</Text>
-                        </View>
-                    </View>
-                </Animated.View>
-            )}
-        </View>
-    );
+	const progressRatio = duration > 0 ? currentTime / duration : 0;
+
+	return (
+		<View style={styles.videoContainer}>
+			<VideoView style={styles.media} player={player} nativeControls={false} />
+			<View style={styles.tapOverlay}>
+				<TouchableWithoutFeedback onPress={handleLeftDoubleTap}>
+					<View style={styles.tapZone}>
+						<Animated.View style={[styles.arrowContainer, { opacity: leftArrowOpacity }]}>
+							<View style={styles.circleFeedback}>
+								<IconButton icon="rewind" iconColor="white" size={32} />
+								<Text style={styles.arrowText}>-10s</Text>
+							</View>
+						</Animated.View>
+					</View>
+				</TouchableWithoutFeedback>
+				<TouchableWithoutFeedback onPress={handleRightDoubleTap}>
+					<View style={styles.tapZone}>
+						<Animated.View style={[styles.arrowContainer, { opacity: rightArrowOpacity }]}>
+							<View style={styles.circleFeedback}>
+								<IconButton icon="fast-forward" iconColor="white" size={32} />
+								<Text style={styles.arrowText}>+10s</Text>
+							</View>
+						</Animated.View>
+					</View>
+				</TouchableWithoutFeedback>
+			</View>
+			{showControls && (
+				<Animated.View style={[styles.controlsOverlay, { opacity: controlsOpacity }]}>
+					<View style={styles.topControlRow}>
+						<IconButton icon="chevron-down" iconColor="white" size={30} onPress={() => navigation.goBack()} />
+						<Text style={styles.videoTitle} numberOfLines={1}>{file.name}</Text>
+					</View>
+					<View style={styles.centerControlRow}>
+						<TouchableOpacity style={styles.playPauseCircle} onPress={() => {
+							isPlaying ? player.pause() : player.play();
+							resetControlsTimer();
+						}}>
+							<IconButton icon={isPlaying ? "pause" : "play"} iconColor="white" size={48} />
+						</TouchableOpacity>
+					</View>
+					<View style={styles.bottomControlRow}>
+						<View style={styles.progressBarWrapper} onLayout={(e) => setProgressBarWidth(e.nativeEvent.layout.width)}>
+							<TouchableWithoutFeedback onPress={handleProgressBarPress}>
+								<View style={styles.progressBarBg}>
+									<View style={[styles.progressBarFill, { width: `${progressRatio * 100}%`, backgroundColor: theme.colors.primary }]} />
+									<View style={[styles.progressBarHandle, { left: `${progressRatio * 100}%`, backgroundColor: theme.colors.primary }]} />
+								</View>
+							</TouchableWithoutFeedback>
+						</View>
+						<View style={styles.timeRow}>
+							<Text style={styles.timeText}>{formatTime(currentTime)} / {formatTime(duration)}</Text>
+						</View>
+					</View>
+				</Animated.View>
+			)}
+		</View>
+	);
 };
 
 export const ViewerScreen = ({ route, navigation }: any) => {
-    const { file, fPid, flInfoHex } = route.params;
-    const theme = useTheme();
-    const { client } = useAppContext();
-    
-    const [loading, setLoading] = useState(true);
-    const [localUri, setLocalUri] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [textContent, setTextContent] = useState<string | null>(null);
-    const [pdfBase64, setPdfBase64] = useState<string | null>(null);
+	const { file, fPid, flInfoHex } = route.params;
+	const theme = useTheme();
+	const { client } = useAppContext();
 
-    const ext = file.name.split('.').pop()?.toLowerCase();
-    const isVideo = ['mp4', 'webm', 'mov', 'mkv'].includes(ext || '');
+	const [loading, setLoading] = useState(true);
+	const [localUri, setLocalUri] = useState<string | null>(null);
+	const [error, setError] = useState<string | null>(null);
+	const [textContent, setTextContent] = useState<string | null>(null);
+	const [pdfBase64, setPdfBase64] = useState<string | null>(null);
 
-    useEffect(() => {
-        downloadAndPrepare();
-        return () => {
-            if (localUri) {
-                FileSystem.deleteAsync(localUri, { idempotent: true }).catch(() => {});
-            }
-        };
-    }, []);
+	const ext = file.name.split('.').pop()?.toLowerCase();
+	const isVideo = ['mp4', 'webm', 'mov', 'mkv'].includes(ext || '');
 
-    const downloadAndPrepare = async () => {
-        try {
-            const tempDir = FileSystem.cacheDirectory + 'mediahub_temp/';
-            const dirInfo = await FileSystem.getInfoAsync(tempDir);
-            if (!dirInfo.exists) {
-                await FileSystem.makeDirectoryAsync(tempDir);
-            }
-            if (!flInfoHex) throw new Error("Missing file info");
-            
-            let flInfo;
-            try {
-                flInfo = Buffer.from(flInfoHex, 'hex');
-            } catch (err) {
-                throw new Error("Failed to parse file info buffer");
-            }
-            
-            const destPath = await client!.dnFile(fPid, flInfo, file.name, tempDir);
-            setLocalUri(destPath);
-            
-            if (['txt', 'md', 'csv', 'json', 'log', 'svg'].includes(ext || '')) {
-                const b64 = await FileSystem.readAsStringAsync(destPath, { encoding: FileSystem.EncodingType.Base64 });
-                const text = Buffer.from(b64, 'base64').toString('utf-8');
-                setTextContent(text);
-            } else if (ext === 'pdf') {
-                const b64 = await FileSystem.readAsStringAsync(destPath, { encoding: FileSystem.EncodingType.Base64 });
-                setPdfBase64(b64);
-            }
-        } catch (e: any) {
-            setError(e.message || String(e));
-        } finally {
-            setLoading(false);
-        }
-    };
+	useEffect(() => {
+		downloadAndPrepare();
+		return () => {
+			if (localUri) {
+				FileSystem.deleteAsync(localUri, { idempotent: true }).catch(() => { });
+			}
+		};
+	}, []);
 
-    const renderContent = () => {
-        if (loading) return <ActivityIndicator size="large" color={theme.colors.primary} style={styles.center} />;
-        if (error) return <Text style={[styles.center, { color: theme.colors.error }]}>{error}</Text>;
-        if (!localUri) return null;
+	const downloadAndPrepare = async () => {
+		try {
+			const tempDir = FileSystem.cacheDirectory + 'mediahub_temp/';
+			const dirInfo = await FileSystem.getInfoAsync(tempDir);
+			if (!dirInfo.exists) {
+				await FileSystem.makeDirectoryAsync(tempDir);
+			}
+			if (!flInfoHex) throw new Error("Missing file info");
 
-        // Image Viewer
-        if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext || '')) {
-            return <Image source={{ uri: localUri }} style={styles.media} resizeMode="contain" />;
-        }
+			let flInfo;
+			try {
+				flInfo = Buffer.from(flInfoHex, 'hex');
+			} catch (err) {
+				throw new Error("Failed to parse file info buffer");
+			}
 
-        // SVG Viewer (runs inside WebView)
-        if (ext === 'svg' && textContent) {
-            const html = `
+			const destPath = await client!.dnFile(fPid, flInfo, file.name, tempDir);
+			setLocalUri(destPath);
+
+			if (['txt', 'md', 'csv', 'json', 'log', 'svg'].includes(ext || '')) {
+				const b64 = await FileSystem.readAsStringAsync(destPath, { encoding: FileSystem.EncodingType.Base64 });
+				const text = Buffer.from(b64, 'base64').toString('utf-8');
+				setTextContent(text);
+			} else if (ext === 'pdf') {
+				const b64 = await FileSystem.readAsStringAsync(destPath, { encoding: FileSystem.EncodingType.Base64 });
+				setPdfBase64(b64);
+			}
+		} catch (e: any) {
+			setError(e.message || String(e));
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	const renderContent = () => {
+		if (loading) return <ActivityIndicator size="large" color={theme.colors.primary} style={styles.center} />;
+		if (error) return <Text style={[styles.center, { color: theme.colors.error }]}>{error}</Text>;
+		if (!localUri) return null;
+
+		// Image Viewer
+		if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext || '')) {
+			return <Image source={{ uri: localUri }} style={styles.media} resizeMode="contain" />;
+		}
+
+		// SVG Viewer (runs inside WebView)
+		if (ext === 'svg' && textContent) {
+			const html = `
                 <!DOCTYPE html>
                 <html>
                 <head>
@@ -262,12 +262,12 @@ export const ViewerScreen = ({ route, navigation }: any) => {
                 <body>${textContent}</body>
                 </html>
             `;
-            return <WebView source={{ html }} style={styles.web} backgroundColor="#1C1C1E" />;
-        }
+			return <WebView source={{ html }} style={styles.web} backgroundColor="#1C1C1E" />;
+		}
 
-        // PDF Viewer (runs via pdf.js in WebView)
-        if (ext === 'pdf' && pdfBase64) {
-            const html = `
+		// PDF Viewer (runs via pdf.js in WebView)
+		if (ext === 'pdf' && pdfBase64) {
+			const html = `
                 <!DOCTYPE html>
                 <html>
                 <head>
@@ -308,68 +308,68 @@ export const ViewerScreen = ({ route, navigation }: any) => {
                 </body>
                 </html>
             `;
-            return <WebView source={{ html }} style={styles.web} backgroundColor="#1C1C1E" originWhitelist={['*']} />;
-        }
+			return <WebView source={{ html }} style={styles.web} backgroundColor="#1C1C1E" originWhitelist={['*']} />;
+		}
 
-        // MP4 Video Viewer with Custom Youtube Controls
-        if (isVideo) {
-            return <VideoPlayerComponent localUri={localUri} file={file} navigation={navigation} />;
-        }
+		// MP4 Video Viewer with Custom Youtube Controls
+		if (isVideo) {
+			return <VideoPlayerComponent localUri={localUri} file={file} navigation={navigation} />;
+		}
 
-        // Text Viewer
-        if (textContent !== null) {
-            return (
-                <ScrollView style={styles.textScroll} contentContainerStyle={styles.textContainer}>
-                    <Text style={[styles.textContent, { color: '#E5E5EA' }]}>{textContent}</Text>
-                </ScrollView>
-            );
-        }
+		// Text Viewer
+		if (textContent !== null) {
+			return (
+				<ScrollView style={styles.textScroll} contentContainerStyle={styles.textContainer}>
+					<Text style={[styles.textContent, { color: '#E5E5EA' }]}>{textContent}</Text>
+				</ScrollView>
+			);
+		}
 
-        return <Text style={styles.center}>Preview not supported for this file type.</Text>;
-    };
+		return <Text style={styles.center}>Preview not supported for this file type.</Text>;
+	};
 
-    return (
-        <View style={[styles.container, { backgroundColor: '#1C1C1E' }]}>
-            {!isVideo && (
-                <Appbar.Header elevated style={{ backgroundColor: '#1C1C1E' }} theme={{ dark: true }}>
-                    <Appbar.BackAction onPress={() => navigation.goBack()} color="white" />
-                    <Appbar.Content title={file.name} titleStyle={{ color: 'white' }} />
-                </Appbar.Header>
-            )}
-            <View style={styles.content}>
-                {renderContent()}
-            </View>
-        </View>
-    );
+	return (
+		<View style={[styles.container, { backgroundColor: '#1C1C1E' }]}>
+			{!isVideo && (
+				<Appbar.Header elevated style={{ backgroundColor: '#1C1C1E' }} theme={{ dark: true }}>
+					<Appbar.BackAction onPress={() => navigation.goBack()} color="white" />
+					<Appbar.Content title={file.name} titleStyle={{ color: 'white' }} />
+				</Appbar.Header>
+			)}
+			<View style={styles.content}>
+				{renderContent()}
+			</View>
+		</View>
+	);
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1 },
-    content: { flex: 1, backgroundColor: '#1C1C1E' },
-    center: { textAlign: 'center', margin: 20, alignSelf: 'center', color: '#8E8E93' },
-    media: { width: '100%', height: '100%' },
-    web: { flex: 1, width: SCREEN_WIDTH },
-    textScroll: { flex: 1, width: '100%' },
-    textContainer: { padding: 15 },
-    textContent: { fontFamily: 'monospace', fontSize: 14, lineHeight: 20 },
-    
-    // Video Custom Layout
-    videoContainer: { width: '100%', height: '100%', backgroundColor: 'black', justifyContent: 'center', alignItems: 'center', position: 'relative' },
-    tapOverlay: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, flexDirection: 'row', zIndex: 10 },
-    tapZone: { flex: 1, height: '100%', justifyContent: 'center', alignItems: 'center' },
-    circleFeedback: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-    arrowContainer: { justifyContent: 'center', alignItems: 'center' },
-    arrowText: { color: 'white', fontSize: 12, fontWeight: 'bold', marginTop: -5 },
-    controlsOverlay: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0, 0, 0, 0.45)', zIndex: 20, justifyContent: 'space-between', paddingVertical: 10 },
-    topControlRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, marginTop: 20 },
-    videoTitle: { color: 'white', fontSize: 16, fontWeight: 'bold', flex: 1 },
-    centerControlRow: { justifyContent: 'center', alignItems: 'center' },
-    playPauseCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(0, 0, 0, 0.6)', justifyContent: 'center', alignItems: 'center' },
-    bottomControlRow: { paddingHorizontal: 20, paddingBottom: 20 },
-    progressBarWrapper: { height: 20, justifyContent: 'center', width: '100%', marginBottom: 8 },
-    progressBarBg: { height: 4, width: '100%', backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 2, position: 'relative' },
-    progressBarFill: { height: '100%', borderRadius: 2, position: 'absolute', left: 0, top: 0 },
-    progressBarHandle: { width: 12, height: 12, borderRadius: 6, position: 'absolute', top: -4, marginLeft: -6 },
-    timeRow: { flexDirection: 'row', justifyContent: 'space-between' },
-    timeText: { color: 'white', fontSize: 12 }
+	container: { flex: 1 },
+	content: { flex: 1, backgroundColor: '#1C1C1E' },
+	center: { textAlign: 'center', margin: 20, alignSelf: 'center', color: '#8E8E93' },
+	media: { width: '100%', height: '100%' },
+	web: { flex: 1, width: SCREEN_WIDTH },
+	textScroll: { flex: 1, width: '100%' },
+	textContainer: { padding: 15 },
+	textContent: { fontFamily: 'monospace', fontSize: 14, lineHeight: 20 },
+
+	// Video Custom Layout
+	videoContainer: { width: '100%', height: '100%', backgroundColor: 'black', justifyContent: 'center', alignItems: 'center', position: 'relative' },
+	tapOverlay: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, flexDirection: 'row', zIndex: 10 },
+	tapZone: { flex: 1, height: '100%', justifyContent: 'center', alignItems: 'center' },
+	circleFeedback: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+	arrowContainer: { justifyContent: 'center', alignItems: 'center' },
+	arrowText: { color: 'white', fontSize: 12, fontWeight: 'bold', marginTop: -5 },
+	controlsOverlay: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0, 0, 0, 0.45)', zIndex: 20, justifyContent: 'space-between', paddingVertical: 10 },
+	topControlRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, marginTop: 20 },
+	videoTitle: { color: 'white', fontSize: 16, fontWeight: 'bold', flex: 1 },
+	centerControlRow: { justifyContent: 'center', alignItems: 'center' },
+	playPauseCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(0, 0, 0, 0.6)', justifyContent: 'center', alignItems: 'center' },
+	bottomControlRow: { paddingHorizontal: 20, paddingBottom: 20 },
+	progressBarWrapper: { height: 20, justifyContent: 'center', width: '100%', marginBottom: 8 },
+	progressBarBg: { height: 4, width: '100%', backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 2, position: 'relative' },
+	progressBarFill: { height: '100%', borderRadius: 2, position: 'absolute', left: 0, top: 0 },
+	progressBarHandle: { width: 12, height: 12, borderRadius: 6, position: 'absolute', top: -4, marginLeft: -6 },
+	timeRow: { flexDirection: 'row', justifyContent: 'space-between' },
+	timeText: { color: 'white', fontSize: 12 }
 });

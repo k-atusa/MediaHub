@@ -209,21 +209,17 @@ export class MediaHubClient {
 		const origSz = Opsec.decodeInt(flInfo.subarray(44, 52) as unknown as Buffer, false);
 		const fpid = this.objPid(fk);
 		const smx = new Bencrypt.SymMaster("gcmx1", fk.subarray(0, 32) as unknown as Buffer);
-
-		const tempEncPath = `${outDir}/${name}.enc`;
-		const { status } = await FileSystem.downloadAsync(`${this.url}/api/media/${fPid}/${fpid}/dat`, tempEncPath);
-		
-		if (status === 200 || status === 206) {
-			const b64 = await FileSystem.readAsStringAsync(tempEncPath, { encoding: FileSystem.EncodingType.Base64 });
-			const encryptedData = Buffer.from(b64, 'base64');
-			await FileSystem.deleteAsync(tempEncPath, { idempotent: true });
-
+		const ciphSz = smx.afterSize(origSz);
+		const res = await fetch(`${this.url}/api/media/${fPid}/${fpid}/dat`);
+		if (res.status === 200 || res.status === 206) {
+			const ab = await res.arrayBuffer();
+			const encryptedData = Buffer.from(ab).subarray(0, ciphSz) as unknown as Buffer;
 			const decrypted = smx.deBin(encryptedData);
 			const destPath = `${outDir}/${name}`;
 			await FileSystem.writeAsStringAsync(destPath, Buffer.from(decrypted.subarray(0, origSz)).toString('base64'), { encoding: FileSystem.EncodingType.Base64 });
 			return destPath;
 		} else {
-			throw new Error(`Download failed: ${status}`);
+			throw new Error(`Download failed: ${res.status}`);
 		}
 	}
 }
