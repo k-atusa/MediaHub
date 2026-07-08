@@ -21,7 +21,8 @@
     "react-native-paper": "^5.15.3",
     "react-native-quick-crypto": "^1.1.5",
     "react-native-safe-area-context": "^5.8.0",
-    "react-native-vector-icons": "^10.3.0"
+    "react-native-vector-icons": "^10.3.0",
+    "react-native-webview": "13.16.1"
   },
   "devDependencies": {
     "@types/node": "^26.1.0",
