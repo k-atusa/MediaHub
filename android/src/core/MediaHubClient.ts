@@ -210,16 +210,86 @@ export class MediaHubClient {
 		const fpid = this.objPid(fk);
 		const smx = new Bencrypt.SymMaster("gcmx1", fk.subarray(0, 32) as unknown as Buffer);
 		const ciphSz = smx.afterSize(origSz);
-		const res = await fetch(`${this.url}/api/media/${fPid}/${fpid}/dat`);
-		if (res.status === 200 || res.status === 206) {
-			const ab = await res.arrayBuffer();
-			const encryptedData = Buffer.from(ab).subarray(0, ciphSz) as unknown as Buffer;
-			const decrypted = smx.deBin(encryptedData);
-			const destPath = `${outDir}/${name}`;
-			await FileSystem.writeAsStringAsync(destPath, Buffer.from(decrypted.subarray(0, origSz)).toString('base64'), { encoding: FileSystem.EncodingType.Base64 });
-			return destPath;
-		} else {
-			throw new Error(`Download failed: ${res.status}`);
+
+		const destPath = `${outDir}/${name}`;
+
+		// Clean up existing file
+		const fileInfo = await FileSystem.getInfoAsync(destPath);
+		if (fileInfo.exists) {
+			await FileSystem.deleteAsync(destPath, { idempotent: true });
 		}
+
+		const BLOCK_SIZE = 1048576 + 16; // 1MB ciphertext + 16 bytes tag
+		const BLOCKS_PER_CHUNK = 8;
+		const CHUNK_DOWNLOAD_SIZE = BLOCKS_PER_CHUNK * BLOCK_SIZE;
+
+		let downloaded = 0;
+		let decryptedBytesWritten = 0;
+		let globalIV: Buffer | null = null;
+		let cryptoCount = 0;
+
+		while (downloaded < ciphSz) {
+			const isFirstChunk = (downloaded === 0);
+			const start = downloaded;
+			// First chunk must download the 12-byte global IV as well
+			const chunkLimit = isFirstChunk ? (CHUNK_DOWNLOAD_SIZE + 12) : CHUNK_DOWNLOAD_SIZE;
+			const end = Math.min(start + chunkLimit - 1, ciphSz - 1);
+
+			const headers: Record<string, string> = {
+				'Range': `bytes=${start}-${end}`,
+			};
+
+			const res = await fetch(`${this.url}/api/media/${fPid}/${fpid}/dat`, { headers });
+			if (res.status !== 200 && res.status !== 206) {
+				throw new Error(`Download failed: status ${res.status}`);
+			}
+
+			const ab = await res.arrayBuffer();
+			const chunkBuffer = Buffer.from(ab);
+
+			let cipherToDecrypt: Buffer;
+			if (isFirstChunk) {
+				if (chunkBuffer.length < 12) {
+					throw new Error("Encrypted file is too short (missing global IV)");
+				}
+				globalIV = Buffer.from(new Uint8Array(chunkBuffer.subarray(0, 12)));
+				cipherToDecrypt = Buffer.from(new Uint8Array(chunkBuffer.subarray(12)));
+			} else {
+				cipherToDecrypt = chunkBuffer;
+			}
+
+			// Decrypt chunk
+			const [decryptedChunk, nextCount] = smx.worker.deAESGCMxChunk(
+				smx.key,
+				cipherToDecrypt,
+				globalIV!,
+				cryptoCount
+			);
+			cryptoCount = nextCount;
+
+			// Truncate to origSz at the end of the file if needed
+			let bytesToWrite = decryptedChunk.length;
+			if (decryptedBytesWritten + bytesToWrite > origSz) {
+				bytesToWrite = origSz - decryptedBytesWritten;
+			}
+
+			if (bytesToWrite > 0) {
+				const sliceToWrite = decryptedChunk.subarray(0, bytesToWrite);
+				const b64 = Buffer.from(sliceToWrite).toString('base64');
+				await FileSystem.writeAsStringAsync(destPath, b64, {
+					encoding: FileSystem.EncodingType.Base64,
+					append: !isFirstChunk
+				});
+				decryptedBytesWritten += bytesToWrite;
+			}
+
+			downloaded += chunkBuffer.length;
+
+			if (progCb) {
+				progCb(downloaded, ciphSz);
+			}
+		}
+
+		return destPath;
 	}
 }

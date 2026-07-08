@@ -25,6 +25,7 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 
 	const player = useVideoPlayer(localUri, p => {
 		p.loop = true;
+		p.timeUpdateEventInterval = 0.2; // Emit timeUpdate every 200ms
 	});
 
 	const [isPlaying, setIsPlaying] = useState(false);
@@ -79,7 +80,7 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 	const handleLeftDoubleTap = () => {
 		const now = Date.now();
 		if (now - lastTapLeft < 300) {
-			player.currentTime = Math.max(0, currentTime - 10);
+			player.seekBy(-10);
 			triggerDoubleTapAnimation(leftArrowOpacity);
 			resetControlsTimer();
 		} else {
@@ -91,7 +92,7 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 	const handleRightDoubleTap = () => {
 		const now = Date.now();
 		if (now - lastTapRight < 300) {
-			player.currentTime = Math.min(duration, currentTime + 10);
+			player.seekBy(10);
 			triggerDoubleTapAnimation(rightArrowOpacity);
 			resetControlsTimer();
 		} else {
@@ -148,7 +149,7 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 				</TouchableWithoutFeedback>
 			</View>
 			{showControls && (
-				<Animated.View style={[styles.controlsOverlay, { opacity: controlsOpacity }]}>
+				<Animated.View style={[styles.controlsOverlay, { opacity: controlsOpacity }]} pointerEvents="box-none">
 					<View style={styles.topControlRow}>
 						<IconButton icon="chevron-down" iconColor="white" size={30} onPress={() => navigation.goBack()} />
 						<Text style={styles.videoTitle} numberOfLines={1}>{file.name}</Text>
@@ -165,8 +166,8 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 						<View style={styles.progressBarWrapper} onLayout={(e) => setProgressBarWidth(e.nativeEvent.layout.width)}>
 							<TouchableWithoutFeedback onPress={handleProgressBarPress}>
 								<View style={styles.progressBarBg}>
-									<View style={[styles.progressBarFill, { width: `${progressRatio * 100}%`, backgroundColor: theme.colors.primary }]} />
-									<View style={[styles.progressBarHandle, { left: `${progressRatio * 100}%`, backgroundColor: theme.colors.primary }]} />
+									<View pointerEvents="none" style={[styles.progressBarFill, { width: `${progressRatio * 100}%`, backgroundColor: theme.colors.primary }]} />
+									<View pointerEvents="none" style={[styles.progressBarHandle, { left: `${progressRatio * 100}%`, backgroundColor: theme.colors.primary }]} />
 								</View>
 							</TouchableWithoutFeedback>
 						</View>

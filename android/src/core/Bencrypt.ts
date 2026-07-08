@@ -209,6 +209,32 @@ export class AES1 {
 		}
 		return Buffer.concat(dst);
 	}
+
+	deAESGCMxChunk(key: Buffer, src: Buffer, globalIV: Buffer, startCount: number, chunkSize: number = 1048576): [Buffer, number] {
+		if (key.length !== 32) throw new Error("key size must be 32 bytes");
+
+		let count = startCount;
+		let offset = 0;
+		let dst = [];
+		const size = src.length;
+
+		while (offset < size) {
+			const iv = mkiv(globalIV, count++);
+			const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+
+			const remaining = size - offset;
+			const currentChunkSize = Math.min(chunkSize + 16, remaining);
+
+			const ciphertext = Buffer.from(new Uint8Array(src.subarray(offset, offset + currentChunkSize - 16)));
+			const tag = Buffer.from(new Uint8Array(src.subarray(offset + currentChunkSize - 16, offset + currentChunkSize)));
+			decipher.setAuthTag(tag as any);
+			const plaintext = Buffer.concat([decipher.update(ciphertext) as any, decipher.final() as any]);
+			dst.push(plaintext as unknown as Buffer);
+
+			offset += currentChunkSize;
+		}
+		return [Buffer.concat(dst), count];
+	}
 }
 
 export class SymMaster {
