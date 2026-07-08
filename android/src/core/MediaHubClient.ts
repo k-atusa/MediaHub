@@ -237,6 +237,7 @@ export class MediaHubClient {
 
 			const headers: Record<string, string> = {
 				'Range': `bytes=${start}-${end}`,
+				'Cache-Control': 'no-cache, no-store'
 			};
 
 			const res = await fetch(`${this.url}/api/media/${fPid}/${fpid}/dat`, { headers });
@@ -245,7 +246,7 @@ export class MediaHubClient {
 			}
 
 			const ab = await res.arrayBuffer();
-			const chunkBuffer = Buffer.from(ab);
+			let chunkBuffer: Buffer | null = Buffer.from(ab);
 
 			let cipherToDecrypt: Buffer;
 			if (isFirstChunk) {
@@ -259,7 +260,7 @@ export class MediaHubClient {
 			}
 
 			// Decrypt chunk
-			const [decryptedChunk, nextCount] = smx.worker.deAESGCMxChunk(
+			let [decryptedChunk, nextCount] = smx.worker.deAESGCMxChunk(
 				smx.key,
 				cipherToDecrypt,
 				globalIV!,
@@ -285,9 +286,17 @@ export class MediaHubClient {
 
 			downloaded += chunkBuffer.length;
 
+			// Explicitly release large memory blocks
+			chunkBuffer = null;
+			cipherToDecrypt = null as any;
+			decryptedChunk = null as any;
+
 			if (progCb) {
 				progCb(downloaded, ciphSz);
 			}
+			
+			// Force yield to the event loop so Hermes GC can reclaim memory
+			await new Promise(r => setTimeout(r, 10));
 		}
 
 		return destPath;

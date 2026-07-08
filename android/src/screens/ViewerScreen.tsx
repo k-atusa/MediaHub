@@ -25,7 +25,7 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 
 	const player = useVideoPlayer(localUri, p => {
 		p.loop = true;
-		p.timeUpdateEventInterval = 0.2; // Emit timeUpdate every 200ms
+		p.timeUpdateEventInterval = 0.2;
 	});
 
 	const [isPlaying, setIsPlaying] = useState(false);
@@ -65,11 +65,12 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 
 	const showControlsAnimated = () => {
 		setShowControls(true);
-		Animated.timing(controlsOpacity, { toValue: 1, duration: 250, useNativeDriver: true }).start(() => resetControlsTimer());
+		Animated.timing(controlsOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start(() => resetControlsTimer());
 	};
 
 	const hideControlsAnimated = () => {
-		Animated.timing(controlsOpacity, { toValue: 0, duration: 250, useNativeDriver: true }).start(() => setShowControls(false));
+		setShowControls(false);
+		Animated.timing(controlsOpacity, { toValue: 0, duration: 150, useNativeDriver: true }).start();
 	};
 
 	const toggleControls = () => {
@@ -77,41 +78,45 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 		else showControlsAnimated();
 	};
 
-	const handleLeftDoubleTap = () => {
+	const handleScreenTap = (event: GestureResponderEvent) => {
+		const { pageX } = event.nativeEvent;
+		const isLeft = pageX < SCREEN_WIDTH / 2;
 		const now = Date.now();
-		if (now - lastTapLeft < 300) {
-			player.seekBy(-10);
-			triggerDoubleTapAnimation(leftArrowOpacity);
-			resetControlsTimer();
-		} else {
-			toggleControls();
-		}
-		setLastTapLeft(now);
-	};
 
-	const handleRightDoubleTap = () => {
-		const now = Date.now();
-		if (now - lastTapRight < 300) {
-			player.seekBy(10);
-			triggerDoubleTapAnimation(rightArrowOpacity);
-			resetControlsTimer();
+		if (isLeft) {
+			if (now - lastTapLeft < 400) {
+				player.seekBy(-10);
+				triggerDoubleTapAnimation(leftArrowOpacity);
+				resetControlsTimer();
+				setLastTapLeft(0);
+			} else {
+				toggleControls();
+				setLastTapLeft(now);
+			}
+			setLastTapRight(0);
 		} else {
-			toggleControls();
+			if (now - lastTapRight < 400) {
+				player.seekBy(10);
+				triggerDoubleTapAnimation(rightArrowOpacity);
+				resetControlsTimer();
+				setLastTapRight(0);
+			} else {
+				toggleControls();
+				setLastTapRight(now);
+			}
+			setLastTapLeft(0);
 		}
-		setLastTapRight(now);
 	};
 
 	const triggerDoubleTapAnimation = (opacityVar: Animated.Value) => {
-		opacityVar.setValue(0);
-		Animated.sequence([
-			Animated.timing(opacityVar, { toValue: 1, duration: 150, useNativeDriver: true }),
-			Animated.timing(opacityVar, { toValue: 0, duration: 300, delay: 200, useNativeDriver: true })
-		]).start();
+		opacityVar.setValue(1);
+		Animated.timing(opacityVar, { toValue: 0, duration: 500, delay: 100, useNativeDriver: true }).start();
 	};
 
 	const handleProgressBarPress = (event: GestureResponderEvent) => {
 		const ratio = Math.max(0, Math.min(1, event.nativeEvent.locationX / progressBarWidth));
-		player.currentTime = ratio * duration;
+		const targetTime = ratio * duration;
+		player.seekBy(targetTime - currentTime);
 		resetControlsTimer();
 	};
 
@@ -126,8 +131,9 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 	return (
 		<View style={styles.videoContainer}>
 			<VideoView style={styles.media} player={player} nativeControls={false} />
-			<View style={styles.tapOverlay}>
-				<TouchableWithoutFeedback onPress={handleLeftDoubleTap}>
+			
+			<TouchableWithoutFeedback onPress={handleScreenTap}>
+				<View style={styles.tapOverlay}>
 					<View style={styles.tapZone}>
 						<Animated.View style={[styles.arrowContainer, { opacity: leftArrowOpacity }]}>
 							<View style={styles.circleFeedback}>
@@ -136,8 +142,6 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 							</View>
 						</Animated.View>
 					</View>
-				</TouchableWithoutFeedback>
-				<TouchableWithoutFeedback onPress={handleRightDoubleTap}>
 					<View style={styles.tapZone}>
 						<Animated.View style={[styles.arrowContainer, { opacity: rightArrowOpacity }]}>
 							<View style={styles.circleFeedback}>
@@ -146,37 +150,36 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 							</View>
 						</Animated.View>
 					</View>
-				</TouchableWithoutFeedback>
-			</View>
-			{showControls && (
-				<Animated.View style={[styles.controlsOverlay, { opacity: controlsOpacity }]} pointerEvents="box-none">
-					<View style={styles.topControlRow}>
-						<IconButton icon="chevron-down" iconColor="white" size={30} onPress={() => navigation.goBack()} />
-						<Text style={styles.videoTitle} numberOfLines={1}>{file.name}</Text>
+				</View>
+			</TouchableWithoutFeedback>
+
+			<Animated.View style={[styles.controlsOverlay, { opacity: controlsOpacity }]} pointerEvents={showControls ? "box-none" : "none"}>
+				<View style={styles.topControlRow}>
+					<IconButton icon="chevron-down" iconColor="white" size={30} onPress={() => navigation.goBack()} />
+					<Text style={styles.videoTitle} numberOfLines={1}>{file.name}</Text>
+				</View>
+				<View style={styles.centerControlRow}>
+					<TouchableOpacity style={styles.playPauseCircle} onPress={() => {
+						isPlaying ? player.pause() : player.play();
+						resetControlsTimer();
+					}}>
+						<IconButton icon={isPlaying ? "pause" : "play"} iconColor="white" size={48} />
+					</TouchableOpacity>
+				</View>
+				<View style={styles.bottomControlRow}>
+					<View style={styles.progressBarWrapper} onLayout={(e) => setProgressBarWidth(e.nativeEvent.layout.width)}>
+						<TouchableWithoutFeedback onPress={handleProgressBarPress}>
+							<View style={styles.progressBarBg}>
+								<View pointerEvents="none" style={[styles.progressBarFill, { width: `${progressRatio * 100}%`, backgroundColor: theme.colors.primary }]} />
+								<View pointerEvents="none" style={[styles.progressBarHandle, { left: `${progressRatio * 100}%`, backgroundColor: theme.colors.primary }]} />
+							</View>
+						</TouchableWithoutFeedback>
 					</View>
-					<View style={styles.centerControlRow}>
-						<TouchableOpacity style={styles.playPauseCircle} onPress={() => {
-							isPlaying ? player.pause() : player.play();
-							resetControlsTimer();
-						}}>
-							<IconButton icon={isPlaying ? "pause" : "play"} iconColor="white" size={48} />
-						</TouchableOpacity>
+					<View style={styles.timeRow}>
+						<Text style={styles.timeText}>{formatTime(currentTime)} / {formatTime(duration)}</Text>
 					</View>
-					<View style={styles.bottomControlRow}>
-						<View style={styles.progressBarWrapper} onLayout={(e) => setProgressBarWidth(e.nativeEvent.layout.width)}>
-							<TouchableWithoutFeedback onPress={handleProgressBarPress}>
-								<View style={styles.progressBarBg}>
-									<View pointerEvents="none" style={[styles.progressBarFill, { width: `${progressRatio * 100}%`, backgroundColor: theme.colors.primary }]} />
-									<View pointerEvents="none" style={[styles.progressBarHandle, { left: `${progressRatio * 100}%`, backgroundColor: theme.colors.primary }]} />
-								</View>
-							</TouchableWithoutFeedback>
-						</View>
-						<View style={styles.timeRow}>
-							<Text style={styles.timeText}>{formatTime(currentTime)} / {formatTime(duration)}</Text>
-						</View>
-					</View>
-				</Animated.View>
-			)}
+				</View>
+			</Animated.View>
 		</View>
 	);
 };
@@ -239,7 +242,11 @@ export const ViewerScreen = ({ route, navigation }: any) => {
 	};
 
 	const renderContent = () => {
-		if (loading) return <ActivityIndicator size="large" color={theme.colors.primary} style={styles.center} />;
+		if (loading) return (
+			<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+				<ActivityIndicator size="large" color={theme.colors.primary} />
+			</View>
+		);
 		if (error) return <Text style={[styles.center, { color: theme.colors.error }]}>{error}</Text>;
 		if (!localUri) return null;
 
