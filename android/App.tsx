@@ -7,6 +7,8 @@ import { LoginScreen } from './src/screens/LoginScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { ViewerScreen } from './src/screens/ViewerScreen';
 
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+
 const Stack = createNativeStackNavigator();
 
 const customTheme = {
@@ -22,7 +24,12 @@ const customTheme = {
 export default function App() {
   return (
     <AppProvider>
-      <PaperProvider theme={customTheme}>
+      <PaperProvider 
+        theme={customTheme}
+        settings={{
+          icon: props => <MaterialCommunityIcons {...props} />,
+        }}
+      >
         <NavigationContainer theme={customTheme as any}>
           <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="Login" component={LoginScreen} />

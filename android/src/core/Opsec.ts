@@ -90,7 +90,7 @@ export function decodeCfg(data: Buffer): Record<string, Buffer> {
         }
 
         const keyBytes = data.subarray(offset, offset + keyLen);
-        const key = keyBytes.toString('utf-8');
+        const key = Buffer.from(keyBytes).toString('utf-8');
         offset += keyLen;
 
         let dataLen = 0;

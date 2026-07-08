@@ -217,7 +217,7 @@ export class MediaHubClient {
             // We just decrypt everything in memory.
             const decrypted = smx.deBin(encryptedData);
             const destPath = `${outDir}/${name}`;
-            await FileSystem.writeAsStringAsync(destPath, (decrypted.subarray(0, origSz) as unknown as Buffer).toString('base64'), { encoding: FileSystem.EncodingType.Base64 });
+            await FileSystem.writeAsStringAsync(destPath, Buffer.from(decrypted.subarray(0, origSz)).toString('base64'), { encoding: FileSystem.EncodingType.Base64 });
             return destPath;
         } else {
             throw new Error(`Download failed: ${res.status}`);
