@@ -1,0 +1,39 @@
+{
+  "name": "android",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "dependencies": {
+    "@expo/vector-icons": "^15.0.2",
+    "@react-navigation/native": "^7.3.8",
+    "@react-navigation/native-stack": "^7.17.10",
+    "expo": "~57.0.4",
+    "expo-document-picker": "^57.0.0",
+    "expo-file-system": "^57.0.0",
+    "expo-image-manipulator": "^57.0.2",
+    "expo-secure-store": "^57.0.0",
+    "expo-status-bar": "~57.0.0",
+    "expo-video": "~57.0.0",
+    "expo-video-thumbnails": "^57.0.0",
+    "js-sha3": "^0.9.3",
+    "react": "19.2.3",
+    "react-native": "0.86.0",
+    "react-native-argon2": "^4.0.0",
+    "react-native-paper": "^5.15.3",
+    "react-native-quick-crypto": "^1.1.5",
+    "react-native-safe-area-context": "^5.8.0",
+    "react-native-vector-icons": "^10.3.0",
+    "react-native-webview": "13.16.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "@types/react": "~19.2.2",
+    "typescript": "~6.0.3"
+  },
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web"
+  },
+  "private": true
+}
