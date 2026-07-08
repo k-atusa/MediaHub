@@ -25,14 +25,16 @@ export const LoginScreen = ({ navigation }: any) => {
                 const cred = JSON.parse(credStr);
                 setUrl(cred.url);
                 setUser(cred.user);
-                setAutoLogin(true);
                 
+                /* 
+                setAutoLogin(true);
                 // Do auto login
                 setLoading(true);
                 const cli = new MediaHubClient(cred.url, cred.user, "");
                 cli.setAuth(cred.uHash, Buffer.from(cred.uKey, 'hex'));
                 setClient(cli);
                 navigation.replace('Home');
+                */
             }
         } catch (e) {}
     };

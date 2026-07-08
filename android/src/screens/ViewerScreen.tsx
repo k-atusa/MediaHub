@@ -69,8 +69,6 @@ export const ViewerScreen = ({ route, navigation }: any) => {
                 <VideoView
                     style={styles.media}
                     player={player}
-                    allowsFullscreen
-                    allowsPictureInPicture
                 />
             );
         }

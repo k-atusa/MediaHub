@@ -4,7 +4,7 @@ import { sha3_256, sha3_512 } from 'js-sha3';
 import Argon2 from 'react-native-argon2';
 
 export function random(size: number): Buffer {
-    return crypto.randomBytes(size);
+    return crypto.randomBytes(size) as unknown as Buffer;
 }
 
 export function sha3256(data: Buffer): Buffer {
@@ -12,7 +12,7 @@ export function sha3256(data: Buffer): Buffer {
 }
 
 export function hmac3256(key: Buffer, data: Buffer): Buffer {
-    return crypto.createHmac('sha3-256', key).update(data).digest();
+    return crypto.createHmac('sha3-256', key).update(data).digest() as unknown as Buffer;
 }
 
 export function sha3512(data: Buffer): Buffer {
@@ -20,13 +20,13 @@ export function sha3512(data: Buffer): Buffer {
 }
 
 export function hmac3512(key: Buffer, data: Buffer): Buffer {
-    return crypto.createHmac('sha3-512', key).update(data).digest();
+    return crypto.createHmac('sha3-512', key).update(data).digest() as unknown as Buffer;
 }
 
 export function genkey(data: Buffer, lbl: string, size: number): Buffer {
-    const key = crypto.createHmac('sha3-512', data).update(Buffer.from(lbl, 'utf-8')).digest();
+    const key = crypto.createHmac('sha3-512', data).update(Buffer.from(lbl, 'utf-8')).digest() as unknown as Buffer;
     if (size > key.length) throw new Error("key size too large");
-    return key.subarray(0, size);
+    return key.subarray(0, size) as unknown as Buffer;
 }
 
 export function mkiv(g: Buffer, c: number): Buffer {
@@ -75,12 +75,13 @@ export class HashMaster {
             // For react-native-argon2: Argon2(password, salt, { iterations: 3, memory: 262144, parallelism: 6, hashLength: 64, mode: 'argon2id' })
             // Note: the output format might be a string (encoded) or raw. react-native-argon2 returns an object { rawHash: string, ... } where rawHash is hex.
             try {
-                const res = await Argon2(pw.toString('utf-8'), salt.toString('utf-8'), {
+                const res = await Argon2(pw.toString('utf-8'), salt.toString('hex'), {
                     iterations: 3,
                     memory: 262144,
                     parallelism: 6,
                     hashLength: 64,
-                    mode: 'argon2id'
+                    mode: 'argon2id',
+                    saltEncoding: 'hex'
                 });
                 master = Buffer.from(res.rawHash, 'hex');
             } catch (e) {
@@ -110,13 +111,13 @@ export class AES1 {
     deAESGCM(key: Buffer, data: Buffer): Buffer {
         if (key.length !== 32) throw new Error("key size must be 32 bytes");
         if (data.length < 28) throw new Error("cipher too short");
-        const iv = data.subarray(0, 12);
-        const ciphertext = data.subarray(12, data.length - 16);
-        const tag = data.subarray(data.length - 16);
+        const iv = data.subarray(0, 12) as unknown as Buffer;
+        const ciphertext = data.subarray(12, data.length - 16) as unknown as Buffer;
+        const tag = data.subarray(data.length - 16) as unknown as Buffer;
         const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-        decipher.setAuthTag(tag);
-        const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-        return plaintext;
+        decipher.setAuthTag(tag as any);
+        const plaintext = Buffer.concat([decipher.update(ciphertext) as any, decipher.final() as any]);
+        return plaintext as unknown as Buffer;
     }
 
     // Extended chunked operations (gcmx1) used for file streams
@@ -132,10 +133,10 @@ export class AES1 {
             const iv = mkiv(globalIV, count++);
             const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
             let end = Math.min(offset + chunkSize, size);
-            const chunk = src.subarray(offset, end);
+            const chunk = src.subarray(offset, end) as unknown as Buffer;
             const ciphertext = Buffer.concat([cipher.update(chunk), cipher.final()]);
             const tag = cipher.getAuthTag();
-            dst.push(ciphertext, tag);
+            dst.push(ciphertext as unknown as Buffer, tag as unknown as Buffer);
             offset = end;
         }
         
@@ -145,7 +146,7 @@ export class AES1 {
             const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
             const ciphertext = Buffer.concat([cipher.update(Buffer.alloc(0)), cipher.final()]);
             const tag = cipher.getAuthTag();
-            dst.push(ciphertext, tag);
+            dst.push(ciphertext as unknown as Buffer, tag as unknown as Buffer);
         }
         return Buffer.concat(dst);
     }
@@ -154,7 +155,7 @@ export class AES1 {
         if (key.length !== 32) throw new Error("key size must be 32 bytes");
         if (src.length < 28) throw new Error("cipher too short to decrypt");
         
-        const globalIV = src.subarray(0, 12);
+        const globalIV = src.subarray(0, 12) as unknown as Buffer;
         let count = 0;
         let offset = 12;
         let dst = [];
@@ -168,12 +169,11 @@ export class AES1 {
             const remaining = size - offset;
             const currentChunkSize = Math.min(chunkSize + 16, remaining);
             
-            const ciphertext = src.subarray(offset, offset + currentChunkSize - 16);
-            const tag = src.subarray(offset + currentChunkSize - 16, offset + currentChunkSize);
-            
-            decipher.setAuthTag(tag);
-            const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-            dst.push(plaintext);
+            const ciphertext = src.subarray(offset, offset + currentChunkSize - 16) as unknown as Buffer;
+            const tag = src.subarray(offset + currentChunkSize - 16, offset + currentChunkSize) as unknown as Buffer;
+            decipher.setAuthTag(tag as any);
+            const plaintext = Buffer.concat([decipher.update(ciphertext) as any, decipher.final() as any]);
+            dst.push(plaintext as unknown as Buffer);
             
             offset += currentChunkSize;
         }

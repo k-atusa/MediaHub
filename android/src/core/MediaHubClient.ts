@@ -20,11 +20,11 @@ export class MediaHubClient {
     }
 
     usrPid(key: Buffer): string {
-        return Bencrypt.sha3256(key).subarray(0, 16).toString('hex');
+        return (Bencrypt.sha3256(key).subarray(0, 16) as unknown as Buffer).toString('hex');
     }
 
     objPid(key: Buffer): string {
-        return key.subarray(32, 44).toString('hex');
+        return (key.subarray(32, 44) as unknown as Buffer).toString('hex');
     }
 
     async auth() {
@@ -50,7 +50,7 @@ export class MediaHubClient {
             const ab = await res.arrayBuffer();
             const buf = Buffer.from(ab);
             if (buf.length > 0) {
-                const sm = new Bencrypt.SymMaster("gcm1", this.uKey!.subarray(0, 32));
+                const sm = new Bencrypt.SymMaster("gcm1", this.uKey!.subarray(0, 32) as unknown as Buffer);
                 const dec = sm.deBin(buf);
                 this.fldMap = Opsec.decodeCfg(dec);
             } else {
@@ -67,12 +67,12 @@ export class MediaHubClient {
         const folderKey = Buffer.concat([Bencrypt.random(32), Bencrypt.random(12)]);
         this.fldMap[name] = folderKey;
         
-        const sm = new Bencrypt.SymMaster("gcm1", this.uKey!.subarray(0, 32));
+        const sm = new Bencrypt.SymMaster("gcm1", this.uKey!.subarray(0, 32) as unknown as Buffer);
         const enc = sm.enBin(Opsec.encodeCfg(this.fldMap));
         
         const res = await fetch(`${this.url}/api/userdata/${this.uHash}`, {
             method: 'POST',
-            body: enc
+            body: enc as any
         });
         if (res.status !== 200) {
             throw new Error(`Failed to create folder: code ${res.status}`);
@@ -90,7 +90,7 @@ export class MediaHubClient {
             const ab = await res.arrayBuffer();
             const buf = Buffer.from(ab);
             if (buf.length > 0) {
-                const sm = new Bencrypt.SymMaster("gcm1", fKey.subarray(0, 32));
+                const sm = new Bencrypt.SymMaster("gcm1", fKey.subarray(0, 32) as unknown as Buffer);
                 flMap = Opsec.decodeCfg(sm.deBin(buf));
             }
         }
@@ -145,12 +145,12 @@ export class MediaHubClient {
         }
 
         if (thumb) {
-            const sm = new Bencrypt.SymMaster("gcm1", fk.subarray(0, 32));
-            const encThumb = sm.enBin(thumb);
+            const sm = new Bencrypt.SymMaster("gcm1", fk.subarray(0, 32) as unknown as Buffer);
+            const enc = sm.enBin(thumb);
             await fetch(`${this.url}/api/media/${fPid}/${fpid}/thumb`, {
                 method: 'POST',
                 headers: { 'X-User-Hash': this.uHash! },
-                body: encThumb
+                body: enc as any
             });
         }
 
@@ -159,7 +159,7 @@ export class MediaHubClient {
         const b64 = await FileSystem.readAsStringAsync(path, { encoding: FileSystem.EncodingType.Base64 });
         const rawData = Buffer.from(b64, 'base64');
 
-        const smx = new Bencrypt.SymMaster("gcmx1", fk.subarray(0, 32));
+        const smx = new Bencrypt.SymMaster("gcmx1", fk.subarray(0, 32) as unknown as Buffer);
         const encData = smx.enBin(rawData);
         
         const padSz = Opsec.padLen(encData.length);
@@ -187,13 +187,13 @@ export class MediaHubClient {
         const sizeBuf = Opsec.encodeInt(origSz, 8, false);
         flMap[name] = Buffer.concat([fk, sizeBuf]);
         
-        const sm = new Bencrypt.SymMaster("gcm1", fKey.subarray(0, 32));
+        const sm = new Bencrypt.SymMaster("gcm1", fKey.subarray(0, 32) as unknown as Buffer);
         const encMap = sm.enBin(Opsec.encodeCfg(flMap));
         
         const resMap = await fetch(`${this.url}/api/storage/${fPid}/names`, {
             method: 'POST',
             headers: { 'X-User-Hash': this.uHash! },
-            body: encMap
+            body: encMap as any
         });
         
         if (resMap.status !== 200) {
@@ -204,9 +204,9 @@ export class MediaHubClient {
 
     async dnFile(fPid: string, flInfo: Buffer, name: string, outDir: string, progCb?: (sent: number, total: number) => void): Promise<string> {
         const fk = flInfo.subarray(0, 44);
-        const origSz = Opsec.decodeInt(flInfo.subarray(44, 52), false);
+        const origSz = Opsec.decodeInt(flInfo.subarray(44, 52) as unknown as Buffer, false);
         const fpid = this.objPid(fk);
-        const smx = new Bencrypt.SymMaster("gcmx1", fk.subarray(0, 32));
+        const smx = new Bencrypt.SymMaster("gcmx1", fk.subarray(0, 32) as unknown as Buffer);
         
         const res = await fetch(`${this.url}/api/media/${fPid}/${fpid}/dat`);
         if (res.status === 200 || res.status === 206) {
@@ -215,7 +215,7 @@ export class MediaHubClient {
             // We just decrypt everything in memory.
             const decrypted = smx.deBin(encryptedData);
             const destPath = `${outDir}/${name}`;
-            await FileSystem.writeAsStringAsync(destPath, decrypted.subarray(0, origSz).toString('base64'), { encoding: FileSystem.EncodingType.Base64 });
+            await FileSystem.writeAsStringAsync(destPath, (decrypted.subarray(0, origSz) as unknown as Buffer).toString('base64'), { encoding: FileSystem.EncodingType.Base64 });
             return destPath;
         } else {
             throw new Error(`Download failed: ${res.status}`);
