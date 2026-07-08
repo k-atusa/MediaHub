@@ -143,7 +143,7 @@ export const HomeScreen = ({ navigation }: any) => {
         navigation.navigate('Viewer', {
             file: { name: file.name, size: file.size },
             fPid: curPid,
-            flInfoHex: file.info.toString('hex'),
+            flInfoHex: Buffer.from(file.info).toString('hex'),
         });
     };
 

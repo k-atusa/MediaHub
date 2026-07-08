@@ -44,10 +44,11 @@ export function encodeInt(data: number, size: number, signed: boolean): Buffer {
 }
 
 export function decodeInt(data: Buffer, signed: boolean): number {
+	const buf = Buffer.from(data);
 	if (signed) {
-		return data.readIntLE(0, data.length);
+		return buf.readIntLE(0, buf.length);
 	} else {
-		return data.readUIntLE(0, data.length);
+		return buf.readUIntLE(0, buf.length);
 	}
 }
 
