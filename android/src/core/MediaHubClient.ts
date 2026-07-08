@@ -235,17 +235,27 @@ export class MediaHubClient {
 			const chunkLimit = isFirstChunk ? (CHUNK_DOWNLOAD_SIZE + 12) : CHUNK_DOWNLOAD_SIZE;
 			const end = Math.min(start + chunkLimit - 1, ciphSz - 1);
 
-			const headers: Record<string, string> = {
-				'Range': `bytes=${start}-${end}`,
-				'Cache-Control': 'no-cache, no-store'
-			};
+			const ab = await new Promise<ArrayBuffer>((resolve, reject) => {
+				const xhr = new XMLHttpRequest();
+				xhr.open('GET', `${this.url}/api/media/${fPid}/${fpid}/dat`);
+				xhr.setRequestHeader('Range', `bytes=${start}-${end}`);
+				xhr.setRequestHeader('Cache-Control', 'no-cache, no-store');
+				xhr.responseType = 'arraybuffer';
+				xhr.onload = () => {
+					if (xhr.status === 200 || xhr.status === 206) {
+						if (xhr.status === 200 && ciphSz > CHUNK_DOWNLOAD_SIZE + 12) {
+							reject(new Error("Server returned full file (200 OK). Range requests are not supported by the backend."));
+						} else {
+							resolve(xhr.response as ArrayBuffer);
+						}
+					} else {
+						reject(new Error(`Download failed: status ${xhr.status}`));
+					}
+				};
+				xhr.onerror = () => reject(new Error('Network request failed'));
+				xhr.send();
+			});
 
-			const res = await fetch(`${this.url}/api/media/${fPid}/${fpid}/dat`, { headers });
-			if (res.status !== 200 && res.status !== 206) {
-				throw new Error(`Download failed: status ${res.status}`);
-			}
-
-			const ab = await res.arrayBuffer();
 			let chunkBuffer: Buffer | null = Buffer.from(ab);
 
 			let cipherToDecrypt: Buffer;
@@ -296,7 +306,7 @@ export class MediaHubClient {
 			}
 			
 			// Force yield to the event loop so Hermes GC can reclaim memory
-			await new Promise(r => setTimeout(r, 10));
+			await new Promise(r => setTimeout(r, 20));
 		}
 
 		return destPath;

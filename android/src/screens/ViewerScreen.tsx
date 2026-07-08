@@ -198,32 +198,18 @@ export const ViewerScreen = ({ route, navigation }: any) => {
 	const ext = file.name.split('.').pop()?.toLowerCase();
 	const isVideo = ['mp4', 'webm', 'mov', 'mkv'].includes(ext || '');
 
-	useEffect(() => {
-		downloadAndPrepare();
-		return () => {
-			if (localUri) {
-				FileSystem.deleteAsync(localUri, { idempotent: true }).catch(() => { });
-			}
-		};
-	}, []);
+	const [downloadProgress, setDownloadProgress] = useState(0);
 
 	const downloadAndPrepare = async () => {
 		try {
 			const tempDir = FileSystem.cacheDirectory + 'mediahub_temp/';
-			const dirInfo = await FileSystem.getInfoAsync(tempDir);
-			if (!dirInfo.exists) {
-				await FileSystem.makeDirectoryAsync(tempDir);
-			}
-			if (!flInfoHex) throw new Error("Missing file info");
+			await FileSystem.makeDirectoryAsync(tempDir, { intermediates: true });
 
-			let flInfo;
-			try {
-				flInfo = Buffer.from(flInfoHex, 'hex');
-			} catch (err) {
-				throw new Error("Failed to parse file info buffer");
-			}
+			const flInfo = Buffer.from(flInfoHex, 'hex');
 
-			const destPath = await client!.dnFile(fPid, flInfo, file.name, tempDir);
+			const destPath = await client!.dnFile(fPid, flInfo, file.name, tempDir, (sent, total) => {
+				setDownloadProgress(Math.floor((sent / total) * 100));
+			});
 			setLocalUri(destPath);
 
 			if (['txt', 'md', 'csv', 'json', 'log', 'svg'].includes(ext || '')) {
@@ -234,17 +220,28 @@ export const ViewerScreen = ({ route, navigation }: any) => {
 				const b64 = await FileSystem.readAsStringAsync(destPath, { encoding: FileSystem.EncodingType.Base64 });
 				setPdfBase64(b64);
 			}
-		} catch (e: any) {
-			setError(e.message || String(e));
+		} catch (err: any) {
+			console.error(err);
+			setError(err.message || String(err));
 		} finally {
 			setLoading(false);
 		}
 	};
 
+	useEffect(() => {
+		downloadAndPrepare();
+		return () => {
+			if (localUri) {
+				FileSystem.deleteAsync(localUri, { idempotent: true }).catch(() => { });
+			}
+		};
+	}, []);
+
 	const renderContent = () => {
 		if (loading) return (
 			<View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
 				<ActivityIndicator size="large" color={theme.colors.primary} />
+				<Text style={{ color: 'white', marginTop: 16 }}>Downloading... {downloadProgress}%</Text>
 			</View>
 		);
 		if (error) return <Text style={[styles.center, { color: theme.colors.error }]}>{error}</Text>;
