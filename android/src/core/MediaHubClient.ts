@@ -20,18 +20,18 @@ export class MediaHubClient {
     }
 
     usrPid(key: Buffer): string {
-        return (Bencrypt.sha3256(key).subarray(0, 16) as unknown as Buffer).toString('hex');
+        return Buffer.from(Bencrypt.sha3256(key).subarray(0, 16)).toString('hex');
     }
 
     objPid(key: Buffer): string {
-        return (key.subarray(32, 44) as unknown as Buffer).toString('hex');
+        return Buffer.from(key.subarray(32, 44)).toString('hex');
     }
 
     async auth() {
         const PEPPER = "_PROJECT_WHY_MEDIAHUB_PEPPER_2026_!@#$";
-        const salt = Bencrypt.sha3256(Buffer.from(this.user + PEPPER, 'utf-8'));
-        // In python: Bencode.NormPW(self.pw), assuming plain pw for now
-        const pwBuf = Buffer.from(this.pw, 'utf-8'); 
+        const normalizedUser = this.user.normalize('NFC');
+        const salt = Bencrypt.sha3256(Buffer.from(normalizedUser + PEPPER, 'utf-8'));
+        const pwBuf = Buffer.from(this.pw.normalize('NFC'), 'utf-8'); 
         const hm = new Bencrypt.HashMaster("arg2st");
         const [stKey, uKey] = await hm.KDF(pwBuf, salt);
         this.uHash = this.usrPid(stKey);
@@ -56,6 +56,8 @@ export class MediaHubClient {
             } else {
                 this.fldMap = {};
             }
+        } else if (res.status === 404) {
+            this.fldMap = {};
         } else {
             throw new Error(`Connection Error: code ${res.status}`);
         }

@@ -24,9 +24,38 @@ export function hmac3512(key: Buffer, data: Buffer): Buffer {
 }
 
 export function genkey(data: Buffer, lbl: string, size: number): Buffer {
-    const key = crypto.createHmac('sha3-512', data).update(Buffer.from(lbl, 'utf-8')).digest() as unknown as Buffer;
-    if (size > key.length) throw new Error("key size too large");
-    return key.subarray(0, size) as unknown as Buffer;
+    const B = 72; // Block size for SHA3-512 (rate = 576 bits = 72 bytes)
+    let k: any = Buffer.from(data);
+    const m = Buffer.from(lbl, 'utf-8');
+
+    if (k.length > B) {
+        k = sha3512(k);
+    }
+    if (k.length < B) {
+        const newK = Buffer.alloc(B);
+        newK.set(k);
+        k = newK;
+    }
+
+    const o_key_pad = Buffer.alloc(B);
+    const i_key_pad = Buffer.alloc(B);
+    for (let i = 0; i < B; i++) {
+        o_key_pad[i] = k[i] ^ 0x5c;
+        i_key_pad[i] = k[i] ^ 0x36;
+    }
+
+    const innerData = Buffer.alloc(B + m.length);
+    innerData.set(i_key_pad, 0);
+    innerData.set(m, B);
+    const innerHash = sha3512(innerData);
+
+    const outerData = Buffer.alloc(B + innerHash.length);
+    outerData.set(o_key_pad, 0);
+    outerData.set(innerHash, B);
+    const result = sha3512(outerData);
+
+    if (size > result.length) throw new Error("key size too large");
+    return result.subarray(0, size) as unknown as Buffer;
 }
 
 export function mkiv(g: Buffer, c: number): Buffer {

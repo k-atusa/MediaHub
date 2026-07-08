@@ -46,8 +46,9 @@ export const LoginScreen = ({ navigation }: any) => {
         }
         setLoading(true);
         try {
-            const cli = new MediaHubClient(url, user, password);
+            const cli = new MediaHubClient(url.trim(), user.trim(), password);
             await cli.auth();
+            await cli.getFlds();
             if (autoLogin) {
                 await SecureStore.setItemAsync('mediahub_cred', JSON.stringify({
                     url, user, uHash: cli.uHash, uKey: cli.uKey?.toString('hex')
