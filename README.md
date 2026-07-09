@@ -57,3 +57,9 @@ go mod init example.com
 go mod tidy
 go build -ldflags="-s -w" -trimpath server.go
 ```
+
+```bash
+gradlew.bat clean
+gradlew.bat [assembleRelease|assembleDebug]
+cd android/app/build/outputs/apk/debug
+```
