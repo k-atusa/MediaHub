@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, StyleSheet, Image, ActivityIndicator, TouchableWithoutFeedback, TouchableOpacity, ScrollView, Animated, Dimensions, GestureResponderEvent } from 'react-native';
+import { View, StyleSheet, Image, ActivityIndicator, TouchableWithoutFeedback, TouchableOpacity, ScrollView, Animated, Dimensions, GestureResponderEvent, PanResponder } from 'react-native';
 import { Appbar, Text, useTheme, IconButton } from 'react-native-paper';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEventListener } from 'expo';
@@ -32,12 +32,16 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 	const [currentTime, setCurrentTime] = useState(0);
 	const [duration, setDuration] = useState(0);
 
+	const [isDragging, setIsDragging] = useState(false);
+	const [dragTime, setDragTime] = useState(0);
+	const dragStartRatio = useRef(0);
+
 	useEventListener(player, 'playingChange', ({ isPlaying }) => {
 		setIsPlaying(isPlaying);
 	});
 
 	useEventListener(player, 'timeUpdate', ({ currentTime }) => {
-		setCurrentTime(currentTime);
+		if (!isDragging) setCurrentTime(currentTime);
 	});
 
 	useEventListener(player, 'sourceLoad', ({ duration }) => {
@@ -57,7 +61,7 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 	const resetControlsTimer = () => {
 		if (controlsTimer.current) clearTimeout(controlsTimer.current);
 		controlsTimer.current = setTimeout(() => {
-			if (player.playing) {
+			if (player.playing && !isDragging) {
 				hideControlsAnimated();
 			}
 		}, 3500);
@@ -65,7 +69,8 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 
 	const showControlsAnimated = () => {
 		setShowControls(true);
-		Animated.timing(controlsOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start(() => resetControlsTimer());
+		controlsOpacity.setValue(1); // Instant appearance
+		resetControlsTimer();
 	};
 
 	const hideControlsAnimated = () => {
@@ -88,7 +93,7 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 				player.seekBy(-10);
 				triggerDoubleTapAnimation(leftArrowOpacity);
 				resetControlsTimer();
-				setLastTapLeft(0);
+				setLastTapLeft(now);
 			} else {
 				toggleControls();
 				setLastTapLeft(now);
@@ -99,7 +104,7 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 				player.seekBy(10);
 				triggerDoubleTapAnimation(rightArrowOpacity);
 				resetControlsTimer();
-				setLastTapRight(0);
+				setLastTapRight(now);
 			} else {
 				toggleControls();
 				setLastTapRight(now);
@@ -113,12 +118,31 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 		Animated.timing(opacityVar, { toValue: 0, duration: 500, delay: 100, useNativeDriver: true }).start();
 	};
 
-	const handleProgressBarPress = (event: GestureResponderEvent) => {
-		const ratio = Math.max(0, Math.min(1, event.nativeEvent.locationX / progressBarWidth));
-		const targetTime = ratio * duration;
-		player.seekBy(targetTime - currentTime);
-		resetControlsTimer();
-	};
+	const panResponder = useRef(
+		PanResponder.create({
+			onStartShouldSetPanResponder: () => true,
+			onMoveShouldSetPanResponder: () => true,
+			onPanResponderGrant: (evt) => {
+				setIsDragging(true);
+				const ratio = Math.max(0, Math.min(1, evt.nativeEvent.locationX / progressBarWidth));
+				dragStartRatio.current = ratio;
+				setDragTime(ratio * duration);
+				resetControlsTimer();
+			},
+			onPanResponderMove: (evt, gestureState) => {
+				const currentRatio = Math.max(0, Math.min(1, dragStartRatio.current + gestureState.dx / progressBarWidth));
+				setDragTime(currentRatio * duration);
+				resetControlsTimer();
+			},
+			onPanResponderRelease: (evt, gestureState) => {
+				setIsDragging(false);
+				const currentRatio = Math.max(0, Math.min(1, dragStartRatio.current + gestureState.dx / progressBarWidth));
+				player.currentTime = currentRatio * duration;
+				setCurrentTime(currentRatio * duration);
+				resetControlsTimer();
+			},
+		})
+	).current;
 
 	const formatTime = (seconds: number) => {
 		const mins = Math.floor(seconds / 60);
@@ -126,7 +150,8 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 		return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 	};
 
-	const progressRatio = duration > 0 ? currentTime / duration : 0;
+	const displayTime = isDragging ? dragTime : currentTime;
+	const progressRatio = duration > 0 ? (isDragging ? dragTime / duration : currentTime / duration) : 0;
 
 	return (
 		<View style={styles.videoContainer}>
@@ -167,16 +192,14 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 					</TouchableOpacity>
 				</View>
 				<View style={styles.bottomControlRow}>
-					<View style={styles.progressBarWrapper} onLayout={(e) => setProgressBarWidth(e.nativeEvent.layout.width)}>
-						<TouchableWithoutFeedback onPress={handleProgressBarPress}>
-							<View style={styles.progressBarBg}>
-								<View pointerEvents="none" style={[styles.progressBarFill, { width: `${progressRatio * 100}%`, backgroundColor: theme.colors.primary }]} />
-								<View pointerEvents="none" style={[styles.progressBarHandle, { left: `${progressRatio * 100}%`, backgroundColor: theme.colors.primary }]} />
-							</View>
-						</TouchableWithoutFeedback>
+					<View style={styles.progressBarWrapper} onLayout={(e) => setProgressBarWidth(e.nativeEvent.layout.width)} {...panResponder.panHandlers}>
+						<View style={styles.progressBarBg}>
+							<View pointerEvents="none" style={[styles.progressBarFill, { width: `${progressRatio * 100}%`, backgroundColor: theme.colors.primary }]} />
+							<View pointerEvents="none" style={[styles.progressBarHandle, { left: `${progressRatio * 100}%`, backgroundColor: theme.colors.primary }]} />
+						</View>
 					</View>
 					<View style={styles.timeRow}>
-						<Text style={styles.timeText}>{formatTime(currentTime)} / {formatTime(duration)}</Text>
+						<Text style={styles.timeText}>{formatTime(displayTime)} / {formatTime(duration)}</Text>
 					</View>
 				</View>
 			</Animated.View>
@@ -204,21 +227,32 @@ export const ViewerScreen = ({ route, navigation }: any) => {
 		try {
 			const tempDir = FileSystem.cacheDirectory + 'mediahub_temp/';
 			await FileSystem.makeDirectoryAsync(tempDir, { intermediates: true });
-
 			const flInfo = Buffer.from(flInfoHex, 'hex');
 
-			const destPath = await client!.dnFile(fPid, flInfo, file.name, tempDir, (sent, total) => {
-				setDownloadProgress(Math.floor((sent / total) * 100));
-			});
-			setLocalUri(destPath);
+			if (isVideo) {
+				// Start the local proxy server if it hasn't been started
+				if (!client!.proxy) {
+					client!.startProxy();
+				}
+				// Use the local proxy streaming URL
+				const ext = file.name.split('.').pop()?.toLowerCase();
+				const streamUrl = `http://127.0.0.1:${client!.proxy!.port}/stream?fPid=${fPid}&fpid=${client!.objPid(flInfo)}&flInfoHex=${flInfoHex}&ext=${ext}`;
+				setLocalUri(streamUrl);
+			} else {
+				const destPath = await client!.dnFile(fPid, flInfo, file.name, tempDir, (sent, total) => {
+					setDownloadProgress(Math.floor((sent / total) * 100));
+				});
+				setLocalUri(destPath);
 
-			if (['txt', 'md', 'csv', 'json', 'log', 'svg'].includes(ext || '')) {
-				const b64 = await FileSystem.readAsStringAsync(destPath, { encoding: FileSystem.EncodingType.Base64 });
-				const text = Buffer.from(b64, 'base64').toString('utf-8');
-				setTextContent(text);
-			} else if (ext === 'pdf') {
-				const b64 = await FileSystem.readAsStringAsync(destPath, { encoding: FileSystem.EncodingType.Base64 });
-				setPdfBase64(b64);
+				const ext = file.name.split('.').pop()?.toLowerCase();
+				if (['txt', 'md', 'csv', 'json', 'log', 'svg'].includes(ext || '')) {
+					const b64 = await FileSystem.readAsStringAsync(destPath, { encoding: FileSystem.EncodingType.Base64 });
+					const text = Buffer.from(b64, 'base64').toString('utf-8');
+					setTextContent(text);
+				} else if (ext === 'pdf') {
+					const b64 = await FileSystem.readAsStringAsync(destPath, { encoding: FileSystem.EncodingType.Base64 });
+					setPdfBase64(b64);
+				}
 			}
 		} catch (err: any) {
 			console.error(err);

@@ -4,6 +4,7 @@ import * as Opsec from './Opsec';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as VideoThumbnails from 'expo-video-thumbnails';
+import { LocalProxyServer } from './LocalProxyServer';
 
 export class MediaHubClient {
 	url: string;
@@ -12,11 +13,19 @@ export class MediaHubClient {
 	uHash: string | null = null;
 	uKey: Buffer | null = null;
 	fldMap: Record<string, Buffer> = {};
+	proxy: LocalProxyServer | null = null;
 
 	constructor(url: string, user: string, pw: string) {
 		this.url = url.replace(/\/$/, '');
 		this.user = user;
 		this.pw = pw;
+	}
+
+	startProxy() {
+		if (!this.proxy) {
+			this.proxy = new LocalProxyServer(this);
+			this.proxy.start();
+		}
 	}
 
 	usrPid(key: Buffer): string {
