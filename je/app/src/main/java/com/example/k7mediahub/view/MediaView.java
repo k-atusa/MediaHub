@@ -5,6 +5,9 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.WindowInsets;
+import android.view.WindowInsetsController;
 import android.webkit.WebChromeClient;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -44,7 +47,38 @@ public class MediaView extends AppCompatActivity {
         tStat = findViewById(R.id.txtStatus);
 
         web.setWebViewClient(new WebViewClient());
-        web.setWebChromeClient(new WebChromeClient());
+        web.setWebChromeClient(new WebChromeClient() {
+            private View cView;
+            private WebChromeClient.CustomViewCallback cCall;
+
+            @Override
+            public void onShowCustomView(View view, WebChromeClient.CustomViewCallback call) {
+                if (cView != null) {
+                    call.onCustomViewHidden();
+                    return;
+                }
+                cView = view;
+                cCall = call;
+                ((ViewGroup) getWindow().getDecorView()).addView(cView, new ViewGroup.LayoutParams(-1, -1));
+                web.setVisibility(View.GONE);
+                WindowInsetsController ic = getWindow().getInsetsController();
+                if (ic != null) {
+                    ic.hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
+                    ic.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                }
+            }
+
+            @Override
+            public void onHideCustomView() {
+                if (cView == null) return;
+                ((ViewGroup) getWindow().getDecorView()).removeView(cView);
+                cView = null;
+                cCall.onCustomViewHidden();
+                web.setVisibility(View.VISIBLE);
+                WindowInsetsController ic = getWindow().getInsetsController();
+                if (ic != null) ic.show(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
+            }
+        });
 
         String fld = getIntent().getStringExtra("folder");
         String fl = getIntent().getStringExtra("file");
@@ -87,9 +121,18 @@ public class MediaView extends AppCompatActivity {
             case "image":
                 byte[] imgD = SvcMH.mediaData;
                 if (imgD != null) {
-                    Bitmap b = BitmapFactory.decodeByteArray(imgD, 0, imgD.length);
-                    img.setImageBitmap(b);
-                    img.setVisibility(View.VISIBLE);
+                    setWeb();
+                    web.getSettings().setBuiltInZoomControls(true);
+                    web.getSettings().setDisplayZoomControls(false);
+                    web.getSettings().setUseWideViewPort(true);
+                    web.getSettings().setLoadWithOverviewMode(true);
+                    
+                    String b64 = android.util.Base64.encodeToString(imgD, android.util.Base64.NO_WRAP);
+                    String h = "<!DOCTYPE html><html><head><style>"
+                        + "body{margin:0;background:#000;display:flex;justify-content:center;align-items:center;min-height:100vh}"
+                        + "img{max-width:100%;height:auto}</style></head>"
+                        + "<body><img src='data:image/jpeg;base64," + b64 + "'></body></html>";
+                    web.loadDataWithBaseURL(null, h, "text/html", "UTF-8", null);
                     SvcMH.mediaData = null;
                     tStat.setText(name);
                 }
