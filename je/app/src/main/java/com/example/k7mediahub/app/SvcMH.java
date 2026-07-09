@@ -16,6 +16,7 @@ import androidx.lifecycle.Observer;
 
 import com.example.k7mediahub.MHcore;
 import com.example.k7mediahub.Opsec;
+import com.example.k7mediahub.R;
 import com.example.k7mediahub.SVCC1;
 
 import java.io.File;
@@ -58,7 +59,7 @@ public class SvcMH extends Service {
                 handleCommand(event);
             } catch (Exception e) {
                 String msg = e.getMessage();
-                sendToMain("ERROR", bundleMsg(msg != null ? msg : "알 수 없는 오류"));
+                sendToMain("ERROR", bundleMsg(msg != null ? msg : "Unknown Error"));
             }
         });
     };
@@ -68,7 +69,7 @@ public class SvcMH extends Service {
         super.onCreate();
         executor = Executors.newFixedThreadPool(4);
         createNotifChannel();
-        startForeground(NOTIF_ID, buildNotif("MediaHub 서비스 준비 중"));
+        startForeground(NOTIF_ID, buildNotif("MediaHub JE Preparing"));
         SVCC1.getChan().ToSvcBus.observeForever(cmdObserver);
     }
 
@@ -139,7 +140,7 @@ public class SvcMH extends Service {
 
         if (!core.CheckAcc()) {
             core = null;
-            sendToMain("LOGIN_FAIL", bundleMsg("계정을 찾을 수 없습니다"));
+            sendToMain("LOGIN_FAIL", bundleMsg("Cannot find account"));
             return;
         }
         core.SaveCfg(getApplicationContext(), url, name);
@@ -150,7 +151,7 @@ public class SvcMH extends Service {
         streamer = new LocalStreamer();
         streamer.start(core);
 
-        updateNotif("MediaHub 서비스 실행 중");
+        updateNotif("MediaHub JE Service");
         sendToMain("LOGIN_OK", null);
     }
 
@@ -169,7 +170,7 @@ public class SvcMH extends Service {
         requireCore();
         String name = d.getString("name", "");
         if (name.isEmpty())
-            throw new IllegalArgumentException("폴더 이름이 비어 있습니다");
+            throw new IllegalArgumentException("Folder name is empty");
         core.MkFld(name);
         doGetFolders(); // auto-refresh
     }
@@ -188,16 +189,14 @@ public class SvcMH extends Service {
         b.putStringArrayList("names", names);
         sendToMain("FILES_LOADED", b);
 
-        // Load thumbnails sequentially on a separate thread
-        // to avoid LiveData postValue coalescing with FILES_LOADED
-        new Thread(() -> {
-            for (String fileName : names) {
-                loadThumb(folder, ff, fileName);
-            }
-        }, "ThumbLoader").start();
+        // Load thumbnails in parallel
+        for (String name : names) {
+            executor.submit(() -> loadThumb(folder, ff, name));
+        }
     }
 
     private void loadThumb(String folder, MHcore.FolderFiles ff, String fileName) {
+        if (thumbCache.containsKey(folder + "/" + fileName)) return;
         try {
             byte[] thumb = core.DnMem(ff, fileName, true);
             if (thumb != null && thumb.length > 0) {
@@ -231,7 +230,7 @@ public class SvcMH extends Service {
                 continue;
 
             try {
-                updateNotif("업로드 중: " + tempFile.getName());
+                updateNotif("Upload: " + tempFile.getName());
                 core.UpFile(getApplicationContext(), ff, tempFile);
 
                 Bundle prog = new Bundle();
@@ -243,7 +242,7 @@ public class SvcMH extends Service {
                 tempFile.delete();
             }
         }
-        updateNotif("MediaHub 서비스 실행 중");
+        updateNotif("MediaHub JE Service");
 
         Bundle done = new Bundle();
         done.putString("folder", folder);
@@ -266,7 +265,7 @@ public class SvcMH extends Service {
         int total = fileNames.size();
         for (int i = 0; i < total; i++) {
             String fileName = fileNames.get(i);
-            updateNotif("다운로드 중: " + fileName);
+            updateNotif("Download: " + fileName);
             String resultUri = core.DnFile(getApplicationContext(), ff, fileName);
 
             Bundle prog = new Bundle();
@@ -276,7 +275,7 @@ public class SvcMH extends Service {
             prog.putInt("total", total);
             sendToMain("DOWNLOAD_PROGRESS", prog);
         }
-        updateNotif("MediaHub 서비스 실행 중");
+        updateNotif("MediaHub JE Service");
 
         Bundle done = new Bundle();
         done.putString("folder", folder);
@@ -304,14 +303,12 @@ public class SvcMH extends Service {
         String type;
         if (Arrays.asList("jpg", "jpeg", "png", "gif", "webp", "bmp").contains(ext)) {
             type = "image";
-        } else if (Arrays.asList("txt", "json", "xml", "csv", "md", "log", "ini", "yaml", "yml").contains(ext)) {
-            type = "text";
         } else if ("pdf".equals(ext)) {
             type = "pdf";
         } else if (Arrays.asList("mp4", "webm", "mov", "mkv", "avi").contains(ext)) {
             type = "video";
         } else {
-            type = "unknown";
+            type = "text";
         }
 
         Bundle result = new Bundle();
@@ -327,7 +324,7 @@ public class SvcMH extends Service {
             // Set up streaming session
             byte[] flInfo = ff.flMap.get(fileName);
             if (flInfo == null)
-                throw new IllegalArgumentException("파일 메타데이터를 찾을 수 없습니다");
+                throw new IllegalArgumentException("Cannot find filemeta");
 
             byte[] fk = Arrays.copyOfRange(flInfo, 0, 44);
             String fId = core.ObjPid(fk);
@@ -356,7 +353,7 @@ public class SvcMH extends Service {
             }
 
             if (streamer == null)
-                throw new IllegalStateException("스트리밍 서버가 실행되지 않았습니다");
+                throw new IllegalStateException("No streaming server");
             String url = streamer.addSession(ff.fPid, fId, fk, origSz, mime);
             result.putString("url", url);
         }
@@ -367,7 +364,7 @@ public class SvcMH extends Service {
     // ===== Helpers =====
     private void requireCore() {
         if (core == null)
-            throw new IllegalStateException("로그인이 필요합니다");
+            throw new IllegalStateException("Login required");
     }
 
     private void sendToMain(String action, Bundle data) {
@@ -410,8 +407,8 @@ public class SvcMH extends Service {
     // ===== Notification =====
     private void createNotifChannel() {
         NotificationChannel channel = new NotificationChannel(
-                CHANNEL_ID, "MediaHub 서비스", NotificationManager.IMPORTANCE_LOW);
-        channel.setDescription("MediaHub 백그라운드 작업");
+                CHANNEL_ID, "MediaHub JE", NotificationManager.IMPORTANCE_LOW);
+        channel.setDescription("MediaHub Foreground Service");
         getSystemService(NotificationManager.class).createNotificationChannel(channel);
     }
 
@@ -419,7 +416,7 @@ public class SvcMH extends Service {
         return new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("MediaHub")
                 .setContentText(text)
-                .setSmallIcon(android.R.drawable.stat_notify_sync)
+                .setSmallIcon(R.drawable.icon_play)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setOngoing(true)
                 .build();

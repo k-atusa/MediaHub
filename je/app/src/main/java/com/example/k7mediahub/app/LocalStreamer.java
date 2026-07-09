@@ -19,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Runs on localhost, serves decrypted byte ranges via MHcore.DlPart.
  */
 public class LocalStreamer {
+    // io fields
     private MHcore core;
     private ServerSocket serverSocket;
     private Thread acceptThread;
@@ -26,6 +27,7 @@ public class LocalStreamer {
     private volatile boolean running;
     private final Map<String, StreamInfo> sessions = new ConcurrentHashMap<>();
 
+    // streaming info
     public static class StreamInfo {
         public String fPid;
         public String fId;
@@ -34,6 +36,7 @@ public class LocalStreamer {
         public String mime;
     }
 
+    // start streaming
     public void start(MHcore core) throws IOException {
         this.core = core;
         this.serverSocket = new ServerSocket(0, 8, InetAddress.getByName("127.0.0.1"));
@@ -44,10 +47,12 @@ public class LocalStreamer {
         this.acceptThread.start();
     }
 
+    // get port
     public int getPort() {
         return port;
     }
 
+    // add streaming session
     public String addSession(String fPid, String fId, byte[] fKey, long origSz, String mime) {
         String sid = UUID.randomUUID().toString().replace("-", "");
         StreamInfo info = new StreamInfo();
@@ -60,29 +65,36 @@ public class LocalStreamer {
         return "http://127.0.0.1:" + port + "/" + sid;
     }
 
+    // remove streaming session
     public void removeSession(String sid) {
         sessions.remove(sid);
     }
 
+    // stop streaming
     public void stop() {
         running = false;
         try {
-            if (serverSocket != null) serverSocket.close();
-        } catch (Exception ignored) {}
+            if (serverSocket != null)
+                serverSocket.close();
+        } catch (Exception ignored) {
+        }
         sessions.clear();
     }
 
+    // accept client
     private void acceptLoop() {
         while (running) {
             try {
                 Socket client = serverSocket.accept();
                 new Thread(() -> handleClient(client), "Streamer-Client").start();
             } catch (Exception e) {
-                if (!running) break;
+                if (!running)
+                    break;
             }
         }
     }
 
+    // client connection
     private void handleClient(Socket client) {
         try {
             client.setSoTimeout(30000);
@@ -91,9 +103,16 @@ public class LocalStreamer {
 
             // Parse request line: GET /sessionId HTTP/1.1
             String requestLine = in.readLine();
-            if (requestLine == null) { client.close(); return; }
+            if (requestLine == null) {
+                client.close();
+                return;
+            }
             String[] parts = requestLine.split(" ");
-            if (parts.length < 2) { sendError(out, 400, "Bad Request"); client.close(); return; }
+            if (parts.length < 2) {
+                sendError(out, 400, "Bad Request");
+                client.close();
+                return;
+            }
             String method = parts[0];
             String path = parts[1];
 
@@ -111,7 +130,8 @@ public class LocalStreamer {
             String sid = path.startsWith("/") ? path.substring(1) : path;
             // Remove query string if present
             int qIdx = sid.indexOf('?');
-            if (qIdx >= 0) sid = sid.substring(0, qIdx);
+            if (qIdx >= 0)
+                sid = sid.substring(0, qIdx);
 
             StreamInfo info = sessions.get(sid);
             if (info == null) {
@@ -154,7 +174,8 @@ public class LocalStreamer {
             }
 
             // Clamp range
-            if (rangeEnd >= info.origSz) rangeEnd = info.origSz - 1;
+            if (rangeEnd >= info.origSz)
+                rangeEnd = info.origSz - 1;
 
             // Limit per-request chunk to 2MB for smooth streaming
             long maxChunk = 2 * 1024 * 1024;
@@ -170,7 +191,7 @@ public class LocalStreamer {
             if (isRange) {
                 resp.append("HTTP/1.1 206 Partial Content\r\n");
                 resp.append("Content-Range: bytes ").append(rangeStart).append("-")
-                    .append(rangeStart + data.length - 1).append("/").append(info.origSz).append("\r\n");
+                        .append(rangeStart + data.length - 1).append("/").append(info.origSz).append("\r\n");
             } else {
                 resp.append("HTTP/1.1 200 OK\r\n");
             }
@@ -190,10 +211,14 @@ public class LocalStreamer {
             client.close();
 
         } catch (Exception e) {
-            try { client.close(); } catch (Exception ignored) {}
+            try {
+                client.close();
+            } catch (Exception ignored) {
+            }
         }
     }
 
+    // send error
     private void sendError(OutputStream out, int code, String msg) throws IOException {
         String resp = "HTTP/1.1 " + code + " " + msg + "\r\n"
                 + "Content-Length: 0\r\nConnection: close\r\n\r\n";

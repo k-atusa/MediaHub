@@ -64,13 +64,19 @@ public class FileView extends AppCompatActivity {
         bPre.setOnClickListener(v -> { if (pg > 0) { pg--; update(); } });
         bNxt.setOnClickListener(v -> { if (pg < (items.size() - 1) / 30) { pg++; update(); } });
 
-        // Handle uploads
+        // File selection result handler
         lch = registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), res -> {
             if (res.getResultCode() == RESULT_OK && res.getData() != null) {
                 List<IO1.VFile> fs = IO1.HandleSelectedFile(res.getData());
                 if (!fs.isEmpty()) {
                     ArrayList<String> us = new ArrayList<>();
                     for (IO1.VFile f : fs) us.add(f.GetUri().toString());
+
+                    // Set initial status
+                    tStat.setText("Up: 0/" + us.size() + " (0%)");
+                    SVCC1.getChan().SetString(1, "Up: 0/" + us.size());
+                    SVCC1.getChan().SetInt(0, 0);
+
                     Bundle b = new Bundle();
                     b.putString("folder", fld);
                     b.putStringArrayList("uris", us);
@@ -93,6 +99,12 @@ public class FileView extends AppCompatActivity {
                     pg = 0;
                     update();
                     break;
+                case "UPLOAD_PROGRESS":
+                    SVCC1.getChan().SetString(1, "Up: " + d.getInt("current") + "/" + d.getInt("total"));
+                    break;
+                case "DOWNLOAD_PROGRESS":
+                    SVCC1.getChan().SetString(1, "Dn: " + d.getInt("current") + "/" + d.getInt("total"));
+                    break;
                 case "UPLOAD_DONE":
                 case "DOWNLOAD_DONE":
                     refresh();
@@ -100,10 +112,33 @@ public class FileView extends AppCompatActivity {
             }
         });
 
+        // Sync percent
+        SVCC1.getChan().IntSlots[0].observe(this, p -> {
+            String s = SVCC1.getChan().StringSlots[1].getValue();
+            if (s != null && !s.isEmpty()) {
+                tStat.setText(s + " (" + p + "%)");
+            }
+        });
+        
+        // Sync status text
+        SVCC1.getChan().StringSlots[1].observe(this, s -> {
+            Integer p = SVCC1.getChan().IntSlots[0].getValue();
+            if (s != null && !s.isEmpty()) {
+                tStat.setText(s + " (" + (p != null ? p : 0) + "%)");
+            }
+        });
+
         bAdd.setOnClickListener(v -> IO1.SelectFile(lch, true));
         bDn.setOnClickListener(v -> {
+            if (sel.isEmpty()) return;
             ArrayList<String> s = new ArrayList<>();
             for (int p : sel) s.add(items.get(p));
+            
+            // Set initial status
+            tStat.setText("Dn: 0/" + s.size() + " (0%)");
+            SVCC1.getChan().SetString(1, "Dn: 0/" + s.size());
+            SVCC1.getChan().SetInt(0, 0);
+
             Bundle b = new Bundle();
             b.putString("folder", fld);
             b.putStringArrayList("files", s);

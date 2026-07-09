@@ -152,12 +152,9 @@ public class MHcore {
 
         } else { // extreme ratio
             int s = Math.min(w, h);
-            int x = (w - s) / 2;
-            int y = (h - s) / 2;
-            Bitmap cropped = Bitmap.createBitmap(img, x, y, s, s);
+            Bitmap cropped = Bitmap.createBitmap(img, 0, 0, s, s);
             out = Bitmap.createScaledBitmap(cropped, 256, 256, true);
-            if (cropped != img)
-                cropped.recycle();
+            if (cropped != img) cropped.recycle();
         }
 
         // JPEG 70%
@@ -435,11 +432,11 @@ public class MHcore {
         c.setRequestMethod("POST");
         c.setRequestProperty("X-User-Hash", uHash);
         c.setRequestProperty("Content-Type", "application/octet-stream");
-        c.setFixedLengthStreamingMode(tFile.length());
+        long tLen = tFile.length();
+        c.setFixedLengthStreamingMode(tLen);
         c.setDoOutput(true);
 
-        // update uploading status
-        SVCC1.getChan().SetString(0, "UPLOAD: " + name);
+        // Upload stream
         FileInputStream tIn = new FileInputStream(tFile);
         OutputStream out = c.getOutputStream();
         byte[] buf = new byte[65536];
@@ -448,7 +445,7 @@ public class MHcore {
         while ((r = tIn.read(buf)) != -1) {
             out.write(buf, 0, r);
             cur += r;
-            SVCC1.getChan().SetLong(0, cur);
+            SVCC1.getChan().SetInt(0, (int) (cur * 100 / tLen));
         }
         out.flush();
         out.close();
@@ -514,8 +511,17 @@ public class MHcore {
             if (destFile == null) throw new RuntimeException("Failed to create download file");
             OutputStream fos = destFile.OpenWriter(ctx, false);
             InputStream in = c.getInputStream();
-            SVCC1.getChan().SetString(0, "DOWNLOAD: " + fileName);
-            smx.DeFile(in, ciphSz, fos); // direct decrypt
+            
+            // Decrypt stream with progress
+            new Thread(() -> {
+                while (smx.Processed() < ciphSz) {
+                    SVCC1.getChan().SetInt(0, (int) (smx.Processed() * 100 / ciphSz));
+                    try { Thread.sleep(200); } catch (Exception ignored) {}
+                }
+                SVCC1.getChan().SetInt(0, 100);
+            }).start();
+
+            smx.DeFile(in, ciphSz, fos);
             in.close();
             fos.close();
             c.disconnect();
@@ -585,6 +591,7 @@ public class MHcore {
         byte[] gIv = fetchNet(u, 0, 11);
         if (gIv.length < 12) return new byte[0];
 
+        // calculate offset
         Bencrypt.SymMaster smx = new Bencrypt.SymMaster("gcmx1", Arrays.copyOfRange(fKey, 0, 32));
         long totCiph = smx.AfterSize(origSz);
         long sChunk = ptStart / CHUNK_SZ;
@@ -593,14 +600,15 @@ public class MHcore {
         long reqEnd = 12 + ((eChunk + 1) * (CHUNK_SZ + 16)) - 1;
         if (reqEnd > 12 + totCiph - 13) reqEnd = 12 + totCiph - 13;
 
+        // prepare manual decrypt
         byte[] cData = fetchNet(u, reqStart, reqEnd);
-
         Cipher ciph = Cipher.getInstance("AES/GCM/NoPadding");
         ByteArrayOutputStream ptBuf = new ByteArrayOutputStream();
         int off = 0;
         long curC = sChunk;
         byte[] kSlice = Arrays.copyOfRange(fKey, 0, 32);
 
+        // decrypt
         while (off < cData.length) {
             int bLen = Math.min(CHUNK_SZ + 16, cData.length - off);
             byte[] iv = mkIv(gIv, curC++);
@@ -609,6 +617,7 @@ public class MHcore {
             off += bLen;
         }
 
+        // cut to requested size
         byte[] fullPt = ptBuf.toByteArray();
         int sIdx = (int) (ptStart % CHUNK_SZ);
         int fLen = Math.min(ptLen, fullPt.length - sIdx);

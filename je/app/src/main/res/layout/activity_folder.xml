@@ -8,7 +8,7 @@
     android:paddingBottom="64dp">
 
     <!-- Top Bar -->
-    <LinearLayout style="@style/hbox" android:padding="16dp">
+    <LinearLayout style="@style/hbox" android:paddingVertical="4dp" android:paddingHorizontal="8dp">
         <TextView style="@style/title" android:text="Folders" />
         <View style="@style/spacer" />
         <Button
@@ -30,6 +30,7 @@
     <TextView
         android:id="@+id/txtStatus"
         style="@style/cap"
-        android:padding="16dp" />
+        android:paddingVertical="4dp"
+        android:paddingHorizontal="8dp"/>
 
 </LinearLayout>

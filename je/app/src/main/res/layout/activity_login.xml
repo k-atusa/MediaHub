@@ -15,10 +15,6 @@
             android:text="MediaHub"
             android:textSize="32sp" />
 
-        <TextView style="@style/cap"
-            android:text="Secure Media Storage"
-            android:layout_marginTop="4dp" />
-
         <com.google.android.material.card.MaterialCardView
             style="@style/card"
             android:layout_marginTop="24dp">
@@ -57,7 +53,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content" />
                     <TextView style="@style/body"
-                        android:text="Ignore TLS"
+                        android:text="Ignore TLS Warning"
                         android:textSize="14sp" />
                 </LinearLayout>
 

@@ -8,7 +8,7 @@
     android:paddingBottom="64dp">
 
     <!-- Top Bar -->
-    <LinearLayout style="@style/hbox" android:padding="16dp">
+    <LinearLayout style="@style/hbox" android:paddingVertical="4dp" android:paddingHorizontal="8dp">
         <TextView
             android:id="@+id/txtFolderName"
             style="@style/title"
@@ -37,7 +37,8 @@
         android:id="@+id/layoutPagination"
         style="@style/hbox"
         android:gravity="center"
-        android:padding="8dp"
+        android:paddingVertical="4dp"
+        android:paddingHorizontal="8dp"
         android:visibility="gone">
         <Button
             android:id="@+id/btnPrev"
@@ -61,7 +62,7 @@
     </LinearLayout>
 
     <!-- Bottom Bar -->
-    <LinearLayout style="@style/hbox" android:padding="16dp">
+    <LinearLayout style="@style/hbox" android:paddingVertical="4dp" android:paddingHorizontal="8dp">
         <TextView
             android:id="@+id/txtStatus"
             style="@style/cap"
