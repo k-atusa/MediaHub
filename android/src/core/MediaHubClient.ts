@@ -4,6 +4,7 @@ import * as Opsec from './Opsec';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as VideoThumbnails from 'expo-video-thumbnails';
+import { LocalProxyServer } from './LocalProxyServer';
 
 export class MediaHubClient {
 	url: string;
@@ -12,11 +13,19 @@ export class MediaHubClient {
 	uHash: string | null = null;
 	uKey: Buffer | null = null;
 	fldMap: Record<string, Buffer> = {};
+	proxy: LocalProxyServer | null = null;
 
 	constructor(url: string, user: string, pw: string) {
 		this.url = url.replace(/\/$/, '');
 		this.user = user;
 		this.pw = pw;
+	}
+
+	startProxy() {
+		if (!this.proxy) {
+			this.proxy = new LocalProxyServer(this);
+			this.proxy.start();
+		}
 	}
 
 	usrPid(key: Buffer): string {
@@ -209,21 +218,106 @@ export class MediaHubClient {
 		const origSz = Opsec.decodeInt(flInfo.subarray(44, 52) as unknown as Buffer, false);
 		const fpid = this.objPid(fk);
 		const smx = new Bencrypt.SymMaster("gcmx1", fk.subarray(0, 32) as unknown as Buffer);
+		const ciphSz = smx.afterSize(origSz);
 
-		const tempEncPath = `${outDir}/${name}.enc`;
-		const { status } = await FileSystem.downloadAsync(`${this.url}/api/media/${fPid}/${fpid}/dat`, tempEncPath);
-		
-		if (status === 200 || status === 206) {
-			const b64 = await FileSystem.readAsStringAsync(tempEncPath, { encoding: FileSystem.EncodingType.Base64 });
-			const encryptedData = Buffer.from(b64, 'base64');
-			await FileSystem.deleteAsync(tempEncPath, { idempotent: true });
+		const destPath = `${outDir}/${name}`;
 
-			const decrypted = smx.deBin(encryptedData);
-			const destPath = `${outDir}/${name}`;
-			await FileSystem.writeAsStringAsync(destPath, Buffer.from(decrypted.subarray(0, origSz)).toString('base64'), { encoding: FileSystem.EncodingType.Base64 });
-			return destPath;
-		} else {
-			throw new Error(`Download failed: ${status}`);
+		// Clean up existing file
+		const fileInfo = await FileSystem.getInfoAsync(destPath);
+		if (fileInfo.exists) {
+			await FileSystem.deleteAsync(destPath, { idempotent: true });
 		}
+
+		const BLOCK_SIZE = 1048576 + 16; // 1MB ciphertext + 16 bytes tag
+		const BLOCKS_PER_CHUNK = 8;
+		const CHUNK_DOWNLOAD_SIZE = BLOCKS_PER_CHUNK * BLOCK_SIZE;
+
+		let downloaded = 0;
+		let decryptedBytesWritten = 0;
+		let globalIV: Buffer | null = null;
+		let cryptoCount = 0;
+
+		while (downloaded < ciphSz) {
+			const isFirstChunk = (downloaded === 0);
+			const start = downloaded;
+			// First chunk must download the 12-byte global IV as well
+			const chunkLimit = isFirstChunk ? (CHUNK_DOWNLOAD_SIZE + 12) : CHUNK_DOWNLOAD_SIZE;
+			const end = Math.min(start + chunkLimit - 1, ciphSz - 1);
+
+			const ab = await new Promise<ArrayBuffer>((resolve, reject) => {
+				const xhr = new XMLHttpRequest();
+				xhr.open('GET', `${this.url}/api/media/${fPid}/${fpid}/dat`);
+				xhr.setRequestHeader('Range', `bytes=${start}-${end}`);
+				xhr.setRequestHeader('Cache-Control', 'no-cache, no-store');
+				xhr.responseType = 'arraybuffer';
+				xhr.onload = () => {
+					if (xhr.status === 200 || xhr.status === 206) {
+						if (xhr.status === 200 && ciphSz > CHUNK_DOWNLOAD_SIZE + 12) {
+							reject(new Error("Server returned full file (200 OK). Range requests are not supported by the backend."));
+						} else {
+							resolve(xhr.response as ArrayBuffer);
+						}
+					} else {
+						reject(new Error(`Download failed: status ${xhr.status}`));
+					}
+				};
+				xhr.onerror = () => reject(new Error('Network request failed'));
+				xhr.send();
+			});
+
+			let chunkBuffer: Buffer | null = Buffer.from(ab);
+
+			let cipherToDecrypt: Buffer;
+			if (isFirstChunk) {
+				if (chunkBuffer.length < 12) {
+					throw new Error("Encrypted file is too short (missing global IV)");
+				}
+				globalIV = Buffer.from(new Uint8Array(chunkBuffer.subarray(0, 12)));
+				cipherToDecrypt = Buffer.from(new Uint8Array(chunkBuffer.subarray(12)));
+			} else {
+				cipherToDecrypt = chunkBuffer;
+			}
+
+			// Decrypt chunk
+			let [decryptedChunk, nextCount] = smx.worker.deAESGCMxChunk(
+				smx.key,
+				cipherToDecrypt,
+				globalIV!,
+				cryptoCount
+			);
+			cryptoCount = nextCount;
+
+			// Truncate to origSz at the end of the file if needed
+			let bytesToWrite = decryptedChunk.length;
+			if (decryptedBytesWritten + bytesToWrite > origSz) {
+				bytesToWrite = origSz - decryptedBytesWritten;
+			}
+
+			if (bytesToWrite > 0) {
+				const sliceToWrite = decryptedChunk.subarray(0, bytesToWrite);
+				const b64 = Buffer.from(sliceToWrite).toString('base64');
+				await FileSystem.writeAsStringAsync(destPath, b64, {
+					encoding: FileSystem.EncodingType.Base64,
+					append: !isFirstChunk
+				});
+				decryptedBytesWritten += bytesToWrite;
+			}
+
+			downloaded += chunkBuffer.length;
+
+			// Explicitly release large memory blocks
+			chunkBuffer = null;
+			cipherToDecrypt = null as any;
+			decryptedChunk = null as any;
+
+			if (progCb) {
+				progCb(downloaded, ciphSz);
+			}
+			
+			// Force yield to the event loop so Hermes GC can reclaim memory
+			await new Promise(r => setTimeout(r, 20));
+		}
+
+		return destPath;
 	}
 }
