@@ -31,12 +31,14 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 import java.security.cert.X509Certificate;
 
+// Core logic for auth, crypto, and network
 public class MHcore {
-    // constants
+    // Shared pepper string
     private static final String PEPPER = "_PROJECT_WHY_MEDIAHUB_PEPPER_2026_!@#$";
+    // Config filename
     private static final String CFG_FILE = "config.dat";
-    private static final int CHUNK_SZ = 1048576; // 1MB
-    private static final int CIPHER_SZ = 1048592; // 1MB + 16B(Tag)
+    // Data chunk size
+    private static final int CHUNK_SZ = 1048576;
 
     // connection
     public String srvUrl;
@@ -61,7 +63,7 @@ public class MHcore {
         }
     }
 
-    // Initialize core states and bypass TLS verification
+    // Init core and trust all SSL
     public MHcore(boolean ignTLS) {
         this.masker = Bencrypt.Masker.GetMasker();
         this.bencrypt = new Bencrypt();
@@ -69,7 +71,7 @@ public class MHcore {
         if (ignTLS) trustAllSsl();
     }
 
-    // Bypass self-signed TLS certificate validation globally
+    // Bypass SSL validation
     private void trustAllSsl() {
         try {
             @SuppressLint("CustomX509TrustManager") TrustManager[] trustAllCerts = new TrustManager[] {
@@ -232,16 +234,14 @@ public class MHcore {
         out.close();
     }
 
-    // Authenticate user credentials and derive keys
+    // Derive keys and set user hash
     public void Login(String name, String pw) throws Exception {
-        // derive key
         this.uName = name;
         byte[] p = Bencode.NormPW(pw);
         byte[] s = Bencrypt.SHA3256((name + PEPPER).getBytes(StandardCharsets.UTF_8));
         Bencrypt.HashMaster hm = new Bencrypt.HashMaster("arg2st");
         byte[][] keys = hm.KDF(p, s);
 
-        // set user hash and key
         byte[] hash = Bencrypt.SHA3256(keys[0]);
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < 16; i++)
@@ -254,7 +254,7 @@ public class MHcore {
         Arrays.fill(keys[1], (byte) 0);
     }
 
-    // Verify if user account exists on remote server
+    // Check account existence
     public boolean CheckAcc() throws Exception {
         URL u = new URL(srvUrl + "/api/userdata/" + uHash);
         HttpURLConnection c = (HttpURLConnection) u.openConnection();
@@ -579,44 +579,40 @@ public class MHcore {
         }
     }
 
-    // Partially decrypt targeted block segment chunks for fluid streaming
+    // Partial decrypt for streaming
     public byte[] DlPart(String fld, String fId, byte[] fKey, long origSz, long ptStart, int ptLen) throws Exception {
         URL u = new URL(srvUrl + "/api/media/" + fld + "/" + fId + "/dat");
         byte[] gIv = fetchNet(u, 0, 11);
         if (gIv.length < 12) return new byte[0];
 
-        // calculate offsets
         Bencrypt.SymMaster smx = new Bencrypt.SymMaster("gcmx1", Arrays.copyOfRange(fKey, 0, 32));
-        long totalCipherSz = smx.AfterSize(origSz);
+        long totCiph = smx.AfterSize(origSz);
         long sChunk = ptStart / CHUNK_SZ;
         long eChunk = (ptStart + ptLen - 1) / CHUNK_SZ;
-        long reqStart = 12 + (sChunk * CIPHER_SZ);
-        long reqEnd = 12 + ((eChunk + 1) * CIPHER_SZ) - 1;
-        if (reqEnd > 12 + totalCipherSz - 1) {
-            reqEnd = 12 + totalCipherSz - 1;
-        }
+        long reqStart = 12 + (sChunk * (CHUNK_SZ + 16));
+        long reqEnd = 12 + ((eChunk + 1) * (CHUNK_SZ + 16)) - 1;
+        if (reqEnd > 12 + totCiph - 13) reqEnd = 12 + totCiph - 13;
 
         byte[] cData = fetchNet(u, reqStart, reqEnd);
-        SVCC1.getChan().SetString(0, "PARTIAL_DL:" + fId);
-        SVCC1.getChan().SetLong(0, cData.length);
 
-        // prepare manual decryption
-        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        Cipher ciph = Cipher.getInstance("AES/GCM/NoPadding");
         ByteArrayOutputStream ptBuf = new ByteArrayOutputStream();
         int off = 0;
         long curC = sChunk;
+        byte[] kSlice = Arrays.copyOfRange(fKey, 0, 32);
 
         while (off < cData.length) {
-            int bLen = Math.min(CIPHER_SZ, cData.length - off);
-            cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(Arrays.copyOfRange(fKey, 0, 32), "AES"), new GCMParameterSpec(128, mkIv(gIv, curC++)));
-            ptBuf.write(cipher.doFinal(cData, off, bLen));
+            int bLen = Math.min(CHUNK_SZ + 16, cData.length - off);
+            byte[] iv = mkIv(gIv, curC++);
+            ciph.init(Cipher.DECRYPT_MODE, new SecretKeySpec(kSlice, "AES"), new GCMParameterSpec(128, iv));
+            ptBuf.write(ciph.doFinal(cData, off, bLen));
             off += bLen;
         }
 
-        // cut into requested size
         byte[] fullPt = ptBuf.toByteArray();
         int sIdx = (int) (ptStart % CHUNK_SZ);
         int fLen = Math.min(ptLen, fullPt.length - sIdx);
+        if (sIdx < 0 || sIdx >= fullPt.length) return new byte[0];
         return Arrays.copyOfRange(fullPt, sIdx, sIdx + fLen);
     }
 }

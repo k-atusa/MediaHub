@@ -14,6 +14,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:largeHeap="true"
+        android:usesCleartextTraffic="true"
         android:theme="@style/Theme.k7mediahub">
 
         <activity android:name=".view.LoginView"
@@ -24,8 +25,12 @@
             </intent-filter>
         </activity>
 
+        <activity android:name=".view.FolderView" android:exported="false" />
+        <activity android:name=".view.FileView" android:exported="false" />
+        <activity android:name=".view.MediaView" android:exported="false" />
+
         <service
-            android:name=".app.SvcYas"
+            android:name=".app.SvcMH"
             android:foregroundServiceType="dataSync"
             android:stopWithTask="true"
             android:exported="false" />

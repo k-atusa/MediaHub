@@ -1,0 +1,155 @@
+package com.example.k7mediahub.view;
+
+import android.annotation.SuppressLint;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.os.Bundle;
+import android.view.View;
+import android.webkit.WebChromeClient;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.widget.ImageView;
+import android.widget.ProgressBar;
+import android.widget.ScrollView;
+import android.widget.TextView;
+
+import androidx.appcompat.app.AppCompatActivity;
+
+import com.example.k7mediahub.R;
+import com.example.k7mediahub.SVCC1;
+import com.example.k7mediahub.app.SvcMH;
+
+import java.nio.charset.StandardCharsets;
+
+// Media viewer activity
+public class MediaView extends AppCompatActivity {
+    private ImageView img;
+    private ScrollView sTxt;
+    private TextView tMed;
+    private WebView web;
+    private ProgressBar prog;
+    private TextView tStat;
+
+    // Standard lifecycle
+    @Override
+    protected void onCreate(Bundle saved) {
+        super.onCreate(saved);
+        setContentView(R.layout.activity_media);
+
+        img = findViewById(R.id.imgMedia);
+        sTxt = findViewById(R.id.scrollText);
+        tMed = findViewById(R.id.txtMedia);
+        web = findViewById(R.id.webMedia);
+        prog = findViewById(R.id.progressMedia);
+        tStat = findViewById(R.id.txtStatus);
+
+        web.setWebViewClient(new WebViewClient());
+        web.setWebChromeClient(new WebChromeClient());
+
+        String fld = getIntent().getStringExtra("folder");
+        String fl = getIntent().getStringExtra("file");
+        if (fld == null) fld = "";
+        if (fl == null) fl = "";
+
+        tStat.setText(fl);
+
+        // Listen for data
+        SVCC1.getChan().ToMainBus.observe(this, ev -> {
+            if (ev == null) return;
+            Bundle d = (ev.data instanceof Bundle) ? (Bundle) ev.data : new Bundle();
+
+            switch (ev.action) {
+                case "MEDIA_READY":
+                    prog.setVisibility(View.GONE);
+                    show(d);
+                    break;
+                case "ERROR":
+                    prog.setVisibility(View.GONE);
+                    tStat.setText("Error: " + d.getString("msg", ""));
+                    break;
+            }
+        });
+
+        // Request media
+        Bundle r = new Bundle();
+        r.putString("folder", fld);
+        r.putString("file", fl);
+        SVCC1.getChan().SendToSvc("STREAM_MEDIA", r);
+    }
+
+    // Switch view type
+    @SuppressLint("SetJavaScriptEnabled")
+    private void show(Bundle d) {
+        String type = d.getString("type", "unknown");
+        String name = d.getString("fileName", "");
+
+        switch (type) {
+            case "image":
+                byte[] imgD = SvcMH.mediaData;
+                if (imgD != null) {
+                    Bitmap b = BitmapFactory.decodeByteArray(imgD, 0, imgD.length);
+                    img.setImageBitmap(b);
+                    img.setVisibility(View.VISIBLE);
+                    SvcMH.mediaData = null;
+                    tStat.setText(name);
+                }
+                break;
+            case "text":
+                byte[] txtD = SvcMH.mediaData;
+                if (txtD != null) {
+                    tMed.setText(new String(txtD, StandardCharsets.UTF_8));
+                    sTxt.setVisibility(View.VISIBLE);
+                    SvcMH.mediaData = null;
+                    tStat.setText(name);
+                }
+                break;
+            case "video":
+                String vUrl = d.getString("url", "");
+                if (!vUrl.isEmpty()) {
+                    setWeb();
+                    String h = "<!DOCTYPE html><html><head><style>"
+                        + "*{margin:0;padding:0;overflow:hidden}body{background:#000;"
+                        + "display:flex;align-items:center;justify-content:center;height:100vh}"
+                        + "video{width:100%;height:100%;object-fit:contain}</style></head>"
+                        + "<body><video controls autoplay playsinline>"
+                        + "<source src='" + vUrl + "' type='video/mp4'></video></body></html>";
+                    web.loadDataWithBaseURL("http://127.0.0.1/", h, "text/html", "UTF-8", null);
+                    tStat.setText(name);
+                }
+                break;
+            case "pdf":
+                String pUrl = d.getString("url", "");
+                if (!pUrl.isEmpty()) {
+                    setWeb();
+                    try {
+                        String u = "file:///android_asset/pdf_viewer.html?file=" 
+                            + java.net.URLEncoder.encode(pUrl, "UTF-8");
+                        web.loadUrl(u);
+                    } catch (Exception e) {
+                        web.loadUrl(pUrl);
+                    }
+                    tStat.setText(name);
+                }
+                break;
+        }
+    }
+
+    // Configure WebView
+    private void setWeb() {
+        web.getSettings().setJavaScriptEnabled(true);
+        web.getSettings().setDomStorageEnabled(true);
+        web.getSettings().setAllowFileAccess(true);
+        web.getSettings().setAllowContentAccess(true);
+        web.setVisibility(View.VISIBLE);
+    }
+
+    // Cleanup WebView
+    @Override
+    protected void onDestroy() {
+        if (web != null) {
+            web.stopLoading();
+            web.destroy();
+        }
+        super.onDestroy();
+    }
+}

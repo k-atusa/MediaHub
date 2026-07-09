@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <title>PDF Viewer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        body { margin: 0; padding: 0; background-color: #333; }
+        #viewer-container { width: 100%; height: 100vh; overflow: auto; display: flex; flex-direction: column; align-items: center; }
+        canvas { display: block; margin: 10px 0; box-shadow: 0 0 10px rgba(0,0,0,0.5); max-width: 100%; }
+        #loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-family: sans-serif; }
+    </style>
+</head>
+<body>
+    <div id="loading">Loading PDF...</div>
+    <div id="viewer-container"></div>
+
+    <script>
+        const url = new URLSearchParams(window.location.search).get('file');
+        if (url) {
+            const pdfjsLib = window['pdfjs-dist/build/pdf'];
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+            const container = document.getElementById('viewer-container');
+            const loading = document.getElementById('loading');
+
+            pdfjsLib.getDocument(url).promise.then(pdf => {
+                loading.style.display = 'none';
+                for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                    pdf.getPage(pageNum).then(page => {
+                        const viewport = page.getViewport({ scale: 1.5 });
+                        const canvas = document.createElement('canvas');
+                        const context = canvas.getContext('2d');
+                        canvas.height = viewport.height;
+                        canvas.width = viewport.width;
+
+                        container.appendChild(canvas);
+
+                        page.render({
+                            canvasContext: context,
+                            viewport: viewport
+                        });
+                    });
+                }
+            }).catch(err => {
+                loading.innerText = 'Error loading PDF: ' + err.message;
+                console.error(err);
+            });
+        } else {
+            document.getElementById('loading').innerText = 'No PDF file specified.';
+        }
+    </script>
+</body>
+</html>
