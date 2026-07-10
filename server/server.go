@@ -7,14 +7,17 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
+	"fmt"
 	"io"
 	"log"
 	"math/big"
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -252,6 +255,107 @@ func serveNotice(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"notice": cfg.Notice})
 }
 
+// handles trim (orphan file deletion)
+func serveTrim(w http.ResponseWriter, r *http.Request) {
+	// URL: /api/trim/{folder_pid}
+	if r.Method != http.MethodPost {
+		postError(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	folderID := strings.TrimPrefix(r.URL.Path, "/api/trim/")
+	if folderID == "" || strings.Contains(folderID, "/") {
+		postError(w, "Bad Request", http.StatusBadRequest)
+		return
+	}
+
+	// User authentication
+	userHash := r.Header.Get("X-User-Hash")
+	if userHash == "" || strings.Contains(userHash, "/") || strings.Contains(userHash, "\\") {
+		postError(w, "Bad Request: Invalid User Hash", http.StatusBadRequest)
+		return
+	}
+	userPath := filepath.Join(cfg.StorageDir, "users", filepath.Clean(userHash))
+	if info, err := os.Stat(userPath); os.IsNotExist(err) || info.IsDir() {
+		postError(w, "Invalid User", http.StatusForbidden)
+		return
+	}
+
+	// Parse request body
+	var req struct {
+		PIDs []string `json:"pids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		postError(w, "Bad Request: Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	// Validate all PIDs are valid hex strings
+	keepSet := make(map[string]bool)
+	for _, pid := range req.PIDs {
+		if _, err := hex.DecodeString(pid); err != nil || pid == "" {
+			postError(w, "Bad Request: Invalid PID", http.StatusBadRequest)
+			return
+		}
+		keepSet[pid] = true
+	}
+
+	// Scan folder directory
+	folderPath := filepath.Join(cfg.StorageDir, "data", filepath.Clean(folderID))
+	entries, err := os.ReadDir(folderPath)
+	if err != nil {
+		postError(w, "Folder Not Found", http.StatusNotFound)
+		return
+	}
+
+	// Classify files: only encrypted media files (hex.dat / hex.thumb)
+	var reEncMedia = regexp.MustCompile(`^[0-9a-f]+\.(dat|thumb)$`)
+	allPIDs := make(map[string]bool)
+	toDelete := make(map[string]bool)
+	deleteFiles := []string{}
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if !reEncMedia.MatchString(name) {
+			continue
+		}
+
+		// Extract PID from filename (everything before the last dot)
+		dotIdx := strings.LastIndex(name, ".")
+		pid := name[:dotIdx]
+		allPIDs[pid] = true
+		if !keepSet[pid] {
+			toDelete[pid] = true
+			deleteFiles = append(deleteFiles, filepath.Join(folderPath, name))
+		}
+	}
+
+	// Safety check: retention ratio must be >= 50%
+	totalUnique := len(allPIDs)
+	deleteUnique := len(toDelete)
+	keepUnique := totalUnique - deleteUnique
+	if totalUnique == 0 {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("No encrypted media files found"))
+		return
+	}
+	if keepUnique*2 < totalUnique {
+		postError(w, fmt.Sprintf("Trim aborted: retention ratio too low (%d/%d keep, need >= 50%%)", keepUnique, totalUnique), http.StatusConflict)
+		return
+	}
+
+	// Execute deletion
+	deleted := 0
+	for _, path := range deleteFiles {
+		if err := os.Remove(path); err == nil {
+			deleted++
+		}
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(fmt.Sprintf("Trimmed %d files (%d orphan PIDs removed, %d PIDs kept)", deleted, deleteUnique, keepUnique)))
+}
+
 // overwrite file
 func save(w http.ResponseWriter, r *http.Request, path string) {
 	out, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
@@ -338,6 +442,7 @@ func main() {
 	mux.HandleFunc("/api/storage/", serveMeta)
 	mux.HandleFunc("/api/media/", serveMedia)
 	mux.HandleFunc("/api/notice", serveNotice)
+	mux.HandleFunc("/api/trim/", serveTrim)
 	mux.Handle("/", http.FileServer(http.Dir("./public")))
 
 	// start server with TLS

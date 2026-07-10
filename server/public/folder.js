@@ -310,7 +310,32 @@ document.getElementById("btnDeleteFolder").addEventListener("click", async () =>
 // Handle pagination.
 document.getElementById("btnPrevPage").addEventListener("click", async () => { if (state.page > 1) { state.page--; await showFls(); } });
 document.getElementById("btnNextPage").addEventListener("click", async () => { if (state.page < Math.ceil(Object.keys(state.flsMap).length / state.limit)) { state.page++; await showFls(); } });
-document.getElementById("btnRefresh").addEventListener("click", () => { sessionStorage.removeItem("oldFold"); loadUsr(); });
+document.getElementById("btnTrim").addEventListener("click", async () => {
+    if (!state.name || !state.id) return alert("⚠️ Select a folder first");
+    if (!confirm("⚠️ Trim will delete orphan files on the server. Continue?")) return;
+
+    // Collect all file PIDs from the current folder's file map.
+    const pids = [];
+    for (const [, fileKey] of Object.entries(state.flsMap)) {
+        const rawFK = mask.XOR(fileKey);
+        const pid = getObjPid(rawFK.slice(0, 44));
+        rawFK.fill(0);
+        pids.push(pid);
+    }
+
+    try {
+        const res = await fetch(`${SERVER}/api/trim/${state.id}`, {
+            method: "POST",
+            headers: { "X-User-Hash": usrHsh, "Content-Type": "application/json" },
+            body: JSON.stringify({ pids })
+        });
+        const text = await res.text();
+        if (res.ok) alert("✅ " + text);
+        else alert("❌ " + text);
+    } catch (e) {
+        alert("❌ Trim error: " + e.message);
+    }
+});
 document.getElementById("lblUserHash").textContent = usrHsh;
 
 // Change Password
