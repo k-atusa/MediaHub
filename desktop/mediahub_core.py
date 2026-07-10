@@ -12,10 +12,11 @@ import Opsec
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 class MHClient:
-    def __init__(self, url, user, pw):
+    def __init__(self, url, user, pw, verify_ssl=True):
         self.url = url.rstrip('/')
         self.user = user
         self.pw = pw
+        self.verify_ssl = verify_ssl
         self.uHash = None
         self.uKey = None
         self.fldMap = {}
@@ -42,7 +43,7 @@ class MHClient:
     def getFlds(self):
         if not self.uHash:
             raise Exception("Not authenticated")
-        res = requests.get(f"{self.url}/api/userdata/{self.uHash}", verify=False)
+        res = requests.get(f"{self.url}/api/userdata/{self.uHash}", verify=self.verify_ssl)
         if res.status_code == 200:
             if len(res.content) > 0:
                 sm = Bencrypt.SymMaster("gcm1", self.uKey[:32])
@@ -59,7 +60,7 @@ class MHClient:
         self.fldMap[name] = Bencrypt.Random(32) + Bencrypt.Random(12)
         sm = Bencrypt.SymMaster("gcm1", self.uKey[:32])
         enc = sm.EnBin(Opsec.EncodeCfg(self.fldMap))
-        res = requests.post(f"{self.url}/api/userdata/{self.uHash}", data=enc, verify=False)
+        res = requests.post(f"{self.url}/api/userdata/{self.uHash}", data=enc, verify=self.verify_ssl)
         if res.status_code != 200:
             raise Exception(f"Failed to create folder: code {res.status_code}")
 
@@ -68,7 +69,7 @@ class MHClient:
             raise Exception("Folder not found")
         fKey = self.fldMap[name]
         fPid = self.objPid(fKey)
-        res = requests.get(f"{self.url}/api/storage/{fPid}/names", verify=False)
+        res = requests.get(f"{self.url}/api/storage/{fPid}/names", verify=self.verify_ssl)
         flMap = {}
         if res.status_code == 200 and len(res.content) > 0:
             sm = Bencrypt.SymMaster("gcm1", fKey[:32])
@@ -124,7 +125,7 @@ class MHClient:
             sm = Bencrypt.SymMaster("gcm1", fk[:32])
             requests.post(f"{self.url}/api/media/{fPid}/{fpid}/thumb",
                           data=sm.EnBin(thumb),
-                          headers={'X-User-Hash': self.uHash}, verify=False)
+                          headers={'X-User-Hash': self.uHash}, verify=self.verify_ssl)
 
         # encrypt and upload media
         smx = Bencrypt.SymMaster("gcmx1", fk[:32])
@@ -159,7 +160,7 @@ class MHClient:
                 f"{self.url}/api/media/{fPid}/{fpid}/dat",
                 data=_Wrap(tmp, total, progCb),
                 headers={'Content-Length': str(total), 'X-User-Hash': self.uHash},
-                verify=False)
+                verify=self.verify_ssl)
             if res.status_code != 200:
                 raise Exception(f"Upload failed: code {res.status_code}")
             if progCb:
@@ -171,7 +172,7 @@ class MHClient:
         res = requests.post(
             f"{self.url}/api/storage/{fPid}/names",
             data=sm.EnBin(Opsec.EncodeCfg(flMap)),
-            headers={'X-User-Hash': self.uHash}, verify=False)
+            headers={'X-User-Hash': self.uHash}, verify=self.verify_ssl)
         if res.status_code != 200:
             raise Exception(f"Failed to sync metadata: code {res.status_code}")
         return True
@@ -183,7 +184,7 @@ class MHClient:
         smx = Bencrypt.SymMaster("gcmx1", fk[:32])
         ciphSz = smx.AfterSize(origSz)
         res = requests.get(f"{self.url}/api/media/{fPid}/{fpid}/dat",
-                           stream=True, verify=False)
+                           stream=True, verify=self.verify_ssl)
         if res.status_code in [200, 206]:
             out = os.path.join(outDir, name)
             with open(out, "wb") as f:

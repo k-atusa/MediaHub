@@ -379,7 +379,7 @@ class WkThumb(WkBase):
             import requests
             import Bencrypt
             url = f"{self.cli.url}/api/media/{self.fPid}/{self.fpid}/thumb"
-            res = requests.get(url, verify=False)
+            res = requests.get(url, verify=self.cli.verify_ssl)
             if res.status_code == 200 and res.content:
                 sm = Bencrypt.SymMaster("gcm1", self.fkBytes[:32])
                 raw = sm.DeBin(res.content)
@@ -842,7 +842,8 @@ class MHApp(QMainWindow):
             self.urlIn.setText(cred['url'])
             self.userIn.setText(cred['user'])
             self.autoChk.setChecked(True)
-            self.cli = MHClient(cred['url'], cred['user'], "")
+            self.ignTlsChk.setChecked(cred.get('ignTls', False))
+            self.cli = MHClient(cred['url'], cred['user'], "", verify_ssl=not cred.get('ignTls', False))
             self.cli.setAuth(cred['uHash'], cred['uKey'])
             self.stack.setCurrentIndex(1)
             self.doFlds()
@@ -860,17 +861,18 @@ class MHApp(QMainWindow):
                 return None
             d = json.loads(raw)
             return {'url': d['url'], 'user': d['user'],
-                    'uHash': d['uHash'], 'uKey': bytes.fromhex(d['uKey'])}
+                    'uHash': d['uHash'], 'uKey': bytes.fromhex(d['uKey']),
+                    'ignTls': d.get('ignTls', False)}
         except Exception:
             return None
 
-    def _saveCred(self, url, user, uHash, uKey):
+    def _saveCred(self, url, user, uHash, uKey, ignTls):
         if not HAS_KEYRING:
             return
         try:
             keyring.set_password(KR_SVC, KR_ACC, json.dumps({
                 'url': url, 'user': user,
-                'uHash': uHash, 'uKey': uKey.hex()}))
+                'uHash': uHash, 'uKey': uKey.hex(), 'ignTls': ignTls}))
         except Exception:
             pass
 
@@ -905,6 +907,9 @@ class MHApp(QMainWindow):
         self.passIn.setEchoMode(QLineEdit.EchoMode.Password)
         self.passIn.setFixedWidth(300)
 
+        self.ignTlsChk = QCheckBox("Ignore TLS Warnings")
+        self.ignTlsChk.setFixedWidth(300)
+
         self.autoChk = QCheckBox("Auto Login")
         self.autoChk.setFixedWidth(300)
 
@@ -920,6 +925,7 @@ class MHApp(QMainWindow):
         lay.addWidget(self.urlIn)
         lay.addWidget(self.userIn)
         lay.addWidget(self.passIn)
+        lay.addWidget(self.ignTlsChk)
         lay.addWidget(self.autoChk)
         lay.addWidget(self.logBtn)
         lay.addWidget(self.statLbl)
@@ -1117,7 +1123,8 @@ class MHApp(QMainWindow):
             return
         self.logBtn.setEnabled(False)
         self.statLbl.setText("Authenticating...")
-        self.cli = MHClient(url, user, pw)
+        ign_tls = self.ignTlsChk.isChecked()
+        self.cli = MHClient(url, user, pw, verify_ssl=not ign_tls)
         self._wk = WkLogin(self.cli)
         self._wk.success.connect(self._onLogOk)
         self._wk.error.connect(self._onLogErr)
@@ -1126,7 +1133,7 @@ class MHApp(QMainWindow):
     def _onLogOk(self):
         if self.autoChk.isChecked():
             self._saveCred(self.urlIn.text().strip(), self.userIn.text().strip(),
-                           self.cli.uHash, self.cli.uKey)
+                           self.cli.uHash, self.cli.uKey, self.ignTlsChk.isChecked())
         self.passIn.clear()
         self.stack.setCurrentIndex(1)
         self.doFlds()
@@ -1142,6 +1149,7 @@ class MHApp(QMainWindow):
         self.fileTbl.setRowCount(0)
         self.fileIconList.clear()
         self.passIn.clear()
+        self.ignTlsChk.setChecked(False)
         self.autoChk.setChecked(False)
         self.stack.setCurrentIndex(0)
         self.logBtn.setEnabled(True)
