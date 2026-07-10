@@ -1,19 +1,18 @@
 package com.example.k7mediahub.view;
 
 import android.annotation.SuppressLint;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
+import android.content.pm.ActivityInfo;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
+import android.webkit.CookieManager;
 import android.webkit.WebChromeClient;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.ImageView;
 import android.widget.ProgressBar;
-import android.widget.ScrollView;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -26,9 +25,6 @@ import java.nio.charset.StandardCharsets;
 
 // Media viewer activity
 public class MediaView extends AppCompatActivity {
-    private ImageView img;
-    private ScrollView sTxt;
-    private TextView tMed;
     private WebView web;
     private ProgressBar prog;
     private TextView tStat;
@@ -39,9 +35,6 @@ public class MediaView extends AppCompatActivity {
         super.onCreate(saved);
         setContentView(R.layout.activity_media);
 
-        img = findViewById(R.id.imgMedia);
-        sTxt = findViewById(R.id.scrollText);
-        tMed = findViewById(R.id.txtMedia);
         web = findViewById(R.id.webMedia);
         prog = findViewById(R.id.progressMedia);
         tStat = findViewById(R.id.txtStatus);
@@ -61,6 +54,10 @@ public class MediaView extends AppCompatActivity {
                 cCall = call;
                 ((ViewGroup) getWindow().getDecorView()).addView(cView, new ViewGroup.LayoutParams(-1, -1));
                 web.setVisibility(View.GONE);
+                
+                // Force landscape for fullscreen video
+                setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+
                 WindowInsetsController ic = getWindow().getInsetsController();
                 if (ic != null) {
                     ic.hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
@@ -75,6 +72,10 @@ public class MediaView extends AppCompatActivity {
                 cView = null;
                 cCall.onCustomViewHidden();
                 web.setVisibility(View.VISIBLE);
+
+                // Restore orientation
+                setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+
                 WindowInsetsController ic = getWindow().getInsetsController();
                 if (ic != null) ic.show(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
             }
@@ -140,8 +141,16 @@ public class MediaView extends AppCompatActivity {
             case "text":
                 byte[] txtD = SvcMH.mediaData;
                 if (txtD != null) {
-                    tMed.setText(new String(txtD, StandardCharsets.UTF_8));
-                    sTxt.setVisibility(View.VISIBLE);
+                    setWeb();
+                    String textContent = new String(txtD, StandardCharsets.UTF_8);
+                    // XSS Prevention: Escape HTML content
+                    String escapedText = TextUtils.htmlEncode(textContent);
+                    
+                    String h = "<!DOCTYPE html><html><head><style>"
+                        + "body{margin:0;padding:32px 16px;background:#121212;color:#fff;font-family:sans-serif;white-space:pre-wrap;word-wrap:break-word;}"
+                        + "</style></head><body>" + escapedText + "</body></html>";
+                    
+                    web.loadDataWithBaseURL(null, h, "text/html", "UTF-8", null);
                     SvcMH.mediaData = null;
                     tStat.setText(name);
                 }
@@ -186,11 +195,14 @@ public class MediaView extends AppCompatActivity {
         web.setVisibility(View.VISIBLE);
     }
 
-    // Cleanup WebView
+    // Cleanup WebView and improve security
     @Override
     protected void onDestroy() {
         if (web != null) {
             web.stopLoading();
+            web.clearCache(true);
+            web.clearHistory();
+            CookieManager.getInstance().removeAllCookies(null);
             web.destroy();
         }
         super.onDestroy();
