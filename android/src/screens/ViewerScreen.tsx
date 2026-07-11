@@ -19,9 +19,12 @@ const getDistance = (touches: any) => {
 
 const PinchZoomView = ({ children }: any) => {
 	const scale = useRef(new Animated.Value(1)).current;
+	const pan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
 	const currentScale = useRef(1);
 	const initialScale = useRef(1);
 	const initialDistance = useRef<number | null>(null);
+	const currentPan = useRef({ x: 0, y: 0 });
+	const initialPan = useRef({ x: 0, y: 0 });
 
 	useEffect(() => {
 		const id = scale.addListener(({ value }) => {
@@ -33,20 +36,37 @@ const PinchZoomView = ({ children }: any) => {
 	const panResponder = useRef(
 		PanResponder.create({
 			onStartShouldSetPanResponderCapture: (evt) => evt.nativeEvent.touches.length === 2,
-			onMoveShouldSetPanResponderCapture: (evt) => evt.nativeEvent.touches.length === 2,
+			onMoveShouldSetPanResponderCapture: (evt, gestureState) => {
+				if (evt.nativeEvent.touches.length === 2) return true;
+				if (evt.nativeEvent.touches.length === 1 && currentScale.current > 1) {
+					return Math.abs(gestureState.dx) > 5 || Math.abs(gestureState.dy) > 5;
+				}
+				return false;
+			},
 			onPanResponderGrant: (evt) => {
 				if (evt.nativeEvent.touches.length === 2) {
 					initialDistance.current = getDistance(evt.nativeEvent.touches);
 					initialScale.current = currentScale.current;
 				}
+				initialPan.current = { x: currentPan.current.x, y: currentPan.current.y };
 			},
-			onPanResponderMove: (evt) => {
+			onPanResponderMove: (evt, gestureState) => {
 				if (evt.nativeEvent.touches.length === 2 && initialDistance.current !== null) {
 					const currentDistance = getDistance(evt.nativeEvent.touches);
 					const rawScale = currentDistance / initialDistance.current;
 					let newScale = initialScale.current * rawScale;
 					newScale = Math.max(1, Math.min(newScale, 5));
 					scale.setValue(newScale);
+
+					if (newScale === 1) {
+						pan.setValue({ x: 0, y: 0 });
+						currentPan.current = { x: 0, y: 0 };
+					}
+				} else if (evt.nativeEvent.touches.length === 1 && currentScale.current > 1) {
+					const newX = initialPan.current.x + gestureState.dx;
+					const newY = initialPan.current.y + gestureState.dy;
+					pan.setValue({ x: newX, y: newY });
+					currentPan.current = { x: newX, y: newY };
 				}
 			},
 			onPanResponderRelease: () => { initialDistance.current = null; },
@@ -56,7 +76,7 @@ const PinchZoomView = ({ children }: any) => {
 
 	return (
 		<View style={{ flex: 1, width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' }} {...panResponder.panHandlers}>
-			<Animated.View style={{ flex: 1, width: '100%', height: '100%', transform: [{ scale }] }}>
+			<Animated.View style={{ flex: 1, width: '100%', height: '100%', transform: [{ translateX: pan.x }, { translateY: pan.y }, { scale }] }}>
 				{children}
 			</Animated.View>
 		</View>
@@ -130,9 +150,12 @@ const VideoPlayerComponent = ({ localUri, file, navigation, onDownload }: any) =
 	const progressBarWidthRef = useRef(1);
 
 	const videoScale = useRef(new Animated.Value(1)).current;
+	const videoPan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
 	const videoCurrentScale = useRef(1);
 	const videoInitialScale = useRef(1);
 	const videoInitialDist = useRef<number | null>(null);
+	const videoCurrentPan = useRef({ x: 0, y: 0 });
+	const videoInitialPan = useRef({ x: 0, y: 0 });
 
 	useEffect(() => {
 		const id = videoScale.addListener(({ value }) => {
@@ -144,20 +167,37 @@ const VideoPlayerComponent = ({ localUri, file, navigation, onDownload }: any) =
 	const pinchResponder = useRef(
 		PanResponder.create({
 			onStartShouldSetPanResponderCapture: (evt) => evt.nativeEvent.touches.length === 2,
-			onMoveShouldSetPanResponderCapture: (evt) => evt.nativeEvent.touches.length === 2,
+			onMoveShouldSetPanResponderCapture: (evt, gestureState) => {
+				if (evt.nativeEvent.touches.length === 2) return true;
+				if (evt.nativeEvent.touches.length === 1 && videoCurrentScale.current > 1) {
+					return Math.abs(gestureState.dx) > 5 || Math.abs(gestureState.dy) > 5;
+				}
+				return false;
+			},
 			onPanResponderGrant: (evt) => {
 				if (evt.nativeEvent.touches.length === 2) {
 					videoInitialDist.current = getDistance(evt.nativeEvent.touches);
 					videoInitialScale.current = videoCurrentScale.current;
 				}
+				videoInitialPan.current = { x: videoCurrentPan.current.x, y: videoCurrentPan.current.y };
 			},
-			onPanResponderMove: (evt) => {
+			onPanResponderMove: (evt, gestureState) => {
 				if (evt.nativeEvent.touches.length === 2 && videoInitialDist.current !== null) {
 					const currentDistance = getDistance(evt.nativeEvent.touches);
 					const rawScale = currentDistance / videoInitialDist.current;
 					let newScale = videoInitialScale.current * rawScale;
 					newScale = Math.max(1, Math.min(newScale, 5));
 					videoScale.setValue(newScale);
+
+					if (newScale === 1) {
+						videoPan.setValue({ x: 0, y: 0 });
+						videoCurrentPan.current = { x: 0, y: 0 };
+					}
+				} else if (evt.nativeEvent.touches.length === 1 && videoCurrentScale.current > 1) {
+					const newX = videoInitialPan.current.x + gestureState.dx;
+					const newY = videoInitialPan.current.y + gestureState.dy;
+					videoPan.setValue({ x: newX, y: newY });
+					videoCurrentPan.current = { x: newX, y: newY };
 				}
 			},
 			onPanResponderRelease: () => { videoInitialDist.current = null; },
@@ -294,7 +334,7 @@ const VideoPlayerComponent = ({ localUri, file, navigation, onDownload }: any) =
 
 	return (
 		<View style={styles.videoContainer} {...pinchResponder.panHandlers}>
-			<Animated.View style={[styles.media, { transform: [{ scale: videoScale }] }]}>
+			<Animated.View style={[styles.media, { transform: [{ translateX: videoPan.x }, { translateY: videoPan.y }, { scale: videoScale }] }]}>
 				<VideoView style={styles.media} player={player} nativeControls={false} />
 			</Animated.View>
 
