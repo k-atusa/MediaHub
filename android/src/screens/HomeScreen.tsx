@@ -120,26 +120,7 @@ export const HomeScreen = ({ navigation }: any) => {
 		}
 	};
 
-	const handleDownload = async (file: { name: string, size: number, info: Buffer }) => {
-		Alert.alert("Download", `Download ${file.name}?`, [
-			{ text: "Cancel", style: "cancel" },
-			{
-				text: "Download", onPress: async () => {
-					setUploading(true);
-					setProgress(0);
-					try {
-						const dest = FileSystem.documentDirectory + file.name;
-						await client!.dnFile(curPid, file.info, file.name, FileSystem.documentDirectory!);
-						Alert.alert("Success", `Downloaded to ${dest}`);
-					} catch (e: any) {
-						Alert.alert("Error", e.message);
-					} finally {
-						setUploading(false);
-					}
-				}
-			}
-		]);
-	};
+
 
 	const handleView = (file: { name: string, size: number, info: Buffer }) => {
 		navigation.navigate('Viewer', {
@@ -206,13 +187,10 @@ export const HomeScreen = ({ navigation }: any) => {
 					renderItem={({ item }) => (
 						<List.Item
 							title={item.name}
+							titleNumberOfLines={1}
+							titleEllipsizeMode="middle"
 							description={formatSize(item.size)}
 							left={props => <List.Icon {...props} icon={getIcon(item.name)} />}
-							right={props => (
-								<View style={{ flexDirection: 'row' }}>
-									<IconButton icon="download" onPress={() => handleDownload(item)} />
-								</View>
-							)}
 							onPress={() => handleView(item)}
 						/>
 					)}

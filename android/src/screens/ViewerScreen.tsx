@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, StyleSheet, Image, ActivityIndicator, TouchableWithoutFeedback, TouchableOpacity, ScrollView, Animated, Dimensions, GestureResponderEvent, PanResponder } from 'react-native';
+import { View, StyleSheet, Image, ActivityIndicator, TouchableWithoutFeedback, TouchableOpacity, ScrollView, Animated, Dimensions, GestureResponderEvent, PanResponder, Alert } from 'react-native';
 import { Appbar, Text, useTheme, IconButton } from 'react-native-paper';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEventListener } from 'expo';
@@ -10,7 +10,7 @@ import { Buffer } from 'buffer';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
+const VideoPlayerComponent = ({ localUri, file, navigation, onDownload }: any) => {
 	const theme = useTheme();
 	const { client } = useAppContext();
 	const [showControls, setShowControls] = useState(true);
@@ -23,23 +23,6 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 	const controlsOpacity = useRef(new Animated.Value(1)).current;
 	const controlsTimer = useRef<NodeJS.Timeout | null>(null);
 
-	const [logs, setLogs] = useState<string[]>([]);
-	const logUI = (msg: string) => {
-		setLogs(prev => [msg, ...prev].slice(0, 8));
-	};
-
-	useEffect(() => {
-		if (client && client.proxy) {
-			client.proxy.onLog = (msg) => {
-				setLogs(prev => [msg, ...prev].slice(0, 8));
-			};
-		}
-		return () => {
-			if (client && client.proxy) {
-				client.proxy.onLog = undefined;
-			}
-		};
-	}, [client]);
 
 	const player = useVideoPlayer(localUri, p => {
 		p.loop = true;
@@ -62,7 +45,6 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 
 	useEventListener(player, 'playingChange', ({ isPlaying }) => {
 		setIsPlaying(isPlaying);
-		logUI(`[UI] Playing change: ${isPlaying}`);
 	});
 
 	useEventListener(player, 'timeUpdate', ({ currentTime }) => {
@@ -71,15 +53,12 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 
 	useEventListener(player, 'sourceLoad', ({ duration }) => {
 		setDuration(duration);
-		logUI(`[UI] Source loaded. Duration: ${duration}s`);
 	});
 
 	useEventListener(player, 'statusChange', ({ status }) => {
-		logUI(`[UI] Status changed to: ${status}`);
 	});
 
 	useEventListener(player as any, 'error', (error: any) => {
-		logUI(`[UI] Player error: ${error?.message || JSON.stringify(error)}`);
 	});
 
 	useEffect(() => {
@@ -124,7 +103,6 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 
 		if (isLeft) {
 			if (now - lastTapLeft < 400) {
-				logUI(`[UI] Double-tap Rewind`);
 				player.seekBy(-10);
 				triggerDoubleTapAnimation(leftArrowOpacity);
 				resetControlsTimer();
@@ -136,7 +114,6 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 			setLastTapRight(0);
 		} else {
 			if (now - lastTapRight < 400) {
-				logUI(`[UI] Double-tap Fast-forward`);
 				player.seekBy(10);
 				triggerDoubleTapAnimation(rightArrowOpacity);
 				resetControlsTimer();
@@ -174,7 +151,6 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 				setIsDragging(false);
 				const currentRatio = Math.max(0, Math.min(1, dragStartRatio.current + gestureState.dx / progressBarWidthRef.current));
 				const targetTime = Math.floor(currentRatio * durationRef.current);
-				logUI(`[UI] Seek release to targetTime: ${targetTime}s (duration: ${durationRef.current}s)`);
 				player.currentTime = targetTime;
 				setCurrentTime(targetTime);
 				resetControlsTimer();
@@ -195,13 +171,7 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 		<View style={styles.videoContainer}>
 			<VideoView style={styles.media} player={player} nativeControls={false} />
 
-			{/* Debug Logs Overlay */}
-			<View pointerEvents="none" style={{ position: 'absolute', top: 60, left: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.6)', padding: 10, borderRadius: 5, zIndex: 100 }}>
-				<Text style={{ color: '#00FF00', fontSize: 9, fontFamily: 'monospace', fontWeight: 'bold' }}>DEBUG LOGS (Realtime):</Text>
-				{logs.map((log, i) => (
-					<Text key={i} style={{ color: '#00FF00', fontSize: 8, fontFamily: 'monospace', marginTop: 2 }} numberOfLines={1}>{log}</Text>
-				))}
-			</View>
+
 			
 			<TouchableWithoutFeedback onPress={handleScreenTap}>
 				<View style={styles.tapOverlay}>
@@ -228,6 +198,7 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 				<View style={styles.topControlRow}>
 					<IconButton icon="chevron-down" iconColor="white" size={30} onPress={() => navigation.goBack()} />
 					<Text style={styles.videoTitle} numberOfLines={1}>{file.name}</Text>
+					<IconButton icon="download" iconColor="white" size={30} onPress={onDownload} />
 				</View>
 				<View style={styles.centerControlRow}>
 					<TouchableOpacity style={styles.playPauseCircle} onPress={() => {
@@ -268,6 +239,24 @@ export const ViewerScreen = ({ route, navigation }: any) => {
 	const isVideo = ['mp4', 'webm', 'mov', 'mkv'].includes(ext || '');
 
 	const [downloadProgress, setDownloadProgress] = useState(0);
+
+	const handleDownloadDevice = async () => {
+		Alert.alert("Download", `Download ${file.name}?`, [
+			{ text: "Cancel", style: "cancel" },
+			{
+				text: "Download", onPress: async () => {
+					try {
+						const dest = FileSystem.documentDirectory + file.name;
+						const flInfo = Buffer.from(flInfoHex, 'hex');
+						await client!.dnFile(fPid, flInfo, file.name, FileSystem.documentDirectory!);
+						Alert.alert("Success", `Downloaded to ${dest}`);
+					} catch (e: any) {
+						Alert.alert("Error", e.message);
+					}
+				}
+			}
+		]);
+	};
 
 	const downloadAndPrepare = async () => {
 		try {
@@ -398,7 +387,7 @@ export const ViewerScreen = ({ route, navigation }: any) => {
 
 		// MP4 Video Viewer with Custom Youtube Controls
 		if (isVideo) {
-			return <VideoPlayerComponent localUri={localUri} file={file} navigation={navigation} />;
+			return <VideoPlayerComponent localUri={localUri} file={file} navigation={navigation} onDownload={handleDownloadDevice} />;
 		}
 
 		// Text Viewer
@@ -419,6 +408,7 @@ export const ViewerScreen = ({ route, navigation }: any) => {
 				<Appbar.Header elevated style={{ backgroundColor: '#1C1C1E' }} theme={{ dark: true }}>
 					<Appbar.BackAction onPress={() => navigation.goBack()} color="white" />
 					<Appbar.Content title={file.name} titleStyle={{ color: 'white' }} />
+					<Appbar.Action icon="download" onPress={handleDownloadDevice} color="white" />
 				</Appbar.Header>
 			)}
 			<View style={styles.content}>
