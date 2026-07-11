@@ -10,9 +10,9 @@ import { Buffer } from 'buffer';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// Separate component to isolate video hooks
 const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 	const theme = useTheme();
+	const { client } = useAppContext();
 	const [showControls, setShowControls] = useState(true);
 	const [lastTapLeft, setLastTapLeft] = useState(0);
 	const [lastTapRight, setLastTapRight] = useState(0);
@@ -22,6 +22,24 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 	const rightArrowOpacity = useRef(new Animated.Value(0)).current;
 	const controlsOpacity = useRef(new Animated.Value(1)).current;
 	const controlsTimer = useRef<NodeJS.Timeout | null>(null);
+
+	const [logs, setLogs] = useState<string[]>([]);
+	const logUI = (msg: string) => {
+		setLogs(prev => [msg, ...prev].slice(0, 8));
+	};
+
+	useEffect(() => {
+		if (client && client.proxy) {
+			client.proxy.onLog = (msg) => {
+				setLogs(prev => [msg, ...prev].slice(0, 8));
+			};
+		}
+		return () => {
+			if (client && client.proxy) {
+				client.proxy.onLog = undefined;
+			}
+		};
+	}, [client]);
 
 	const player = useVideoPlayer(localUri, p => {
 		p.loop = true;
@@ -36,8 +54,15 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 	const [dragTime, setDragTime] = useState(0);
 	const dragStartRatio = useRef(0);
 
+	const durationRef = useRef(0);
+	const progressBarWidthRef = useRef(1);
+
+	durationRef.current = duration;
+	progressBarWidthRef.current = progressBarWidth;
+
 	useEventListener(player, 'playingChange', ({ isPlaying }) => {
 		setIsPlaying(isPlaying);
+		logUI(`[UI] Playing change: ${isPlaying}`);
 	});
 
 	useEventListener(player, 'timeUpdate', ({ currentTime }) => {
@@ -46,6 +71,15 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 
 	useEventListener(player, 'sourceLoad', ({ duration }) => {
 		setDuration(duration);
+		logUI(`[UI] Source loaded. Duration: ${duration}s`);
+	});
+
+	useEventListener(player, 'statusChange', ({ status }) => {
+		logUI(`[UI] Status changed to: ${status}`);
+	});
+
+	useEventListener(player as any, 'error', (error: any) => {
+		logUI(`[UI] Player error: ${error?.message || JSON.stringify(error)}`);
 	});
 
 	useEffect(() => {
@@ -90,6 +124,7 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 
 		if (isLeft) {
 			if (now - lastTapLeft < 400) {
+				logUI(`[UI] Double-tap Rewind`);
 				player.seekBy(-10);
 				triggerDoubleTapAnimation(leftArrowOpacity);
 				resetControlsTimer();
@@ -101,6 +136,7 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 			setLastTapRight(0);
 		} else {
 			if (now - lastTapRight < 400) {
+				logUI(`[UI] Double-tap Fast-forward`);
 				player.seekBy(10);
 				triggerDoubleTapAnimation(rightArrowOpacity);
 				resetControlsTimer();
@@ -124,21 +160,23 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 			onMoveShouldSetPanResponder: () => true,
 			onPanResponderGrant: (evt) => {
 				setIsDragging(true);
-				const ratio = Math.max(0, Math.min(1, evt.nativeEvent.locationX / progressBarWidth));
+				const ratio = Math.max(0, Math.min(1, evt.nativeEvent.locationX / progressBarWidthRef.current));
 				dragStartRatio.current = ratio;
-				setDragTime(ratio * duration);
+				setDragTime(ratio * durationRef.current);
 				resetControlsTimer();
 			},
 			onPanResponderMove: (evt, gestureState) => {
-				const currentRatio = Math.max(0, Math.min(1, dragStartRatio.current + gestureState.dx / progressBarWidth));
-				setDragTime(currentRatio * duration);
+				const currentRatio = Math.max(0, Math.min(1, dragStartRatio.current + gestureState.dx / progressBarWidthRef.current));
+				setDragTime(currentRatio * durationRef.current);
 				resetControlsTimer();
 			},
 			onPanResponderRelease: (evt, gestureState) => {
 				setIsDragging(false);
-				const currentRatio = Math.max(0, Math.min(1, dragStartRatio.current + gestureState.dx / progressBarWidth));
-				player.currentTime = currentRatio * duration;
-				setCurrentTime(currentRatio * duration);
+				const currentRatio = Math.max(0, Math.min(1, dragStartRatio.current + gestureState.dx / progressBarWidthRef.current));
+				const targetTime = Math.floor(currentRatio * durationRef.current);
+				logUI(`[UI] Seek release to targetTime: ${targetTime}s (duration: ${durationRef.current}s)`);
+				player.currentTime = targetTime;
+				setCurrentTime(targetTime);
 				resetControlsTimer();
 			},
 		})
@@ -156,6 +194,14 @@ const VideoPlayerComponent = ({ localUri, file, navigation }: any) => {
 	return (
 		<View style={styles.videoContainer}>
 			<VideoView style={styles.media} player={player} nativeControls={false} />
+
+			{/* Debug Logs Overlay */}
+			<View pointerEvents="none" style={{ position: 'absolute', top: 60, left: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.6)', padding: 10, borderRadius: 5, zIndex: 100 }}>
+				<Text style={{ color: '#00FF00', fontSize: 9, fontFamily: 'monospace', fontWeight: 'bold' }}>DEBUG LOGS (Realtime):</Text>
+				{logs.map((log, i) => (
+					<Text key={i} style={{ color: '#00FF00', fontSize: 8, fontFamily: 'monospace', marginTop: 2 }} numberOfLines={1}>{log}</Text>
+				))}
+			</View>
 			
 			<TouchableWithoutFeedback onPress={handleScreenTap}>
 				<View style={styles.tapOverlay}>

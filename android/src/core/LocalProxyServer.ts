@@ -10,6 +10,7 @@ export class LocalProxyServer {
 	private client: MediaHubClient;
 	private chkCache: Map<string, Buffer> = new Map();
 	private ivCache: Map<string, Buffer> = new Map();
+	public onLog?: (msg: string) => void;
 
 	constructor(client: MediaHubClient) {
 		this.client = client;
@@ -91,10 +92,14 @@ export class LocalProxyServer {
 				if (headerEnd !== -1) {
 					headersParsed = true;
 					const requestStr = headerStr.substring(0, headerEnd);
-					const lines = requestStr.split('\r\n');
+					const lines = requestStr.split(/\r?\n/);
 					const reqLine = lines[0].split(' ');
 					const method = reqLine[0];
 					const url = reqLine[1];
+
+					const reqMsg = `[Proxy] Request: ${method} ${url}`;
+					console.log(reqMsg);
+					if (this.onLog) this.onLog(reqMsg);
 
 					if (method !== 'GET') {
 						socket.write('HTTP/1.1 405 Method Not Allowed\r\n\r\n');
@@ -137,16 +142,21 @@ export class LocalProxyServer {
 					let rS = 0;
 					let rE = origSz - 1;
 					let partial = false;
+					let rangeHeader = '';
+					let openEnd = false;
 
 					for (let i = 1; i < lines.length; i++) {
 						const lowerLine = lines[i].toLowerCase();
 						if (lowerLine.startsWith('range:')) {
+							rangeHeader = lines[i];
 							const rng = lowerLine.substring(6).trim();
 							const rm = rng.match(/bytes=(\d+)-(\d*)/);
 							if (rm) {
 								rS = parseInt(rm[1], 10);
 								if (rm[2]) {
 									rE = parseInt(rm[2], 10);
+								} else {
+									openEnd = true;
 								}
 								partial = true;
 							} else {
@@ -154,13 +164,35 @@ export class LocalProxyServer {
 								if (rm2) {
 									rS = Math.max(0, origSz - parseInt(rm2[1], 10));
 									partial = true;
+									openEnd = true;
 								}
 							}
 							break;
 						}
 					}
 
+					if (!partial) {
+						// Force partial response even if no Range header was provided.
+						// This prevents memory bloat and tells ExoPlayer that seeking is supported.
+						partial = true;
+						openEnd = true;
+					}
+
+					// Cap open-ended requests to 20MB to prevent OOM
+					const MAX_RESPONSE = 20 * 1048576; // 20MB
+					if (openEnd && (rE - rS + 1) > MAX_RESPONSE) {
+						rE = rS + MAX_RESPONSE - 1;
+					}
+					rE = Math.min(rE, origSz - 1);
+
+					const rangeMsg = `[Proxy] Parsed Range Header: "${rangeHeader}" -> parsed rS=${rS}, rE=${rE}, partial=${partial}, origSz=${origSz}`;
+					console.log(rangeMsg);
+					if (this.onLog) this.onLog(rangeMsg);
+
 					if (rS > rE || rS >= origSz) {
+						const satMsg = `[Proxy] Range Not Satisfiable: rS=${rS}, rE=${rE}, origSz=${origSz}`;
+						console.error(satMsg);
+						if (this.onLog) this.onLog(satMsg);
 						socket.write(`HTTP/1.1 416 Range Not Satisfiable\r\nContent-Range: bytes */${origSz}\r\n\r\n`);
 						socket.destroy();
 						return;
@@ -196,13 +228,25 @@ export class LocalProxyServer {
 					try {
 						const gIV = await this.getIV(fPid, fpid);
 						if (!gIV) {
+							const ivErr = "[Proxy] Failed to retrieve global IV";
+							console.error(ivErr);
+							if (this.onLog) this.onLog(ivErr);
 							socket.destroy();
 							return;
 						}
 
 						for (let ci = fi; ci <= li; ci++) {
+							if (socket.destroyed) break;
+
 							const chunk = await this.getChunk(fPid, fpid, aesKey, origSz, ci, gIV);
-							if (!chunk) break;
+							if (!chunk) {
+								const chunkErr = `[Proxy] Failed to retrieve chunk ${ci}`;
+								console.error(chunkErr);
+								if (this.onLog) this.onLog(chunkErr);
+								break;
+							}
+
+							if (socket.destroyed) break;
 
 							const base = ci * PL;
 							const a = Math.max(rS, base) - base;
@@ -210,13 +254,30 @@ export class LocalProxyServer {
 
 							if (a <= b) {
 								const slice = Buffer.from(new Uint8Array(chunk.subarray(a, b + 1)));
-								socket.write(slice);
+								try {
+									if (!socket.destroyed) {
+										socket.write(slice);
+									}
+								} catch (writeErr: any) {
+									const writeErrMsg = `[Proxy] Write error for chunk ${ci}: ${writeErr?.message || String(writeErr)}`;
+									console.log(writeErrMsg);
+									if (this.onLog) this.onLog(writeErrMsg);
+									break;
+								}
 							}
 						}
-					} catch (e) {
-						console.error("Streaming error", e);
+					} catch (e: any) {
+						if (e?.message !== 'Socket is closed') {
+							const streamErr = `[Proxy] Streaming error: ${e?.message || String(e)}`;
+							console.error(streamErr);
+							if (this.onLog) this.onLog(streamErr);
+						}
 					} finally {
-						socket.destroy();
+						setTimeout(() => {
+							if (socket && !socket.destroyed) {
+								try { socket.destroy(); } catch (err) {}
+							}
+						}, 10);
 					}
 				}
 			});
