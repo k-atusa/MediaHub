@@ -10,6 +10,95 @@ import { Buffer } from 'buffer';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
+const getDistance = (touches: any) => {
+	const [t1, t2] = touches;
+	const dx = t1.pageX - t2.pageX;
+	const dy = t1.pageY - t2.pageY;
+	return Math.sqrt(dx * dx + dy * dy);
+};
+
+const PinchZoomView = ({ children }: any) => {
+	const scale = useRef(new Animated.Value(1)).current;
+	const currentScale = useRef(1);
+	const initialScale = useRef(1);
+	const initialDistance = useRef<number | null>(null);
+
+	useEffect(() => {
+		const id = scale.addListener(({ value }) => {
+			currentScale.current = value;
+		});
+		return () => scale.removeListener(id);
+	}, [scale]);
+
+	const panResponder = useRef(
+		PanResponder.create({
+			onStartShouldSetPanResponderCapture: (evt) => evt.nativeEvent.touches.length === 2,
+			onMoveShouldSetPanResponderCapture: (evt) => evt.nativeEvent.touches.length === 2,
+			onPanResponderGrant: (evt) => {
+				if (evt.nativeEvent.touches.length === 2) {
+					initialDistance.current = getDistance(evt.nativeEvent.touches);
+					initialScale.current = currentScale.current;
+				}
+			},
+			onPanResponderMove: (evt) => {
+				if (evt.nativeEvent.touches.length === 2 && initialDistance.current !== null) {
+					const currentDistance = getDistance(evt.nativeEvent.touches);
+					const rawScale = currentDistance / initialDistance.current;
+					let newScale = initialScale.current * rawScale;
+					newScale = Math.max(1, Math.min(newScale, 5));
+					scale.setValue(newScale);
+				}
+			},
+			onPanResponderRelease: () => { initialDistance.current = null; },
+			onPanResponderTerminate: () => { initialDistance.current = null; }
+		})
+	).current;
+
+	return (
+		<View style={{ flex: 1, width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' }} {...panResponder.panHandlers}>
+			<Animated.View style={{ flex: 1, width: '100%', height: '100%', transform: [{ scale }] }}>
+				{children}
+			</Animated.View>
+		</View>
+	);
+};
+
+const PinchZoomText = ({ text }: { text: string }) => {
+	const [fontSize, setFontSize] = useState(14);
+	const baseFontSize = useRef(14);
+	const initialDistance = useRef<number | null>(null);
+
+	const panResponder = useRef(
+		PanResponder.create({
+			onStartShouldSetPanResponderCapture: (evt) => evt.nativeEvent.touches.length === 2,
+			onMoveShouldSetPanResponderCapture: (evt) => evt.nativeEvent.touches.length === 2,
+			onPanResponderGrant: (evt) => {
+				if (evt.nativeEvent.touches.length === 2) {
+					initialDistance.current = getDistance(evt.nativeEvent.touches);
+					baseFontSize.current = fontSize;
+				}
+			},
+			onPanResponderMove: (evt) => {
+				if (evt.nativeEvent.touches.length === 2 && initialDistance.current !== null) {
+					const currentDistance = getDistance(evt.nativeEvent.touches);
+					const rawScale = currentDistance / initialDistance.current;
+					let newSize = baseFontSize.current * rawScale;
+					newSize = Math.max(8, Math.min(newSize, 72));
+					setFontSize(Math.round(newSize));
+				}
+			},
+			onPanResponderRelease: () => { initialDistance.current = null; },
+			onPanResponderTerminate: () => { initialDistance.current = null; }
+		})
+	).current;
+
+	return (
+		<ScrollView style={styles.textScroll} contentContainerStyle={styles.textContainer} {...panResponder.panHandlers}>
+			<Text style={[styles.textContent, { color: '#E5E5EA', fontSize }]}>{text}</Text>
+		</ScrollView>
+	);
+};
+
 const VideoPlayerComponent = ({ localUri, file, navigation, onDownload }: any) => {
 	const theme = useTheme();
 	const { client } = useAppContext();
@@ -39,6 +128,42 @@ const VideoPlayerComponent = ({ localUri, file, navigation, onDownload }: any) =
 
 	const durationRef = useRef(0);
 	const progressBarWidthRef = useRef(1);
+
+	const videoScale = useRef(new Animated.Value(1)).current;
+	const videoCurrentScale = useRef(1);
+	const videoInitialScale = useRef(1);
+	const videoInitialDist = useRef<number | null>(null);
+
+	useEffect(() => {
+		const id = videoScale.addListener(({ value }) => {
+			videoCurrentScale.current = value;
+		});
+		return () => videoScale.removeListener(id);
+	}, [videoScale]);
+
+	const pinchResponder = useRef(
+		PanResponder.create({
+			onStartShouldSetPanResponderCapture: (evt) => evt.nativeEvent.touches.length === 2,
+			onMoveShouldSetPanResponderCapture: (evt) => evt.nativeEvent.touches.length === 2,
+			onPanResponderGrant: (evt) => {
+				if (evt.nativeEvent.touches.length === 2) {
+					videoInitialDist.current = getDistance(evt.nativeEvent.touches);
+					videoInitialScale.current = videoCurrentScale.current;
+				}
+			},
+			onPanResponderMove: (evt) => {
+				if (evt.nativeEvent.touches.length === 2 && videoInitialDist.current !== null) {
+					const currentDistance = getDistance(evt.nativeEvent.touches);
+					const rawScale = currentDistance / videoInitialDist.current;
+					let newScale = videoInitialScale.current * rawScale;
+					newScale = Math.max(1, Math.min(newScale, 5));
+					videoScale.setValue(newScale);
+				}
+			},
+			onPanResponderRelease: () => { videoInitialDist.current = null; },
+			onPanResponderTerminate: () => { videoInitialDist.current = null; }
+		})
+	).current;
 
 	durationRef.current = duration;
 	progressBarWidthRef.current = progressBarWidth;
@@ -168,8 +293,10 @@ const VideoPlayerComponent = ({ localUri, file, navigation, onDownload }: any) =
 	const progressRatio = duration > 0 ? (isDragging ? dragTime / duration : currentTime / duration) : 0;
 
 	return (
-		<View style={styles.videoContainer}>
-			<VideoView style={styles.media} player={player} nativeControls={false} />
+		<View style={styles.videoContainer} {...pinchResponder.panHandlers}>
+			<Animated.View style={[styles.media, { transform: [{ scale: videoScale }] }]}>
+				<VideoView style={styles.media} player={player} nativeControls={false} />
+			</Animated.View>
 
 
 			
@@ -318,7 +445,11 @@ export const ViewerScreen = ({ route, navigation }: any) => {
 
 		// Image Viewer
 		if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext || '')) {
-			return <Image source={{ uri: localUri }} style={styles.media} resizeMode="contain" />;
+			return (
+				<PinchZoomView>
+					<Image source={{ uri: localUri }} style={styles.media} resizeMode="contain" />
+				</PinchZoomView>
+			);
 		}
 
 		// SVG Viewer (runs inside WebView)
@@ -327,7 +458,7 @@ export const ViewerScreen = ({ route, navigation }: any) => {
                 <!DOCTYPE html>
                 <html>
                 <head>
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
                     <style>
                         body { margin: 0; padding: 0; background-color: #1C1C1E; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
                         svg { width: 100%; height: 100%; max-width: 100%; max-height: 100%; }
@@ -345,7 +476,7 @@ export const ViewerScreen = ({ route, navigation }: any) => {
                 <!DOCTYPE html>
                 <html>
                 <head>
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
                     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
                     <style>
                         body { margin: 0; padding: 0; background-color: #1C1C1E; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 100vh; overflow-y: auto; }
@@ -392,11 +523,7 @@ export const ViewerScreen = ({ route, navigation }: any) => {
 
 		// Text Viewer
 		if (textContent !== null) {
-			return (
-				<ScrollView style={styles.textScroll} contentContainerStyle={styles.textContainer}>
-					<Text style={[styles.textContent, { color: '#E5E5EA' }]}>{textContent}</Text>
-				</ScrollView>
-			);
+			return <PinchZoomText text={textContent} />;
 		}
 
 		return <Text style={styles.center}>Preview not supported for this file type.</Text>;
