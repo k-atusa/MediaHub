@@ -3,13 +3,14 @@ package com.example.k7mediahub.view;
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.os.Build;
 import android.os.Bundle;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.TextView;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -25,12 +26,14 @@ public class LoginView extends AppCompatActivity {
     private CheckBox cTls;
     private TextView tStat;
     private Button bLog;
+    private ImageButton bMemo;
+    private MHcore core;
 
     // Standard lifecycle
     @Override
     protected void onCreate(Bundle saved) {
         super.onCreate(saved);
-        setContentView(R.layout.activity_login);
+        setContentView(R.layout.view_login);
 
         eUrl = findViewById(R.id.edtServerUrl);
         eName = findViewById(R.id.edtUsername);
@@ -38,6 +41,8 @@ public class LoginView extends AppCompatActivity {
         cTls = findViewById(R.id.chkTls);
         tStat = findViewById(R.id.txtStatus);
         bLog = findViewById(R.id.btnLogin);
+        bMemo = findViewById(R.id.btnMemo);
+        core = new MHcore(false);
 
         // Req permission
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -46,11 +51,13 @@ public class LoginView extends AppCompatActivity {
 
         // Load saved config
         try {
-            MHcore c = new MHcore(false);
-            c.LoadCfg(this);
-            eUrl.setText(c.srvUrl);
-            eName.setText(c.uName);
+            core.LoadCfg(this);
+            eUrl.setText(core.srvUrl);
+            eName.setText(core.uName);
         } catch (Exception ignored) {}
+
+        // Handle memo
+        bMemo.setOnClickListener(v -> showMemo());
 
         // Handle login result
         SVCC1.getChan().ToMainBus.observe(this, ev -> {
@@ -81,7 +88,6 @@ public class LoginView extends AppCompatActivity {
 
             bLog.setEnabled(false);
             tStat.setText("Connecting...");
-
             startSvc();
 
             Bundle req = new Bundle();
@@ -91,6 +97,23 @@ public class LoginView extends AppCompatActivity {
             req.putBoolean("ignTLS", cTls.isChecked());
             SVCC1.getChan().SendToSvc("LOGIN", req);
         });
+    }
+
+    private void showMemo() {
+        EditText edt = new EditText(this);
+        edt.setText(core.uMemo);
+        edt.setPadding(48, 48, 48, 48);
+
+        new AlertDialog.Builder(this)
+                .setTitle("Memo")
+                .setView(edt)
+                .setPositiveButton("Save", (d, w) -> {
+                    try {
+                        core.SaveCfg(this, eUrl.getText().toString().trim(), eName.getText().toString().trim(), edt.getText().toString());
+                    } catch (Exception ignored) {}
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 
     // Ensure service is running

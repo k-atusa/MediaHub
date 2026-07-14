@@ -134,8 +134,17 @@ public class SvcMH extends Service {
         String pw = d.getString("pw", "");
         boolean ignTLS = d.getBoolean("ignTLS", false);
 
+        // Preserve existing memo before creating new core instance
+        String savedMemo = "";
+        try {
+            MHcore tmp = new MHcore(false);
+            tmp.LoadCfg(getApplicationContext());
+            savedMemo = tmp.uMemo;
+        } catch (Exception ignored) {}
+
         core = new MHcore(ignTLS);
         core.srvUrl = url;
+        core.uMemo = savedMemo;
         core.Login(name, pw);
 
         if (!core.CheckAcc()) {
@@ -143,7 +152,7 @@ public class SvcMH extends Service {
             sendToMain("LOGIN_FAIL", bundleMsg("Cannot find account"));
             return;
         }
-        core.SaveCfg(getApplicationContext(), url, name);
+        core.SaveCfg(getApplicationContext(), url, name, core.uMemo);
 
         // Start local streaming proxy
         if (streamer != null)

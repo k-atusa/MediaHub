@@ -28,12 +28,13 @@ public class MediaView extends AppCompatActivity {
     private WebView web;
     private ProgressBar prog;
     private TextView tStat;
+    private boolean isVideo;
 
     // Standard lifecycle
     @Override
     protected void onCreate(Bundle saved) {
         super.onCreate(saved);
-        setContentView(R.layout.activity_media);
+        setContentView(R.layout.view_media);
 
         web = findViewById(R.id.webMedia);
         prog = findViewById(R.id.progressMedia);
@@ -52,6 +53,7 @@ public class MediaView extends AppCompatActivity {
                 }
                 cView = view;
                 cCall = call;
+                cView.setFitsSystemWindows(true);
                 ((ViewGroup) getWindow().getDecorView()).addView(cView, new ViewGroup.LayoutParams(-1, -1));
                 web.setVisibility(View.GONE);
                 
@@ -77,7 +79,14 @@ public class MediaView extends AppCompatActivity {
                 setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
 
                 WindowInsetsController ic = getWindow().getInsetsController();
-                if (ic != null) ic.show(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
+                if (ic != null) {
+                    ic.show(WindowInsets.Type.statusBars());
+                    if (isVideo) {
+                        hideNavBar();
+                    } else {
+                        ic.show(WindowInsets.Type.navigationBars());
+                    }
+                }
             }
         });
 
@@ -167,6 +176,8 @@ public class MediaView extends AppCompatActivity {
                         + "<source src='" + vUrl + "' type='video/mp4'></video></body></html>";
                     web.loadDataWithBaseURL("http://127.0.0.1/", h, "text/html", "UTF-8", null);
                     tStat.setText(name);
+                    isVideo = true;
+                    hideNavBar();
                 }
                 break;
             case "pdf":
@@ -193,6 +204,15 @@ public class MediaView extends AppCompatActivity {
         web.getSettings().setAllowFileAccess(true);
         web.getSettings().setAllowContentAccess(true);
         web.setVisibility(View.VISIBLE);
+    }
+
+    // Hide navigation bar for video playback
+    private void hideNavBar() {
+        WindowInsetsController ic = getWindow().getInsetsController();
+        if (ic != null) {
+            ic.hide(WindowInsets.Type.navigationBars());
+            ic.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+        }
     }
 
     // Cleanup WebView and improve security

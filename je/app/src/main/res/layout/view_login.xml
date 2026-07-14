@@ -54,7 +54,15 @@
                         android:layout_height="wrap_content" />
                     <TextView style="@style/body"
                         android:text="Ignore TLS Warning"
-                        android:textSize="14sp" />
+                        android:textSize="14sp"
+                        android:layout_weight="1" />
+                    <ImageButton
+                        android:id="@+id/btnMemo"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:src="@drawable/icon_note"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Memo" />
                 </LinearLayout>
 
             </LinearLayout>

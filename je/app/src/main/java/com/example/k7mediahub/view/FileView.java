@@ -43,7 +43,7 @@ public class FileView extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle saved) {
         super.onCreate(saved);
-        setContentView(R.layout.activity_file);
+        setContentView(R.layout.view_file);
 
         fld = getIntent().getStringExtra("folder");
         if (fld == null) fld = "";

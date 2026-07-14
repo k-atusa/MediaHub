@@ -44,6 +44,7 @@ public class MHcore {
     public String srvUrl;
     public String uName;
     public String uHash;
+    public String uMemo = "";
     private byte[] uKey;
     public Map<String, byte[]> fldMap = new HashMap<>();
     private final Bencrypt.Masker masker;
@@ -214,20 +215,22 @@ public class MHcore {
         while ((r = in.read(b)) != -1)
             buf.write(b, 0, r);
         in.close();
-        String[] pts = buf.toString("UTF-8").split("\n", 2);
-        if (pts.length == 2) {
+        String[] pts = buf.toString("UTF-8").split("\n", 3);
+        if (pts.length >= 2) {
             this.srvUrl = pts[0];
             this.uName = pts[1];
+            if (pts.length == 3) this.uMemo = pts[2];
         }
     }
 
     // Save local client settings to file
-    public void SaveCfg(Context ctx, String url, String name) throws Exception {
+    public void SaveCfg(Context ctx, String url, String name, String memo) throws Exception {
         this.srvUrl = url;
         this.uName = name;
+        this.uMemo = memo != null ? memo : "";
         File f = new File(ctx.getFilesDir(), CFG_FILE);
         FileOutputStream out = new FileOutputStream(f);
-        out.write((url + "\n" + name).getBytes(StandardCharsets.UTF_8));
+        out.write((this.srvUrl + "\n" + this.uName + "\n" + this.uMemo).getBytes(StandardCharsets.UTF_8));
         out.close();
     }
 

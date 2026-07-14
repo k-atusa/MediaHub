@@ -31,7 +31,7 @@ public class FolderView extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle saved) {
         super.onCreate(saved);
-        setContentView(R.layout.activity_folder);
+        setContentView(R.layout.view_folder);
 
         rv = findViewById(R.id.rvFolders);
         tStat = findViewById(R.id.txtStatus);
