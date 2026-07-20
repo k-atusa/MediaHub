@@ -12,6 +12,7 @@
     "expo-image-manipulator": "^57.0.2",
     "expo-secure-store": "^57.0.0",
     "expo-status-bar": "~57.0.0",
+    "expo-system-ui": "^57.0.1",
     "expo-video": "~57.0.0",
     "expo-video-thumbnails": "^57.0.0",
     "js-sha3": "^0.9.3",
