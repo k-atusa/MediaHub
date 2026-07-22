@@ -177,26 +177,18 @@ public class LocalStreamer {
             if (rangeEnd >= info.origSz)
                 rangeEnd = info.origSz - 1;
 
-            // Limit per-request chunk to 2MB for smooth streaming
-            long maxChunk = 2 * 1024 * 1024;
-            if (rangeEnd - rangeStart + 1 > maxChunk) {
-                rangeEnd = rangeStart + maxChunk - 1;
-            }
-
-            int ptLen = (int) (rangeEnd - rangeStart + 1);
-            byte[] data = core.DlPart(info.fPid, info.fId, info.fKey, info.origSz, rangeStart, ptLen);
-
-            // Build HTTP response
+            // Build and send HTTP response headers
             StringBuilder resp = new StringBuilder();
             if (isRange) {
                 resp.append("HTTP/1.1 206 Partial Content\r\n");
                 resp.append("Content-Range: bytes ").append(rangeStart).append("-")
-                        .append(rangeStart + data.length - 1).append("/").append(info.origSz).append("\r\n");
+                        .append(rangeEnd).append("/").append(info.origSz).append("\r\n");
+                resp.append("Content-Length: ").append(rangeEnd - rangeStart + 1).append("\r\n");
             } else {
                 resp.append("HTTP/1.1 200 OK\r\n");
+                resp.append("Content-Length: ").append(info.origSz).append("\r\n");
             }
             resp.append("Content-Type: ").append(info.mime).append("\r\n");
-            resp.append("Content-Length: ").append(data.length).append("\r\n");
             resp.append("Accept-Ranges: bytes\r\n");
             resp.append("Connection: close\r\n");
             resp.append("Access-Control-Allow-Origin: *\r\n");
@@ -204,9 +196,20 @@ public class LocalStreamer {
             resp.append("Access-Control-Allow-Headers: Range\r\n");
             resp.append("Access-Control-Expose-Headers: Content-Range, Content-Length, Accept-Ranges\r\n");
             resp.append("\r\n");
-
             out.write(resp.toString().getBytes());
-            out.write(data);
+
+            // Stream data in chunks to keep memory bounded
+            long streamChunk = 4 * 1024 * 1024; // 4MB per DlPart call
+            long offset = rangeStart;
+            long remaining = rangeEnd - rangeStart + 1;
+            while (remaining > 0) {
+                int len = (int) Math.min(streamChunk, remaining);
+                byte[] data = core.DlPart(info.fPid, info.fId, info.fKey, info.origSz, offset, len);
+                out.write(data);
+                offset += data.length;
+                remaining -= data.length;
+                if (data.length == 0) break; // safety
+            }
             out.flush();
             client.close();
 

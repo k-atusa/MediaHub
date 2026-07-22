@@ -325,9 +325,13 @@ public class SvcMH extends Service {
         result.putString("fileName", fileName);
 
         if ("image".equals(type) || "text".equals(type)) {
-            // Download entire file into memory
-            mediaData = core.DnMem(ff, fileName, false);
+            // Download entire file into memory with progress
+            MHcore.ProgressListener progListener = pct ->
+                    SVCC1.getChan().SetInt(0, pct);
+            SVCC1.getChan().SetInt(0, 0);
+            mediaData = core.DnMem(ff, fileName, false, progListener);
             result.putInt("dataSize", mediaData != null ? mediaData.length : 0);
+            SVCC1.getChan().SetInt(0, 100);
 
         } else if ("video".equals(type) || "pdf".equals(type)) {
             // Set up streaming session
@@ -341,10 +345,11 @@ public class SvcMH extends Service {
             Opsec opsec = new Opsec();
             long origSz = opsec.DecodeInt(sizeBytes);
 
-            String mime = "video/mp4";
+            String mime;
             if ("pdf".equals(type)) {
                 mime = "application/pdf";
             } else {
+                mime = "video/mp4";
                 switch (ext) {
                     case "webm":
                         mime = "video/webm";

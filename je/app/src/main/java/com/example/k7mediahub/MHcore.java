@@ -537,8 +537,18 @@ public class MHcore {
         }
     }
 
+    // Progress callback for download operations
+    public interface ProgressListener {
+        void onProgress(int percent);
+    }
+
     // Download and decrypt entire file or thumbnail directly into memory
     public byte[] DnMem(FolderFiles ff, String fileName, boolean isThumbnail) throws Exception {
+        return DnMem(ff, fileName, isThumbnail, null);
+    }
+
+    // Download and decrypt with progress reporting
+    public byte[] DnMem(FolderFiles ff, String fileName, boolean isThumbnail, ProgressListener listener) throws Exception {
         // check validity, get file key
         if (!ff.flMap.containsKey(fileName)) throw new IllegalArgumentException("File not found in metadata");
         byte[] flInfo = ff.flMap.get(fileName);
@@ -557,12 +567,24 @@ public class MHcore {
 
         // download
         if (resCode == 200 || resCode == 206) {
+            long total = c.getContentLengthLong();
             InputStream in = c.getInputStream();
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            byte[] buf = new byte[8192];
+            byte[] buf = new byte[65536];
             int r;
-            while ((r = in.read(buf)) != -1)
+            long cur = 0;
+            int lastPct = -1;
+            while ((r = in.read(buf)) != -1) {
                 bos.write(buf, 0, r);
+                cur += r;
+                if (listener != null && total > 0) {
+                    int pct = (int) (cur * 100 / total);
+                    if (pct != lastPct) {
+                        lastPct = pct;
+                        listener.onProgress(pct);
+                    }
+                }
+            }
             in.close();
             c.disconnect();
 

@@ -2,8 +2,8 @@
 <com.google.android.material.card.MaterialCardView
     xmlns:android="http://schemas.android.com/apk/res/android"
     style="@style/card"
-    android:layout_marginHorizontal="4dp"
-    android:layout_marginVertical="4dp"
+    android:layout_marginHorizontal="2dp"
+    android:layout_marginVertical="2dp"
     android:clickable="true"
     android:focusable="true">
 
@@ -24,19 +24,24 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
-            android:padding="8dp">
+            android:padding="4dp">
             
             <CheckBox
                 android:id="@+id/chkSelect"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:scaleX="0.8"
+                android:scaleY="0.8"
+                android:minWidth="0dp"
+                android:minHeight="0dp" />
                 
             <TextView
                 android:id="@+id/txtFileName"
                 style="@style/body"
                 android:layout_width="0dp"
                 android:layout_weight="1"
-                android:layout_marginStart="4dp"
+                android:layout_marginStart="2dp"
+                android:textSize="12sp"
                 android:ellipsize="middle"
                 android:singleLine="true" />
         </LinearLayout>

@@ -97,6 +97,13 @@ public class MediaView extends AppCompatActivity {
 
         tStat.setText(fl);
 
+        // Download progress observer
+        SVCC1.getChan().IntSlots[0].observe(this, pct -> {
+            if (pct != null && pct > 0 && pct < 100 && prog.getVisibility() == View.VISIBLE) {
+                tStat.setText("Downloading... " + pct + "%");
+            }
+        });
+
         // Listen for data
         SVCC1.getChan().ToMainBus.observe(this, ev -> {
             if (ev == null) return;
@@ -184,6 +191,10 @@ public class MediaView extends AppCompatActivity {
                 String pUrl = d.getString("url", "");
                 if (!pUrl.isEmpty()) {
                     setWeb();
+                    web.getSettings().setBuiltInZoomControls(true);
+                    web.getSettings().setDisplayZoomControls(false);
+                    web.getSettings().setUseWideViewPort(true);
+                    web.getSettings().setLoadWithOverviewMode(true);
                     try {
                         String u = "file:///android_asset/pdf_viewer.html?file=" 
                             + java.net.URLEncoder.encode(pUrl, "UTF-8");
