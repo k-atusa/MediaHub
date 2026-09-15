@@ -4,8 +4,8 @@ name: Alpha Nightly
 # alpha-nightly GitHub Release. Triggered on every push to main.
 #
 # Release assets:
-#   - mediahub-YYMMDD-SHORT_SHA-linux-amd64         (Go server binary)
-#   - mediahub-web-YYMMDD-SHORT_SHA.zip             (static Next.js frontend)
+#   - mediahub-YYMMDD-SHORT_SHA-linux-amd64         (Go server binary with embedded HTML)
+#   - mediahub-web-YYMMDD-SHORT_SHA.zip             (static Next.js frontend assets)
 #
 # Release name: Alpha Nightly - YYYYMMDD (SHORT_SHA)
 # Release tag:  alpha-YYYYMMDD-SHORT_SHA
@@ -64,34 +64,34 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: server/web/package-lock.json
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install npm dependencies
-        working-directory: server/web
+        working-directory: frontend
         run: npm ci
 
       - name: Build Next.js static export
-        working-directory: server/web
-        run: npm run build:full
+        working-directory: frontend
+        run: npm run build
         env:
           WEB_NAME: ${{ steps.ids.outputs.web_name }}
 
       - name: Zip static frontend
-        working-directory: server/public
+        working-directory: backend/dist
         env:
           WEB_NAME: ${{ steps.ids.outputs.web_name }}
         run: |
           set -euo pipefail
-          OUT="../${WEB_NAME}"
-          zip -r "${OUT}" . -x "users/*" "data/*" "certs/*" "config/*" "${OUT##*/}"
+          OUT="../../${WEB_NAME}"
+          zip -r "${OUT}" .
 
       # ---- Backend (Go) ----
       - uses: actions/setup-go@v5
         with:
           go-version: '1.26.4'
 
-      - name: Build Go binary (linux/amd64, static)
-        working-directory: server
+      - name: Build Go binary (linux/amd64, static with embedded frontend)
+        working-directory: backend
         env:
           CGO_ENABLED: '0'
           GOOS: 'linux'
@@ -106,7 +106,7 @@ jobs:
             server.go
 
       - name: Verify Go binary
-        working-directory: server
+        working-directory: backend
         env:
           BIN_NAME: ${{ steps.ids.outputs.bin_name }}
         run: |
@@ -124,5 +124,5 @@ jobs:
           generate_release_notes: true
           token: ${{ secrets.GITHUB_TOKEN }}
           files: |
-            server/${{ steps.ids.outputs.bin_name }}
-            server/${{ steps.ids.outputs.web_name }}
+            backend/${{ steps.ids.outputs.bin_name }}
+            ${{ steps.ids.outputs.web_name }}

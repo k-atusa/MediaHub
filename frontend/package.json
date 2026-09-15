@@ -1,0 +1,30 @@
+{
+  "name": "mediahub-web",
+  "version": "1.5.0",
+  "private": true,
+  "description": "MediaHub web frontend - Material You redesign built on @material/web",
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build --webpack && node ./scripts/copy-to-backend.js",
+    "build:export": "next build --webpack",
+    "build:copy": "node ./scripts/copy-to-backend.js",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@material/material-color-utilities": "^0.3.0",
+    "@material/web": "^2.5.0",
+    "next": "^16.3.5",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.5.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "eslint": "^10.10.0",
+    "eslint-config-next": "^16.3.5",
+    "typescript": "^7.0.2"
+  }
+}
