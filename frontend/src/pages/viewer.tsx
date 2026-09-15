@@ -50,7 +50,7 @@ function Viewer(): React.JSX.Element {
         const resp = await fetch(mediaUrl(folderPid, filePid, 'dat'));
         if (!resp.ok) throw new Error(`Failed to fetch (${resp.status})`);
         const dat = new Uint8Array(await resp.arrayBuffer());
-        const fk = mask.XOR(fromHex(fileKeyHex));
+        const fk = fromHex(fileKeyHex);
         const sizeBytes = fk.slice(44, 52);
         const v = new DataView(sizeBytes.buffer, sizeBytes.byteOffset, 8);
         const origSize = Number(v.getBigUint64(0, true));

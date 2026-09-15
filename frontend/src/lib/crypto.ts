@@ -44,15 +44,11 @@ function wipeMap(map: Record<string, Uint8Array>): void {
 }
 
 function maskMap(map: Record<string, Uint8Array>): Record<string, Uint8Array> {
-  const out: Record<string, Uint8Array> = {};
-  for (const [k, v] of Object.entries(map)) out[k] = mask.XOR(v);
-  return out;
+  return map;
 }
 
 function rawMap(map: Record<string, Uint8Array>): Record<string, Uint8Array> {
-  const out: Record<string, Uint8Array> = {};
-  for (const [k, v] of Object.entries(map)) out[k] = mask.XOR(v);
-  return out;
+  return map;
 }
 
 async function readFileBytes(file: Blob): Promise<Uint8Array> {
@@ -102,23 +98,19 @@ export async function saveUserBlob(
   userKey: Uint8Array,
   folders: FolderMap
 ): Promise<Uint8Array> {
-  const sm = new SymMaster('gcm1', userKey);
-  const fm = rawMap(folders);
-  const encoded = EncodeCfg(fm);
-  wipeMap(fm);
+  const sm = new SymMaster('gcm1', userKey.slice(0, 32));
+  const encoded = EncodeCfg(folders);
   const out = await sm.EnBin(encoded);
   wipe(encoded);
   return out;
 }
 
 export async function decryptUserBlobAsync(userKey: Uint8Array, blob: Uint8Array): Promise<FolderMap> {
-  const sm = new SymMaster('gcm1', userKey);
+  const sm = new SymMaster('gcm1', userKey.slice(0, 32));
   const dec = await sm.DeBin(blob);
   const map = DecodeCfg(dec) as Record<string, Uint8Array>;
   wipe(dec);
-  const out = maskMap(map);
-  wipeMap(map);
-  return out;
+  return map;
 }
 
 // ---------- folder / file keys ----------
@@ -138,7 +130,7 @@ export function createFileKey(): Uint8Array {
 }
 
 export function getFolderPid(folderKey: Uint8Array): string {
-  return toHex(SHA3256(folderKey.slice(0, 32)).slice(0, 16));
+  return toHex(folderKey.slice(32, 44));
 }
 
 export function getFilePid(fileKey: Uint8Array): string {
@@ -170,23 +162,19 @@ export function createFileKeyWithSize(size: number): Uint8Array {
 // ---------- folder names (file map) ----------
 
 export async function saveFolderBlob(folderPid: string, folderKey: Uint8Array, fileMap: FileMap): Promise<Uint8Array> {
-  const sm = new SymMaster('gcm1', folderKey);
-  const fm = rawMap(fileMap);
-  const encoded = EncodeCfg(fm);
-  wipeMap(fm);
+  const sm = new SymMaster('gcm1', folderKey.slice(0, 32));
+  const encoded = EncodeCfg(fileMap);
   const out = await sm.EnBin(encoded);
   wipe(encoded);
   return out;
 }
 
 export async function decryptFolderBlobAsync(folderKey: Uint8Array, blob: Uint8Array): Promise<FileMap> {
-  const sm = new SymMaster('gcm1', folderKey);
+  const sm = new SymMaster('gcm1', folderKey.slice(0, 32));
   const dec = await sm.DeBin(blob);
   const map = DecodeCfg(dec) as Record<string, Uint8Array>;
   wipe(dec);
-  const out = maskMap(map);
-  wipeMap(map);
-  return out;
+  return map;
 }
 
 // ---------- file encryption (chunked AES-GCM via gcmx1) ----------
@@ -336,12 +324,10 @@ export async function makeThumb(file: Blob): Promise<Blob | null> {
 // ---------- share tokens (Opsec password-encrypted) ----------
 
 export async function makeShareToken(name: string, folderKey: Uint8Array, password: string): Promise<string> {
-  const rawKey = mask.XOR(folderKey);
   const op = new Opsec();
   op.Smsg = name;
-  op.SmsgInfo = rawKey;
+  op.SmsgInfo = folderKey;
   const head = await op.Encpw('arg2st', NormPW(password));
-  wipe(rawKey);
   return Encode64(head, '#');
 }
 
@@ -352,7 +338,7 @@ export async function loadShareToken(token: string, password: string): Promise<{
     op.View(raw);
     await op.Decpw(NormPW(password));
     if (!op.Smsg || op.SmsgInfo.length === 0) return null;
-    const folderKey = mask.XOR(op.SmsgInfo);
+    const folderKey = new Uint8Array(op.SmsgInfo);
     wipe(op.SmsgInfo);
     return { name: op.Smsg, folderKey };
   } catch (e) {

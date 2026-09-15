@@ -304,7 +304,7 @@ function FolderView(): React.JSX.Element {
         const updated = { ...fldMap };
         delete updated[fd.name];
         setFldMap(updated);
-        await deleteFolder_(getFolderPid(mask.XOR(fromHex(fd.keyHex))), session.userHash);
+        await deleteFolder_(getFolderPid(fromHex(fd.keyHex)), session.userHash);
         await persistUserBlob(updated);
         if (fd.name === currentName) {
           setCurrentName('');
@@ -329,7 +329,7 @@ function FolderView(): React.JSX.Element {
         return;
       }
       const datBytes = new Uint8Array(await resp.arrayBuffer());
-      const rawKey = mask.XOR(fromHex(file.keyHex));
+      const rawKey = fromHex(file.keyHex);
       const sizeBytes = rawKey.slice(44, 52);
       const v = new DataView(sizeBytes.buffer, sizeBytes.byteOffset, 8);
       const origSize = Number(v.getBigUint64(0, true));
@@ -418,7 +418,7 @@ function FolderView(): React.JSX.Element {
       return {
         pid: getFilePid(key),
         name,
-        keyHex: toHex(mask.XOR(key)),
+        keyHex: toHex(key),
         kind: detectKind(name),
         size,
         updatedAt: 0,
