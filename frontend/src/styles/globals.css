@@ -12,6 +12,65 @@
   --mh-font-family: 'Google Sans Flex', 'Google Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --mh-icon-font: 'Material Symbols Rounded';
 
+  /* Material Design 3 Typeface Reference Tokens */
+  --md-ref-typeface-brand: var(--mh-font-family);
+  --md-ref-typeface-plain: var(--mh-font-family);
+
+  /* Material Design 3 System Typescale Font Tokens */
+  --md-sys-typescale-display-large-font: var(--mh-font-family);
+  --md-sys-typescale-display-medium-font: var(--mh-font-family);
+  --md-sys-typescale-display-small-font: var(--mh-font-family);
+  --md-sys-typescale-headline-large-font: var(--mh-font-family);
+  --md-sys-typescale-headline-medium-font: var(--mh-font-family);
+  --md-sys-typescale-headline-small-font: var(--mh-font-family);
+  --md-sys-typescale-title-large-font: var(--mh-font-family);
+  --md-sys-typescale-title-medium-font: var(--mh-font-family);
+  --md-sys-typescale-title-small-font: var(--mh-font-family);
+  --md-sys-typescale-label-large-font: var(--mh-font-family);
+  --md-sys-typescale-label-medium-font: var(--mh-font-family);
+  --md-sys-typescale-label-small-font: var(--mh-font-family);
+  --md-sys-typescale-body-large-font: var(--mh-font-family);
+  --md-sys-typescale-body-medium-font: var(--mh-font-family);
+  --md-sys-typescale-body-small-font: var(--mh-font-family);
+
+  /* Material Web Components Specific Tokens */
+  --md-filled-button-label-text-font: var(--mh-font-family);
+  --md-outlined-button-label-text-font: var(--mh-font-family);
+  --md-text-button-label-text-font: var(--mh-font-family);
+  --md-elevated-button-label-text-font: var(--mh-font-family);
+  --md-tonal-button-label-text-font: var(--mh-font-family);
+  --md-fab-label-text-font: var(--mh-font-family);
+  --md-fab-branded-label-text-font: var(--mh-font-family);
+
+  --md-filled-field-content-font: var(--mh-font-family);
+  --md-filled-field-label-text-font: var(--mh-font-family);
+  --md-filled-field-supporting-text-font: var(--mh-font-family);
+  --md-outlined-field-content-font: var(--mh-font-family);
+  --md-outlined-field-label-text-font: var(--mh-font-family);
+  --md-outlined-field-supporting-text-font: var(--mh-font-family);
+
+  --md-filled-text-field-input-text-font: var(--mh-font-family);
+  --md-filled-text-field-label-text-font: var(--mh-font-family);
+  --md-filled-text-field-supporting-text-font: var(--mh-font-family);
+  --md-outlined-text-field-input-text-font: var(--mh-font-family);
+  --md-outlined-text-field-label-text-font: var(--mh-font-family);
+  --md-outlined-text-field-supporting-text-font: var(--mh-font-family);
+
+  --md-dialog-headline-font: var(--mh-font-family);
+  --md-dialog-supporting-text-font: var(--mh-font-family);
+
+  --md-list-item-label-text-font: var(--mh-font-family);
+  --md-list-item-supporting-text-font: var(--mh-font-family);
+  --md-list-item-trailing-supporting-text-font: var(--mh-font-family);
+  --md-menu-item-label-text-font: var(--mh-font-family);
+  --md-menu-item-supporting-text-font: var(--mh-font-family);
+  --md-menu-item-trailing-supporting-text-font: var(--mh-font-family);
+
+  --md-primary-tab-label-text-font: var(--mh-font-family);
+  --md-secondary-tab-label-text-font: var(--mh-font-family);
+  --md-assist-chip-label-text-font: var(--mh-font-family);
+  --md-filter-chip-label-text-font: var(--mh-font-family);
+
   /* Spacing scale */
   --mh-space-0: 0px;
   --mh-space-1: 4px;
@@ -56,6 +115,35 @@ html,
 body,
 #__next {
   height: 100%;
+}
+
+input,
+button,
+textarea,
+select {
+  font-family: var(--mh-font-family);
+}
+
+md-filled-button,
+md-outlined-button,
+md-text-button,
+md-elevated-button,
+md-tonal-button,
+md-fab,
+md-outlined-text-field,
+md-filled-text-field,
+md-dialog,
+md-tabs,
+md-primary-tab,
+md-secondary-tab,
+md-list,
+md-list-item,
+md-menu,
+md-menu-item,
+md-chip-set,
+md-assist-chip,
+md-filter-chip {
+  font-family: var(--mh-font-family);
 }
 
 body {
