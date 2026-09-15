@@ -72,6 +72,7 @@ function FolderView(): React.JSX.Element {
   const [loading, setLoading] = React.useState(true);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [sessionError, setSessionError] = React.useState<string | null>(null);
   const [renameOpen, setRenameOpen] = React.useState(false);
   const [renameTarget, setRenameTarget] = React.useState<FileEntry | null>(null);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
@@ -110,7 +111,8 @@ function FolderView(): React.JSX.Element {
         }
       } catch (e) {
         if (!cancelled) {
-          setError((e as Error).message);
+          clearSession();
+          setSessionError((e as Error).message || 'Decryption failed');
           setLoading(false);
         }
       }
@@ -118,7 +120,12 @@ function FolderView(): React.JSX.Element {
     return () => {
       cancelled = true;
     };
-  }, [session]);
+  }, [session, clearSession]);
+
+  const handleLogout = React.useCallback(() => {
+    clearSession();
+    router.replace('/');
+  }, [clearSession, router]);
 
   // When the user selects a different folder from the sidebar, switch to it.
   const switchToFolder = React.useCallback(
@@ -428,6 +435,7 @@ function FolderView(): React.JSX.Element {
       username={session.username}
       activeFolder={currentName}
       onCreateFolder={handleCreateFolder}
+      onLogout={handleLogout}
       onSearch={() => {
         /* placeholder */
       }}
@@ -546,6 +554,24 @@ function FolderView(): React.JSX.Element {
         onConfirm={handleChangePassword}
         onCancel={() => setPwOpen(false)}
       />
+
+      {sessionError && (
+        <ConfirmDialog
+          open
+          title="Session Expired or Decryption Failed"
+          message={`Your session is invalid or expired (${sessionError}). Please sign in again.`}
+          confirmLabel="Sign In"
+          cancelLabel="Sign In"
+          onConfirm={() => {
+            clearSession();
+            router.replace('/');
+          }}
+          onCancel={() => {
+            clearSession();
+            router.replace('/');
+          }}
+        />
+      )}
 
       {error && (
         <ConfirmDialog

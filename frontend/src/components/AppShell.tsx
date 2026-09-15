@@ -13,6 +13,7 @@ export interface AppShellProps {
   onSearch?: (query: string) => void;
   children: React.ReactNode;
   showSidebar?: boolean;
+  onLogout?: () => void;
 }
 
 export function AppShell({
@@ -22,6 +23,7 @@ export function AppShell({
   onSearch,
   children,
   showSidebar = true,
+  onLogout,
 }: AppShellProps): React.JSX.Element {
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [themeMode, setThemeMode] = React.useState<'light' | 'dark'>('light');
@@ -67,6 +69,7 @@ export function AppShell({
           themeMode={themeMode}
           onToggleTheme={toggleTheme}
           username={username}
+          onLogout={onLogout}
         />
         <div className="mh-layout">
           {showSidebar && (

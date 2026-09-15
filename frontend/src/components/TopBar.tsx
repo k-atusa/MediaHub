@@ -11,9 +11,17 @@ export interface TopBarProps {
   themeMode: ThemeMode;
   onToggleTheme: () => void;
   username?: string;
+  onLogout?: () => void;
 }
 
-export function TopBar({ onMenuClick, onSearch, themeMode, onToggleTheme, username }: TopBarProps): React.JSX.Element {
+export function TopBar({
+  onMenuClick,
+  onSearch,
+  themeMode,
+  onToggleTheme,
+  username,
+  onLogout,
+}: TopBarProps): React.JSX.Element {
   const searchRef = React.useRef<MdOutlinedTextFieldElement>(null);
 
   const handleSearch = (event: React.FormEvent<HTMLFormElement>): void => {
@@ -61,6 +69,12 @@ export function TopBar({ onMenuClick, onSearch, themeMode, onToggleTheme, userna
         <md-icon-button aria-label="Help">
           <Icon symbol="help" ariaLabel="" />
         </md-icon-button>
+
+        {onLogout && (
+          <md-icon-button aria-label="Sign out" title="Sign out" onClick={onLogout}>
+            <Icon symbol="logout" ariaLabel="" />
+          </md-icon-button>
+        )}
 
         <div
           style={{

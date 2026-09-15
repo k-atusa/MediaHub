@@ -21,7 +21,7 @@ export default function ViewerPage(): React.JSX.Element {
 
 function Viewer(): React.JSX.Element {
   const router = useRouter();
-  const { session } = useSessionContext();
+  const { session, clearSession } = useSessionContext();
   const query = router.query;
 
   const folder = (query.folder as string) ?? '';
@@ -108,7 +108,15 @@ function Viewer(): React.JSX.Element {
   const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
 
   return (
-    <AppShell username={session.username} activeFolder={folder} showSidebar>
+    <AppShell
+      username={session.username}
+      activeFolder={folder}
+      showSidebar
+      onLogout={() => {
+        clearSession();
+        router.replace('/');
+      }}
+    >
       <div className="mh-viewer">
         <div className="mh-viewer__bar">
           <Link href={`/folder?folder=${encodeURIComponent(folder)}`} aria-label="Back to folder">

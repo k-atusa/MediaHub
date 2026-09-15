@@ -86,13 +86,13 @@ export async function makeSession(username: string, password: string): Promise<K
   const [storeKey, userKey] = await hm.KDF(pwBytes, saltBytes);
   wipe(pwBytes);
   const userHash = toHex(SHA3256(storeKey).slice(0, 16));
-  const maskedUserKey = toHex(mask.XOR(userKey));
+  const maskedUserKey = toHex(userKey);
   wipe(userKey);
   return { userHash, maskedUserKey, username };
 }
 
 export function recoverSessionKey(maskedUserKeyHex: string): Uint8Array {
-  return mask.XOR(fromHex(maskedUserKeyHex));
+  return fromHex(maskedUserKeyHex);
 }
 
 // ---------- user blobs ----------
