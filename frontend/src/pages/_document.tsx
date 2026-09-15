@@ -10,6 +10,10 @@ export default function Document(): React.JSX.Element {
         <meta name="description" content="MediaHub - encrypted media storage and sharing" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@8..144,100..1000&family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0&display=swap"
+        />
       </Head>
       <body>
         <Main />

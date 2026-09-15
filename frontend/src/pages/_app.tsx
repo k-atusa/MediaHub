@@ -24,7 +24,7 @@ export default function App({ Component, pageProps }: AppProps): React.JSX.Eleme
                   alignItems: 'center',
                   justifyContent: 'center',
                   color: 'var(--md-sys-color-on-surface-variant)',
-                  fontFamily: 'Roboto, system-ui, sans-serif',
+                  fontFamily: "'Google Sans Flex', 'Google Sans', system-ui, sans-serif",
                 }}
               >
                 Loading MediaHub…

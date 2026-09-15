@@ -105,7 +105,7 @@ func serveUser(w http.ResponseWriter, r *http.Request) {
 
 	path := filepath.Join(cfg.StorageDir, "users", filepath.Clean(userHash))
 	switch r.Method {
-	case http.MethodGet: // read userdata
+	case http.MethodGet, http.MethodHead: // read userdata or check existence
 		http.ServeFile(w, r, path)
 	case http.MethodPost: // create/update userdata
 		isNewUser := false
@@ -187,7 +187,7 @@ func serveMeta(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch r.Method {
-	case http.MethodGet: // read metadata
+	case http.MethodGet, http.MethodHead: // read metadata or check existence
 		http.ServeFile(w, r, path)
 	case http.MethodPost: // create/update metadata
 		os.MkdirAll(filepath.Dir(path), 0755)
@@ -220,7 +220,7 @@ func serveMedia(w http.ResponseWriter, r *http.Request) {
 	path := filepath.Join(cfg.StorageDir, "data", filepath.Clean(folderID), fileName)
 
 	switch r.Method {
-	case http.MethodGet: // read media file
+	case http.MethodGet, http.MethodHead: // read media file or check existence
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Header().Set("Accept-Ranges", "bytes")
 		http.ServeFile(w, r, path)
