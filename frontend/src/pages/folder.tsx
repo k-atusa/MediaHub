@@ -28,11 +28,11 @@ import {
   fromHex,
   getFilePid,
   getFolderPid,
+  getOriginalSize,
   loadShareToken,
   makeSession,
   makeShareToken,
   makeThumb,
-  mask,
   recoverSessionKey,
   saveFolderBlob,
   saveUserBlob,
@@ -325,14 +325,12 @@ function FolderView(): React.JSX.Element {
     try {
       const resp = await fetch(mediaUrl(getFolderPid(currentKey), file.pid, 'dat'));
       if (!resp.ok) {
-        setError('Download failed.');
+        setError(`Download failed (${resp.status})`);
         return;
       }
       const datBytes = new Uint8Array(await resp.arrayBuffer());
       const rawKey = fromHex(file.keyHex);
-      const sizeBytes = rawKey.slice(44, 52);
-      const v = new DataView(sizeBytes.buffer, sizeBytes.byteOffset, 8);
-      const origSize = Number(v.getBigUint64(0, true));
+      const origSize = file.size || getOriginalSize(rawKey);
       const out = await decryptFileBytes(datBytes, rawKey, origSize);
       const blob = new Blob([out as any]);
       const url = URL.createObjectURL(blob);
@@ -342,6 +340,7 @@ function FolderView(): React.JSX.Element {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
+      console.error('Download error:', e);
       setError((e as Error).message);
     }
   };
@@ -495,7 +494,13 @@ function FolderView(): React.JSX.Element {
         />
       ) : (
         <>
-          <FileGrid files={visibleFiles} folderName={currentName} onAction={handleAction} />
+          <FileGrid
+            files={visibleFiles}
+            folderName={currentName}
+            folderPid={currentKey ? getFolderPid(currentKey) : undefined}
+            folderKeyHex={currentKey ? toHex(currentKey) : undefined}
+            onAction={handleAction}
+          />
           {totalPages > 1 && (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 24 }}>
               <md-text-button disabled={page === 1} onClick={() => setPage(page - 1)}>

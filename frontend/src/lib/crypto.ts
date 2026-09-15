@@ -138,12 +138,16 @@ export function getFilePid(fileKey: Uint8Array): string {
 }
 
 export function getOriginalSize(fileKey: Uint8Array): number {
-  const v = new DataView(fileKey.slice(44, 52).buffer, fileKey.slice(44, 52).byteOffset, 8);
+  if (fileKey.length < 52) return 0;
+  const sizeBytes = fileKey.slice(44, 52);
+  const v = new DataView(sizeBytes.buffer, sizeBytes.byteOffset, 8);
   return Number(v.getBigUint64(0, true));
 }
 
 export function setOriginalSize(fileKey: Uint8Array, size: number): void {
-  const v = new DataView(fileKey.slice(44, 52).buffer, fileKey.slice(44, 52).byteOffset, 8);
+  if (fileKey.length < 52) return;
+  const sizeBytes = fileKey.slice(44, 52);
+  const v = new DataView(sizeBytes.buffer, sizeBytes.byteOffset, 8);
   v.setBigUint64(0, BigInt(size), true);
 }
 
@@ -239,6 +243,11 @@ class BlobSrc_ {
 }
 
 // ---------- thumbnails ----------
+
+export async function decryptThumbBytes(thumbBytes: Uint8Array, fileKey: Uint8Array): Promise<Uint8Array> {
+  const sm = new SymMaster('gcm1', fileKey.slice(0, 32));
+  return await sm.DeBin(thumbBytes);
+}
 
 export async function makeImageThumb(file: Blob): Promise<Blob | null> {
   if (typeof createImageBitmap === 'undefined') return null;

@@ -8,7 +8,7 @@ import { AppShell } from '@/components/AppShell';
 import { Icon } from '@/components/Icon';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useSessionContext } from '@/context/SessionContext';
-import { decryptFileBytes, getFolderPid, mask, fromHex } from '@/lib/crypto';
+import { decryptFileBytes, getFolderPid, getOriginalSize, fromHex } from '@/lib/crypto';
 import { mediaUrl } from '@/lib/api';
 
 export default function ViewerPage(): React.JSX.Element {
@@ -24,11 +24,12 @@ function Viewer(): React.JSX.Element {
   const { session, clearSession } = useSessionContext();
   const query = router.query;
 
-  const folder = (query.folder as string) ?? '';
-  const filePid = (query.pid as string) ?? '';
-  const fileName = (query.name as string) ?? '';
-  const fileKeyHex = (query.key as string) ?? '';
-  const folderKeyHex = (query.fk as string) ?? '';
+  const folder = (query.folder as string) || (typeof window !== 'undefined' ? sessionStorage.getItem('currentFolderName') || '' : '');
+  const filePid = (query.pid as string) || (typeof window !== 'undefined' ? sessionStorage.getItem('currentFilePid') || '' : '');
+  const fileName = (query.name as string) || (typeof window !== 'undefined' ? sessionStorage.getItem('currentFileName') || '' : '');
+  const fileKeyHex = (query.key as string) || (typeof window !== 'undefined' ? sessionStorage.getItem('currentFileKey') || '' : '');
+  const folderKeyHex = (query.fk as string) || (typeof window !== 'undefined' ? sessionStorage.getItem('currentFolderKey') || '' : '');
+  const storedFolderId = typeof window !== 'undefined' ? sessionStorage.getItem('currentFolderId') || '' : '';
 
   const [bytes, setBytes] = React.useState<Uint8Array | null>(null);
   const [objectUrl, setObjectUrl] = React.useState<string | null>(null);
@@ -41,35 +42,39 @@ function Viewer(): React.JSX.Element {
   }, [session, router]);
 
   React.useEffect(() => {
+    if (!router.isReady && !fileKeyHex) return;
     if (!filePid || !fileKeyHex) return;
     let cancelled = false;
     (async () => {
       try {
-        const folderKey = fromHex(folderKeyHex);
-        const folderPid = getFolderPid(folderKey);
+        const folderPid = folderKeyHex ? getFolderPid(fromHex(folderKeyHex)) : storedFolderId;
+        if (!folderPid) throw new Error('Missing folder identifier');
         const resp = await fetch(mediaUrl(folderPid, filePid, 'dat'));
-        if (!resp.ok) throw new Error(`Failed to fetch (${resp.status})`);
+        if (!resp.ok) throw new Error(`Failed to fetch media file (${resp.status})`);
         const dat = new Uint8Array(await resp.arrayBuffer());
         const fk = fromHex(fileKeyHex);
-        const sizeBytes = fk.slice(44, 52);
-        const v = new DataView(sizeBytes.buffer, sizeBytes.byteOffset, 8);
-        const origSize = Number(v.getBigUint64(0, true));
+        const origSize = getOriginalSize(fk);
         const out = await decryptFileBytes(dat, fk, origSize);
         if (cancelled) return;
         setBytes(out);
         const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
-        if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext)) {
-          const blob = new Blob([out as any], { type: `image/${ext === 'jpg' ? 'jpeg' : ext}` });
+        if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) {
+          const blob = new Blob([out as any], { type: `image/${ext === 'jpg' ? 'jpeg' : ext === 'svg' ? 'svg+xml' : ext}` });
           setObjectUrl(URL.createObjectURL(blob));
-        } else if (['mp4', 'webm'].includes(ext)) {
-          const mime = ext === 'mp4' ? 'video/mp4' : 'video/webm';
+        } else if (['mp4', 'webm', 'mov', 'mkv'].includes(ext)) {
+          const mime = ext === 'mp4' ? 'video/mp4' : ext === 'webm' ? 'video/webm' : 'video/mp4';
           setObjectUrl(URL.createObjectURL(new Blob([out as any], { type: mime })));
-        } else if (['txt', 'md', 'json', 'csv', 'log'].includes(ext)) {
+        } else if (['txt', 'md', 'json', 'csv', 'log', 'xml', 'html', 'css', 'js', 'ts', 'tsx', 'jsx'].includes(ext)) {
           setTextPreview(new TextDecoder().decode(out));
         } else if (ext === 'pdf') {
           setObjectUrl(URL.createObjectURL(new Blob([out as any], { type: 'application/pdf' })));
+        } else {
+          // generic binary fallback
+          const blob = new Blob([out as any], { type: 'application/octet-stream' });
+          setObjectUrl(URL.createObjectURL(blob));
         }
       } catch (e) {
+        console.error('Viewer decryption error:', e);
         if (!cancelled) setError((e as Error).message);
       }
     })();
@@ -78,7 +83,7 @@ function Viewer(): React.JSX.Element {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filePid, fileKeyHex, folderKeyHex, fileName]);
+  }, [router.isReady, filePid, fileKeyHex, folderKeyHex, storedFolderId, fileName]);
 
   const handleDownload = (): void => {
     if (!bytes) return;
@@ -92,11 +97,13 @@ function Viewer(): React.JSX.Element {
   };
 
   const handleDelete = async (): Promise<void> => {
-    if (!filePid || !folderKeyHex || !session) return;
+    if (!filePid || !session) return;
     try {
-      const folderPid = getFolderPid(fromHex(folderKeyHex));
-      await fetch(mediaUrl(folderPid, filePid, 'dat'), { method: 'DELETE' });
-      await fetch(mediaUrl(folderPid, filePid, 'thumb'), { method: 'DELETE' });
+      const folderPid = folderKeyHex ? getFolderPid(fromHex(folderKeyHex)) : storedFolderId;
+      if (folderPid) {
+        await fetch(mediaUrl(folderPid, filePid, 'dat'), { method: 'DELETE' });
+        await fetch(mediaUrl(folderPid, filePid, 'thumb'), { method: 'DELETE' });
+      }
       router.replace(`/folder?folder=${encodeURIComponent(folder)}`);
     } catch (e) {
       setError((e as Error).message);
