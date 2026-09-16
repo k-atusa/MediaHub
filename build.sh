@@ -13,7 +13,16 @@ fi
 npm run build
 
 echo "==> 2. Building Backend (Go binary with embedded frontend)..."
-cd "${ROOT_DIR}/backend"
-go build -ldflags="-s -w" -trimpath -o server server.go
+VERSION=$(node -p "require('${ROOT_DIR}/frontend/package.json').version" 2>/dev/null || echo "1.5.0")
+OS="$(go env GOOS)"
+ARCH="$(go env GOARCH)"
+EXT=""
+[ "${OS}" = "windows" ] && EXT=".exe"
+BIN_NAME="mediahub-server-${VERSION}-${OS}-${ARCH}${EXT}"
 
-echo "==> Build complete! Output executable: ${ROOT_DIR}/backend/server"
+cd "${ROOT_DIR}/backend"
+echo "Compiling ${BIN_NAME}..."
+go build -ldflags="-s -w" -trimpath -o "${BIN_NAME}" server.go
+cp -f "${BIN_NAME}" server
+
+echo "==> Build complete! Output executable: ${ROOT_DIR}/backend/${BIN_NAME} (and linked to ./server)"

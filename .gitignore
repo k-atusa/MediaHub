@@ -7,6 +7,9 @@ backend/config/
 backend/users/
 backend/data
 backend/server
+backend/mediahub-server-*
+backend/server*.exe
+build/
 backend/dist/*
 !backend/dist/.gitkeep
 frontend/node_modules/

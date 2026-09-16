@@ -45,13 +45,13 @@ MediaHub는 별도의 `feature` 브랜치를 생성하지 않는 간소화된 Gi
 ### 자동 빌드 및 배포 대상 (5대 플랫폼)
 Frontend(Next.js) 정적 번들이 임베딩(`//go:embed all:dist`)된 단일 실행 Go 바이너리를 크로스 컴파일하여 GitHub Release에 자동 첨부합니다.
 
-| 플랫폼 | 아키텍처 | Go 환경 변수 | 배포 바이너리 파일명 |
+| 플랫폼 | 아키텍처 | Go 환경 변수 | 배포 바이너리 파일명 규칙 |
 | :--- | :--- | :--- | :--- |
-| **Windows** | x86_64 | `GOOS=windows GOARCH=amd64` | `mediahub-windows-amd64.exe` |
-| **Windows** | ARM64 | `GOOS=windows GOARCH=arm64` | `mediahub-windows-arm64.exe` |
-| **macOS** | Apple Silicon (ARM64) | `GOOS=darwin GOARCH=arm64` | `mediahub-darwin-arm64` |
-| **Linux** | x86_64 | `GOOS=linux GOARCH=amd64` | `mediahub-linux-amd64` |
-| **Linux** | ARM64 | `GOOS=linux GOARCH=arm64` | `mediahub-linux-arm64` |
+| **Windows** | x86_64 | `GOOS=windows GOARCH=amd64` | `mediahub-server-{version}-windows-amd64.exe` |
+| **Windows** | ARM64 | `GOOS=windows GOARCH=arm64` | `mediahub-server-{version}-windows-arm64.exe` |
+| **macOS** | Apple Silicon (ARM64) | `GOOS=darwin GOARCH=arm64` | `mediahub-server-{version}-darwin-arm64` |
+| **Linux** | x86_64 | `GOOS=linux GOARCH=amd64` | `mediahub-server-{version}-linux-amd64` |
+| **Linux** | ARM64 | `GOOS=linux GOARCH=arm64` | `mediahub-server-{version}-linux-arm64` |
 
 - 무결성 검증을 위해 5개 바이너리의 `checksums.txt` (SHA-256) 파일이 함께 릴리즈에 첨부됩니다.
 

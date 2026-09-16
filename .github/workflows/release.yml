@@ -3,12 +3,15 @@ name: Release
 # Builds multi-platform Go binaries (with embedded Next.js frontend)
 # and automatically creates a GitHub Release when changes are pushed to main.
 #
+# Binary Filename Convention:
+#   mediahub-server-{version}-{os}-{arch}[.exe]
+#
 # Target Architectures:
-#   - Windows x86_64: mediahub-windows-amd64.exe
-#   - Windows arm64:  mediahub-windows-arm64.exe
-#   - macOS arm64:    mediahub-darwin-arm64
-#   - Linux x86_64:   mediahub-linux-amd64
-#   - Linux arm64:    mediahub-linux-arm64
+#   - Windows x86_64: mediahub-server-{version}-windows-amd64.exe
+#   - Windows arm64:  mediahub-server-{version}-windows-arm64.exe
+#   - macOS arm64:    mediahub-server-{version}-darwin-arm64
+#   - Linux x86_64:   mediahub-server-{version}-linux-amd64
+#   - Linux arm64:    mediahub-server-{version}-linux-arm64
 
 on:
   push:
@@ -43,20 +46,26 @@ jobs:
       - name: Compute Release Metadata
         id: meta
         run: |
+          VERSION=$(node -p "require('./frontend/package.json').version" 2>/dev/null || echo "1.5.0")
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             TAG="${GITHUB_REF#refs/tags/}"
+            TAG_VER="${TAG#v}"
+            if [[ -n "${TAG_VER}" ]]; then
+              VERSION="${TAG_VER}"
+            fi
             NAME="MediaHub ${TAG}"
           else
-            VERSION=$(node -p "require('./frontend/package.json').version" 2>/dev/null || echo "1.0.0")
             YMD="$(date -u +%Y%m%d)"
             SHA_SHORT="${GITHUB_SHA::7}"
             TAG="v${VERSION}-${YMD}-${SHA_SHORT}"
             NAME="MediaHub v${VERSION} (${YMD}.${SHA_SHORT})"
           fi
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "name=${NAME}" >> "$GITHUB_OUTPUT"
-          echo "Release Tag:  ${TAG}"
-          echo "Release Name: ${NAME}"
+          echo "Release Tag:     ${TAG}"
+          echo "Release Version: ${VERSION}"
+          echo "Release Name:    ${NAME}"
 
       # ---- Frontend Build ----
       - name: Install Frontend Dependencies
@@ -77,13 +86,14 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p build
+          VERSION="${{ steps.meta.outputs.version }}"
 
           PLATFORMS=(
-            "windows/amd64/mediahub-windows-amd64.exe"
-            "windows/arm64/mediahub-windows-arm64.exe"
-            "darwin/arm64/mediahub-darwin-arm64"
-            "linux/amd64/mediahub-linux-amd64"
-            "linux/arm64/mediahub-linux-arm64"
+            "windows/amd64/mediahub-server-${VERSION}-windows-amd64.exe"
+            "windows/arm64/mediahub-server-${VERSION}-windows-arm64.exe"
+            "darwin/arm64/mediahub-server-${VERSION}-darwin-arm64"
+            "linux/amd64/mediahub-server-${VERSION}-linux-amd64"
+            "linux/arm64/mediahub-server-${VERSION}-linux-arm64"
           )
 
           cd backend
@@ -100,7 +110,7 @@ jobs:
 
           echo "==> Generating SHA256 Checksums..."
           cd build
-          sha256sum mediahub-* > checksums.txt
+          sha256sum mediahub-server-* > checksums.txt
           cat checksums.txt
           cd ..
 
@@ -114,9 +124,5 @@ jobs:
           generate_release_notes: true
           token: ${{ secrets.GITHUB_TOKEN }}
           files: |
-            build/mediahub-windows-amd64.exe
-            build/mediahub-windows-arm64.exe
-            build/mediahub-darwin-arm64
-            build/mediahub-linux-amd64
-            build/mediahub-linux-arm64
+            build/mediahub-server-*
             build/checksums.txt
