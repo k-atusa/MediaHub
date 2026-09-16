@@ -7,6 +7,7 @@ import type { ThemePreference, ResolvedTheme, ThemeMode } from '@/styles/theme';
 
 export interface TopBarProps {
   onMenuClick?: () => void;
+  searchQuery?: string;
   onSearch?: (query: string) => void;
   themePreference?: ThemePreference;
   resolvedTheme?: ResolvedTheme;
@@ -18,6 +19,7 @@ export interface TopBarProps {
 
 export function TopBar({
   onMenuClick,
+  searchQuery = '',
   onSearch,
   themePreference = 'auto',
   resolvedTheme = 'light',
@@ -27,10 +29,40 @@ export function TopBar({
   onLogout,
 }: TopBarProps): React.JSX.Element {
   const searchRef = React.useRef<MdOutlinedTextFieldElement>(null);
+  const [value, setValue] = React.useState(searchQuery);
+
+  React.useEffect(() => {
+    setValue(searchQuery);
+    if (searchRef.current && searchRef.current.value !== searchQuery) {
+      searchRef.current.value = searchQuery;
+    }
+  }, [searchQuery]);
+
+  const handleInput = (event: any): void => {
+    const next = event.target?.value ?? '';
+    setValue(next);
+    onSearch?.(next);
+  };
+
+  const handleClear = (): void => {
+    setValue('');
+    if (searchRef.current) {
+      searchRef.current.value = '';
+      searchRef.current.focus();
+    }
+    onSearch?.('');
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent): void => {
+    if (event.key === 'Escape' && value) {
+      event.preventDefault();
+      handleClear();
+    }
+  };
 
   const handleSearch = (event: React.FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
-    const query = searchRef.current?.value ?? '';
+    const query = searchRef.current?.value ?? value;
     onSearch?.(query);
   };
 
@@ -51,14 +83,32 @@ export function TopBar({
       <form className="mh-topbar__search" onSubmit={handleSearch} role="search">
         <md-outlined-text-field
           ref={searchRef}
-          type="search"
+          type="text"
           placeholder="Search in MediaHub"
           aria-label="Search files"
+          value={value}
+          onInput={handleInput}
+          onKeyDown={handleKeyDown}
           style={{ width: '100%' }}
         >
-          <md-icon-button slot="trailing-icon" type="submit" aria-label="Submit search">
-            <Icon symbol="search" ariaLabel="" />
-          </md-icon-button>
+          <Icon symbol="search" slot="leading-icon" size={20} ariaLabel="" />
+          {value ? (
+            <md-icon-button
+              slot="trailing-icon"
+              type="button"
+              aria-label="Clear search"
+              onClick={handleClear}
+              style={{
+                width: 28,
+                height: 28,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Icon symbol="close" size={18} ariaLabel="" />
+            </md-icon-button>
+          ) : null}
         </md-outlined-text-field>
       </form>
 

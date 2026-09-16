@@ -8,6 +8,7 @@ export interface EmptyStateProps {
   title: string;
   description?: string;
   actionLabel?: string;
+  actionIcon?: string;
   onAction?: () => void;
 }
 
@@ -16,6 +17,7 @@ export function EmptyState({
   title,
   description,
   actionLabel,
+  actionIcon = 'add',
   onAction,
 }: EmptyStateProps): React.JSX.Element {
   return (
@@ -25,7 +27,7 @@ export function EmptyState({
       {description && <p className="mh-empty__text">{description}</p>}
       {actionLabel && onAction && (
         <md-filled-button onClick={onAction}>
-          <Icon symbol="add" slot="icon" ariaLabel="" />
+          {actionIcon && <Icon symbol={actionIcon} slot="icon" ariaLabel="" />}
           {actionLabel}
         </md-filled-button>
       )}

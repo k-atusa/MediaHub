@@ -114,6 +114,8 @@
   --md-sys-color-surface-container-highest: #e3e2e6;
   --md-sys-color-surface-dim: #ded8e1;
   --md-sys-color-surface-bright: #fef7ff;
+  --mh-search-border-color: rgba(0, 0, 0, 0.1);
+  --mh-search-bg-color: var(--md-sys-color-surface-container-high);
 }
 
 [data-theme='light'] {
@@ -132,6 +134,8 @@
   --md-sys-color-outline: #74777f;
   --md-sys-color-outline-variant: #c4c6d0;
   --md-elevated-card-container-color: var(--md-sys-color-surface-container-low);
+  --mh-search-border-color: rgba(0, 0, 0, 0.1);
+  --mh-search-bg-color: var(--md-sys-color-surface-container-high);
 }
 
 [data-theme='dark'] {
@@ -151,6 +155,8 @@
   --md-sys-color-outline-variant: #44474f;
   --md-sys-color-shadow: #000000;
   --md-elevated-card-container-color: var(--md-sys-color-surface-container);
+  --mh-search-border-color: rgba(255, 255, 255, 0.12);
+  --mh-search-bg-color: var(--md-sys-color-surface-container);
 }
 
 * {
@@ -295,8 +301,49 @@ a {
 
 .mh-topbar__search {
   flex: 1 1 auto;
-  max-width: 720px;
+  max-width: 600px;
   margin: 0 auto;
+  display: flex;
+  align-items: center;
+}
+
+.mh-topbar__search md-outlined-text-field {
+  width: 100%;
+  --md-outlined-text-field-container-shape: 9999px;
+  --md-outlined-field-container-shape: 9999px;
+  --md-outlined-text-field-top-space: 8px;
+  --md-outlined-text-field-bottom-space: 8px;
+  --md-outlined-field-top-space: 8px;
+  --md-outlined-field-bottom-space: 8px;
+  --md-outlined-text-field-input-text-size: 14px;
+  --md-outlined-field-content-size: 14px;
+  --md-outlined-text-field-input-text-line-height: 20px;
+  --md-outlined-field-content-line-height: 20px;
+  --md-outlined-text-field-outline-color: var(--mh-search-border-color);
+  --md-outlined-field-outline-color: var(--mh-search-border-color);
+  --md-outlined-text-field-hover-outline-color: var(--md-sys-color-outline-variant);
+  --md-outlined-field-hover-outline-color: var(--md-sys-color-outline-variant);
+  --md-outlined-text-field-focus-outline-color: var(--md-sys-color-primary);
+  --md-outlined-field-focus-outline-color: var(--md-sys-color-primary);
+  --md-outlined-text-field-focus-outline-width: 1.5px;
+  --md-outlined-field-focus-outline-width: 1.5px;
+  --md-outlined-text-field-leading-icon-color: var(--md-sys-color-on-surface-variant);
+  --md-outlined-field-leading-content-color: var(--md-sys-color-on-surface-variant);
+  --md-outlined-text-field-trailing-icon-color: var(--md-sys-color-on-surface-variant);
+  --md-outlined-field-trailing-content-color: var(--md-sys-color-on-surface-variant);
+  border-radius: 9999px;
+  background-color: var(--mh-search-bg-color);
+  transition: background-color var(--mh-duration-short) var(--mh-easing-standard),
+    box-shadow var(--mh-duration-short) var(--mh-easing-standard);
+}
+
+.mh-topbar__search md-outlined-text-field:hover {
+  background-color: var(--md-sys-color-surface-container-highest);
+}
+
+.mh-topbar__search md-outlined-text-field:focus-within {
+  background-color: var(--md-sys-color-surface-container-lowest);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
 .mh-topbar__actions {

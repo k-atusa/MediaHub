@@ -66,6 +66,7 @@ function FolderView(): React.JSX.Element {
   const [currentKey, setCurrentKey] = React.useState<Uint8Array | null>(null);
   const [flsMap, setFlsMap] = React.useState<Record<string, Uint8Array>>({});
   const [page, setPage] = React.useState(1);
+  const [searchQuery, setSearchQuery] = React.useState<string>('');
 
   // UI state
   const [loading, setLoading] = React.useState(true);
@@ -126,12 +127,18 @@ function FolderView(): React.JSX.Element {
     router.replace('/');
   }, [clearSession, router]);
 
+  const handleSearch = React.useCallback((query: string) => {
+    setSearchQuery(query);
+    setPage(1);
+  }, []);
+
   // When the user selects a different folder from the sidebar, switch to it.
   const switchToFolder = React.useCallback(
     async (name: string, key: Uint8Array) => {
       setCurrentName(name);
       setCurrentKey(key);
       setPage(1);
+      setSearchQuery('');
       setFlsMap({});
       try {
         const pid = getFolderPid(key);
@@ -412,11 +419,18 @@ function FolderView(): React.JSX.Element {
     setPwOpen(false);
   };
 
+  // Filter file names based on search query
+  const filteredNames = React.useMemo(() => {
+    const allNames = Object.keys(flsMap);
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return allNames;
+    return allNames.filter((name) => name.toLowerCase().includes(q));
+  }, [flsMap, searchQuery]);
+
   // Build the visible file list for the grid
   const visibleFiles: FileEntry[] = React.useMemo(() => {
-    const names = Object.keys(flsMap);
     const start = (page - 1) * PAGE_SIZE;
-    const slice = names.slice(start, start + PAGE_SIZE);
+    const slice = filteredNames.slice(start, start + PAGE_SIZE);
     return slice.map((name) => {
       const key = flsMap[name];
       const size = getOriginalSize(key);
@@ -429,9 +443,9 @@ function FolderView(): React.JSX.Element {
         updatedAt: 0,
       };
     });
-  }, [flsMap, page]);
+  }, [filteredNames, flsMap, page]);
 
-  const totalPages = Math.max(1, Math.ceil(Object.keys(flsMap).length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filteredNames.length / PAGE_SIZE));
 
   if (!session) return <></>;
 
@@ -447,9 +461,8 @@ function FolderView(): React.JSX.Element {
       }}
       onCreateFolder={handleCreateFolder}
       onLogout={handleLogout}
-      onSearch={() => {
-        /* placeholder */
-      }}
+      searchQuery={searchQuery}
+      onSearch={handleSearch}
     >
       <div className="mh-folder__header">
         <div>
@@ -516,8 +529,38 @@ function FolderView(): React.JSX.Element {
           actionLabel="Upload"
           onAction={() => document.querySelector<HTMLInputElement>('input[type=file]')?.click()}
         />
+      ) : filteredNames.length === 0 ? (
+        <EmptyState
+          icon="search_off"
+          title="No matching files"
+          description={`No files in "${currentName}" match "${searchQuery.trim()}".`}
+          actionLabel="Clear search"
+          actionIcon="close"
+          onAction={() => handleSearch('')}
+        />
       ) : (
         <>
+          {searchQuery.trim() && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 'var(--mh-space-4)',
+                padding: 'var(--mh-space-2) var(--mh-space-4)',
+                background: 'var(--md-sys-color-surface-container-low)',
+                border: '1px solid var(--md-sys-color-outline-variant)',
+                borderRadius: 'var(--mh-radius-md)',
+                fontSize: 13,
+                color: 'var(--md-sys-color-on-surface-variant)',
+              }}
+            >
+              <span>
+                Found <strong>{filteredNames.length}</strong> {filteredNames.length === 1 ? 'file' : 'files'} matching &ldquo;{searchQuery.trim()}&rdquo;
+              </span>
+              <md-text-button onClick={() => handleSearch('')}>Clear search</md-text-button>
+            </div>
+          )}
           <FileGrid
             files={visibleFiles}
             folderName={currentName}

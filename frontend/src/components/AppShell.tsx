@@ -12,6 +12,7 @@ export interface AppShellProps {
   username?: string;
   activeFolder?: string;
   onCreateFolder?: () => void;
+  searchQuery?: string;
   onSearch?: (query: string) => void;
   children: React.ReactNode;
   showSidebar?: boolean;
@@ -24,6 +25,7 @@ export function AppShell({
   username,
   activeFolder,
   onCreateFolder,
+  searchQuery,
   onSearch,
   children,
   showSidebar = true,
@@ -54,6 +56,7 @@ export function AppShell({
       >
         <TopBar
           onMenuClick={() => setSidebarOpen(true)}
+          searchQuery={searchQuery}
           onSearch={onSearch}
           themePreference={preference}
           resolvedTheme={resolvedMode}
