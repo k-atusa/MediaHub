@@ -283,7 +283,7 @@ a {
   height: var(--mh-topbar-height);
   padding: 0 var(--mh-space-3);
   background-color: var(--md-sys-color-surface);
-  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  border-bottom: none;
 }
 
 @media (min-width: 900px) {
@@ -300,8 +300,9 @@ a {
 }
 
 .mh-topbar__search {
-  flex: 1 1 auto;
-  max-width: 600px;
+  flex: 0 1 320px;
+  max-width: 320px;
+  width: 100%;
   margin: 0 auto;
   display: flex;
   align-items: center;
@@ -309,8 +310,8 @@ a {
 
 .mh-topbar__search md-outlined-text-field {
   width: 100%;
-  --md-outlined-text-field-container-shape: 9999px;
-  --md-outlined-field-container-shape: 9999px;
+  --md-outlined-text-field-container-shape: 20px;
+  --md-outlined-field-container-shape: 20px;
   --md-outlined-text-field-top-space: 8px;
   --md-outlined-text-field-bottom-space: 8px;
   --md-outlined-field-top-space: 8px;
@@ -331,7 +332,7 @@ a {
   --md-outlined-field-leading-content-color: var(--md-sys-color-on-surface-variant);
   --md-outlined-text-field-trailing-icon-color: var(--md-sys-color-on-surface-variant);
   --md-outlined-field-trailing-content-color: var(--md-sys-color-on-surface-variant);
-  border-radius: 9999px;
+  border-radius: 20px;
   background-color: var(--mh-search-bg-color);
   transition: background-color var(--mh-duration-short) var(--mh-easing-standard),
     box-shadow var(--mh-duration-short) var(--mh-easing-standard);
