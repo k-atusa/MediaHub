@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/router';
-import Link from 'next/link';
 import { ClientOnly } from '@/components/ClientOnly';
 import { AppShell } from '@/components/AppShell';
 import { FileGrid } from '@/components/FileGrid';
@@ -455,11 +454,11 @@ function FolderView(): React.JSX.Element {
       <div className="mh-folder__header">
         <div>
           <nav className="mh-breadcrumbs" aria-label="Breadcrumb">
-            <Link href="/folder">My Drive</Link>
+            <span className="mh-breadcrumbs__root">Folders</span>
             {currentName && <span aria-hidden>/</span>}
             {currentName && <span className="mh-breadcrumbs__current">{currentName}</span>}
           </nav>
-          <h1 className="mh-folder__title">{currentName || 'My Drive'}</h1>
+          <h1 className="mh-folder__title">{currentName || 'Folders'}</h1>
         </div>
         <div className="mh-folder__toolbar">
           <md-text-button onClick={() => setShareOpen('import')}>

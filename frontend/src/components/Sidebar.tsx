@@ -1,7 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import Link from 'next/link';
 import { Icon } from './Icon';
 
 export interface SidebarProps {
@@ -14,25 +13,15 @@ export interface SidebarProps {
   onSelectFolder?: (folder: string) => void;
 }
 
-interface NavItem {
-  id: string;
-  label: string;
-  icon: string;
-  href: string;
-}
-
-const NAV_ITEMS: NavItem[] = [
-  { id: 'my-drive', label: 'My Drive', icon: 'hard_drive', href: '/folder?folder=My%20Drive' },
-  { id: 'shared', label: 'Shared with me', icon: 'group', href: '/folder?folder=Shared' },
-  { id: 'recent', label: 'Recent', icon: 'schedule', href: '/folder?folder=Recent' },
-  { id: 'trash', label: 'Trash', icon: 'delete', href: '/folder?folder=Trash' },
-];
-
-export function Sidebar({ open, onClose, activeFolder, username, onCreateFolder, folders, onSelectFolder }: SidebarProps): React.JSX.Element {
-  const handleLinkClick = (): void => {
-    onClose();
-  };
-
+export function Sidebar({
+  open,
+  onClose,
+  activeFolder,
+  username,
+  onCreateFolder,
+  folders,
+  onSelectFolder,
+}: SidebarProps): React.JSX.Element {
   return (
     <>
       <div
@@ -42,7 +31,7 @@ export function Sidebar({ open, onClose, activeFolder, username, onCreateFolder,
       />
       <aside
         className={`mh-sidebar ${open ? 'mh-sidebar--open' : ''}`}
-        aria-label="Main navigation"
+        aria-label="Folders navigation"
         aria-hidden={!open}
       >
         <div className="mh-sidebar__actions" style={{ padding: '0 var(--mh-space-2) var(--mh-space-3)' }}>
@@ -57,20 +46,20 @@ export function Sidebar({ open, onClose, activeFolder, username, onCreateFolder,
           </md-filled-button>
         </div>
 
-        {folders && folders.length > 0 && (
-          <div style={{ padding: '0 var(--mh-space-2) var(--mh-space-3)' }}>
-            <div
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: 'var(--md-sys-color-on-surface-variant)',
-                textTransform: 'uppercase',
-                letterSpacing: 0.8,
-                padding: 'var(--mh-space-2) var(--mh-space-3)',
-              }}
-            >
-              Folders
-            </div>
+        <div style={{ padding: '0 var(--mh-space-2)', flex: 1, overflowY: 'auto' }}>
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: 'var(--md-sys-color-on-surface-variant)',
+              textTransform: 'uppercase',
+              letterSpacing: 0.8,
+              padding: 'var(--mh-space-2) var(--mh-space-3)',
+            }}
+          >
+            Folders
+          </div>
+          {folders && folders.length > 0 ? (
             <nav className="mh-sidebar__nav" aria-label="User folders">
               {folders.map((fName) => {
                 const isActive = fName === activeFolder;
@@ -104,26 +93,19 @@ export function Sidebar({ open, onClose, activeFolder, username, onCreateFolder,
                 );
               })}
             </nav>
-          </div>
-        )}
-
-        <nav className="mh-sidebar__nav" aria-label="Drive navigation">
-          {NAV_ITEMS.map((item) => {
-            const isActive = activeFolder ? item.href.includes(`folder=${encodeURIComponent(activeFolder)}`) : item.id === 'my-drive';
-            return (
-              <Link
-                key={item.id}
-                href={item.href}
-                className={`mh-sidebar__link ${isActive ? 'mh-sidebar__link--active' : ''}`}
-                onClick={handleLinkClick}
-                aria-current={isActive ? 'page' : undefined}
-              >
-                <Icon symbol={item.icon} filled={isActive} ariaLabel="" />
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
+          ) : (
+            <div
+              style={{
+                padding: 'var(--mh-space-2) var(--mh-space-3)',
+                fontSize: 13,
+                color: 'var(--md-sys-color-on-surface-variant)',
+                opacity: 0.7,
+              }}
+            >
+              No folders yet
+            </div>
+          )}
+        </div>
 
         {username && (
           <div
