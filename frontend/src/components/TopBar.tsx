@@ -3,12 +3,14 @@
 import * as React from 'react';
 import { Icon } from './Icon';
 import { BrandMark } from './BrandMark';
-import type { ThemeMode } from '@/styles/theme';
+import type { ThemePreference, ResolvedTheme, ThemeMode } from '@/styles/theme';
 
 export interface TopBarProps {
   onMenuClick?: () => void;
   onSearch?: (query: string) => void;
-  themeMode: ThemeMode;
+  themePreference?: ThemePreference;
+  resolvedTheme?: ResolvedTheme;
+  themeMode?: ThemeMode;
   onToggleTheme: () => void;
   username?: string;
   onLogout?: () => void;
@@ -17,6 +19,8 @@ export interface TopBarProps {
 export function TopBar({
   onMenuClick,
   onSearch,
+  themePreference = 'auto',
+  resolvedTheme = 'light',
   themeMode,
   onToggleTheme,
   username,
@@ -60,10 +64,33 @@ export function TopBar({
 
       <div className="mh-topbar__actions">
         <md-icon-button
-          aria-label={themeMode === 'light' ? 'Switch to dark theme' : 'Switch to light theme'}
+          id="mh-theme-toggle-btn"
+          aria-label={
+            themePreference === 'auto'
+              ? `Theme: Auto (${resolvedTheme === 'dark' ? 'Dark' : 'Light'}) - Click to switch to Light`
+              : themePreference === 'light'
+              ? 'Theme: Light - Click to switch to Dark'
+              : 'Theme: Dark - Click to switch to Auto (System)'
+          }
+          title={
+            themePreference === 'auto'
+              ? `Theme: Auto (${resolvedTheme === 'dark' ? 'Dark' : 'Light'})`
+              : themePreference === 'light'
+              ? 'Theme: Light'
+              : 'Theme: Dark'
+          }
           onClick={onToggleTheme}
         >
-          <Icon symbol={themeMode === 'light' ? 'dark_mode' : 'light_mode'} ariaLabel="" />
+          <Icon
+            symbol={
+              themePreference === 'auto'
+                ? 'brightness_auto'
+                : themePreference === 'light'
+                ? 'light_mode'
+                : 'dark_mode'
+            }
+            ariaLabel=""
+          />
         </md-icon-button>
 
         <md-icon-button aria-label="Help">

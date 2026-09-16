@@ -6,6 +6,8 @@ import { TopBar } from './TopBar';
 import { Icon } from './Icon';
 import { ClientOnly } from './ClientOnly';
 
+import { useThemeContext } from '@/context/ThemeContext';
+
 export interface AppShellProps {
   username?: string;
   activeFolder?: string;
@@ -30,24 +32,7 @@ export function AppShell({
   onSelectFolder,
 }: AppShellProps): React.JSX.Element {
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
-  const [themeMode, setThemeMode] = React.useState<'light' | 'dark'>('light');
-
-  // Pull theme mode from <html data-theme> on mount; the ThemeContext updates
-  // the attribute so we listen with a MutationObserver for instant toggle.
-  React.useEffect(() => {
-    const html = document.documentElement;
-    const update = (): void => setThemeMode((html.getAttribute('data-theme') as 'light' | 'dark') || 'light');
-    update();
-    const obs = new MutationObserver(update);
-    obs.observe(html, { attributes: true, attributeFilter: ['data-theme'] });
-    return () => obs.disconnect();
-  }, []);
-
-  const toggleTheme = (): void => {
-    const next = themeMode === 'light' ? 'dark' : 'light';
-    html_set_theme(next);
-    setThemeMode(next);
-  };
+  const { preference, resolvedMode, cyclePreference } = useThemeContext();
 
   return (
     <div className="mh-page">
@@ -70,8 +55,9 @@ export function AppShell({
         <TopBar
           onMenuClick={() => setSidebarOpen(true)}
           onSearch={onSearch}
-          themeMode={themeMode}
-          onToggleTheme={toggleTheme}
+          themePreference={preference}
+          resolvedTheme={resolvedMode}
+          onToggleTheme={cyclePreference}
           username={username}
           onLogout={onLogout}
         />
@@ -94,9 +80,4 @@ export function AppShell({
       </ClientOnly>
     </div>
   );
-}
-
-function html_set_theme(mode: 'light' | 'dark'): void {
-  // Small adapter so AppShell can stay independent of ThemeContext if needed.
-  import('@/styles/theme').then((m) => m.applyTheme(mode)).catch(() => {});
 }
