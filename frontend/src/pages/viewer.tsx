@@ -94,7 +94,9 @@ function Viewer(): React.JSX.Element {
 
           // 2. Direct on-the-fly streaming fallback (0 RAM buffering, no SSL cert issues)
           if (!cancelled) {
-            setStreamUrl(getDirectStreamUrl(folderPid, filePid, fileKeyHex, fileName));
+            const url = getDirectStreamUrl(folderPid, filePid, fileKeyHex, fileName);
+            console.info('[Viewer] Playing video via direct on-the-fly stream:', url);
+            setStreamUrl(url);
           }
           return;
         }
@@ -277,8 +279,15 @@ function Viewer(): React.JSX.Element {
               src={streamUrl}
               controls
               playsInline
+              autoPlay
               className="mh-viewer__content"
               style={{ maxHeight: '75vh', width: '100%', borderRadius: 'var(--mh-radius-md)' }}
+              onError={(e) => {
+                const target = e.currentTarget;
+                const err = target.error;
+                console.error('[Viewer] HTMLVideoElement playback error:', err);
+                setError(err?.message || 'Video stream could not be played. Your browser may not support this video format/codec.');
+              }}
             />
           )}
           {objectUrl && ext.match(/^(jpg|jpeg|png|gif|webp|bmp|svg)$/) && (

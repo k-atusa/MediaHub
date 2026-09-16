@@ -62,7 +62,7 @@ export async function initVideoStreamWorker(): Promise<ServiceWorkerRegistration
 
         return reg;
       } catch (err) {
-        console.warn('[VideoStream] Service worker unavailable:', err);
+        console.info('[VideoStream] Service worker unavailable (self-signed SSL cert). Falling back to direct on-the-fly streaming.');
         swRegistrationPromise = null; // Allow future retry
         return null;
       }

@@ -302,9 +302,15 @@ func (r *DecryptedStreamReader) Read(p []byte) (int, error) {
 
 		cStart := 12 + chunkIdx*cipherChunk
 		cipherBuf := make([]byte, cipherLen)
-		_, err := r.file.ReadAt(cipherBuf, cStart)
+		n, err := r.file.ReadAt(cipherBuf, cStart)
 		if err != nil && err != io.EOF {
 			return 0, err
+		}
+		if int64(n) < cipherLen {
+			cipherBuf = cipherBuf[:n]
+		}
+		if len(cipherBuf) < 16 {
+			return 0, fmt.Errorf("unexpected EOF reading chunk %d (read %d bytes)", chunkIdx, n)
 		}
 
 		iv := make([]byte, 12)
@@ -414,6 +420,12 @@ func serveStream(w http.ResponseWriter, r *http.Request) {
 		lastPlain = remCipher - 16
 	}
 	origSize := fullChunks*plainChunk + lastPlain
+	if len(rawKey) >= 52 {
+		storedSize := int64(binary.LittleEndian.Uint64(rawKey[44:52]))
+		if storedSize > 0 {
+			origSize = storedSize
+		}
+	}
 	if origSize <= 0 {
 		postError(w, "Empty file", http.StatusBadRequest)
 		return
