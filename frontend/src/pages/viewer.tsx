@@ -8,8 +8,9 @@ import { AppShell } from '@/components/AppShell';
 import { Icon } from '@/components/Icon';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useSessionContext } from '@/context/SessionContext';
-import { decryptFileBytes, getFolderPid, getOriginalSize, fromHex } from '@/lib/crypto';
+import { decryptFileBytes, getFolderPid, getOriginalSize, fromHex, wipe } from '@/lib/crypto';
 import { mediaUrl } from '@/lib/api';
+import { registerVideoStream, unregisterVideoStream, getVideoStreamUrl } from '@/lib/videoStream';
 
 export default function ViewerPage(): React.JSX.Element {
   return (
@@ -31,10 +32,15 @@ function Viewer(): React.JSX.Element {
   const folderKeyHex = (query.fk as string) || (typeof window !== 'undefined' ? sessionStorage.getItem('currentFolderKey') || '' : '');
   const storedFolderId = typeof window !== 'undefined' ? sessionStorage.getItem('currentFolderId') || '' : '';
 
+  const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
+  const isVideo = ['mp4', 'webm', 'mov', 'mkv'].includes(ext);
+
   const [bytes, setBytes] = React.useState<Uint8Array | null>(null);
   const [objectUrl, setObjectUrl] = React.useState<string | null>(null);
+  const [streamUrl, setStreamUrl] = React.useState<string | null>(null);
   const [textPreview, setTextPreview] = React.useState<string>('');
   const [error, setError] = React.useState<string | null>(null);
+  const [downloading, setDownloading] = React.useState(false);
   const [delOpen, setDelOpen] = React.useState(false);
 
   React.useEffect(() => {
@@ -45,10 +51,32 @@ function Viewer(): React.JSX.Element {
     if (!router.isReady && !fileKeyHex) return;
     if (!filePid || !fileKeyHex) return;
     let cancelled = false;
+
     (async () => {
       try {
         const folderPid = folderKeyHex ? getFolderPid(fromHex(folderKeyHex)) : storedFolderId;
         if (!folderPid) throw new Error('Missing folder identifier');
+
+        // Video: Stream on-the-fly via Service Worker without loading the entire file into RAM
+        if (isVideo) {
+          const fk = fromHex(fileKeyHex);
+          const origSize = getOriginalSize(fk);
+          const registered = await registerVideoStream({
+            folderId: folderPid,
+            filePid,
+            fileKeyHex,
+            originalSize: origSize,
+            fileName,
+          });
+          if (cancelled) return;
+          if (registered) {
+            setStreamUrl(getVideoStreamUrl(folderPid, filePid));
+            return;
+          }
+          console.warn('[Viewer] Service worker registration timed out, falling back to direct download');
+        }
+
+        // Non-video (or fallback): download and decrypt full buffer
         const resp = await fetch(mediaUrl(folderPid, filePid, 'dat'));
         if (!resp.ok) throw new Error(`Failed to fetch media file (${resp.status})`);
         const dat = new Uint8Array(await resp.arrayBuffer());
@@ -57,7 +85,7 @@ function Viewer(): React.JSX.Element {
         const out = await decryptFileBytes(dat, fk, origSize);
         if (cancelled) return;
         setBytes(out);
-        const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
+
         if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) {
           const blob = new Blob([out as any], { type: `image/${ext === 'jpg' ? 'jpeg' : ext === 'svg' ? 'svg+xml' : ext}` });
           setObjectUrl(URL.createObjectURL(blob));
@@ -69,7 +97,6 @@ function Viewer(): React.JSX.Element {
         } else if (ext === 'pdf') {
           setObjectUrl(URL.createObjectURL(new Blob([out as any], { type: 'application/pdf' })));
         } else {
-          // generic binary fallback
           const blob = new Blob([out as any], { type: 'application/octet-stream' });
           setObjectUrl(URL.createObjectURL(blob));
         }
@@ -78,22 +105,53 @@ function Viewer(): React.JSX.Element {
         if (!cancelled) setError((e as Error).message);
       }
     })();
+
     return () => {
       cancelled = true;
+      if (isVideo) {
+        unregisterVideoStream(filePid);
+      }
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router.isReady, filePid, fileKeyHex, folderKeyHex, storedFolderId, fileName]);
+  }, [router.isReady, filePid, fileKeyHex, folderKeyHex, storedFolderId, fileName, isVideo]);
 
-  const handleDownload = (): void => {
-    if (!bytes) return;
-    const blob = new Blob([bytes as any]);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleDownload = async (): Promise<void> => {
+    if (bytes) {
+      const blob = new Blob([bytes as any]);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    // Video streaming mode: download and decrypt on-demand for saving
+    if (!filePid || !fileKeyHex) return;
+    setDownloading(true);
+    try {
+      const folderPid = folderKeyHex ? getFolderPid(fromHex(folderKeyHex)) : storedFolderId;
+      const resp = await fetch(mediaUrl(folderPid, filePid, 'dat'));
+      if (!resp.ok) throw new Error(`Download failed: ${resp.status}`);
+      const dat = new Uint8Array(await resp.arrayBuffer());
+      const fk = fromHex(fileKeyHex);
+      const origSize = getOriginalSize(fk);
+      const out = await decryptFileBytes(dat, fk, origSize);
+      const blob = new Blob([out as any]);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+      wipe(out);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const handleDelete = async (): Promise<void> => {
@@ -111,8 +169,6 @@ function Viewer(): React.JSX.Element {
   };
 
   if (!session) return <></>;
-
-  const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
 
   return (
     <AppShell
@@ -132,7 +188,11 @@ function Viewer(): React.JSX.Element {
             </md-icon-button>
           </Link>
           <h1 className="mh-viewer__title">{fileName}</h1>
-          <md-icon-button onClick={handleDownload} disabled={!bytes} aria-label="Download">
+          <md-icon-button
+            onClick={handleDownload}
+            disabled={(!bytes && !streamUrl) || downloading}
+            aria-label="Download"
+          >
             <Icon symbol="download" ariaLabel="" />
           </md-icon-button>
           <md-icon-button onClick={() => setDelOpen(true)} aria-label="Delete">
@@ -141,24 +201,39 @@ function Viewer(): React.JSX.Element {
         </div>
 
         <div className="mh-viewer__stage">
-          {!bytes && !error && (
-            <div style={{ color: 'var(--md-sys-color-on-surface-variant)' }}>
+          {!bytes && !streamUrl && !error && (
+            <div style={{ color: 'var(--md-sys-color-on-surface-variant)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
               <md-circular-progress indeterminate />
+              <span>{isVideo ? 'Preparing video stream…' : 'Decrypting media…'}</span>
+            </div>
+          )}
+          {downloading && (
+            <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', background: 'var(--md-sys-color-inverse-surface)', color: 'var(--md-sys-color-inverse-on-surface)', padding: '10px 20px', borderRadius: 8, zIndex: 1000, boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
+              Preparing full download…
             </div>
           )}
           {error && (
             <div style={{ color: 'var(--md-sys-color-error)' }}>{error}</div>
           )}
-          {objectUrl && ext.match(/^(jpg|jpeg|png|gif|webp|bmp)$/) && (
+          {streamUrl && isVideo && (
+            <video
+              src={streamUrl}
+              controls
+              playsInline
+              className="mh-viewer__content"
+              style={{ maxHeight: '75vh', width: '100%', borderRadius: 'var(--mh-radius-md)' }}
+            />
+          )}
+          {objectUrl && ext.match(/^(jpg|jpeg|png|gif|webp|bmp|svg)$/) && (
             <img src={objectUrl} alt={fileName} className="mh-viewer__content" />
           )}
           {objectUrl && ext === 'pdf' && (
             <iframe src={objectUrl} title={fileName} className="mh-viewer__content" style={{ width: '90vw', height: '75vh' }} />
           )}
-          {objectUrl && ext.match(/^(mp4|webm)$/) && (
+          {objectUrl && !streamUrl && isVideo && (
             <video src={objectUrl} controls className="mh-viewer__content" />
           )}
-          {!objectUrl && textPreview && (
+          {!objectUrl && !streamUrl && textPreview && (
             <pre
               className="mh-viewer__content"
               style={{

@@ -474,6 +474,10 @@ func frontendHandler() http.Handler {
 			cleanPath = "index.html"
 		}
 
+		if cleanPath == "sw.js" {
+			w.Header().Set("Service-Worker-Allowed", "/")
+		}
+
 		// Try opening requested file
 		f, err := staticFS.Open(cleanPath)
 		if err == nil {
