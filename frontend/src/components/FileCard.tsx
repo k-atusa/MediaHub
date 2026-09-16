@@ -31,11 +31,15 @@ export function FileCard({ file, folderName, folderPid, folderKeyHex, onAction }
   const buttonId = `${menuId}-btn`;
   const menuRef = React.useRef<MdMenuElement>(null);
   const [thumbUrl, setThumbUrl] = React.useState<string | null>(file.thumb || null);
+  const activeUrlRef = React.useRef<string | null>(null);
 
   React.useEffect(() => {
-    if (thumbUrl || !folderPid || !file.pid || !file.keyHex) return;
-    let cancelled = false;
-    let createdUrl: string | null = null;
+    if (file.thumb) {
+      setThumbUrl(file.thumb);
+      return;
+    }
+    if (!folderPid || !file.pid || !file.keyHex) return;
+    let isSubscribed = true;
 
     (async () => {
       try {
@@ -43,19 +47,29 @@ export function FileCard({ file, folderName, folderPid, folderKeyHex, onAction }
         if (resp.status === 404 || !resp.ok) return;
         const dat = new Uint8Array(await resp.arrayBuffer());
         const dec = await decryptThumbBytes(dat, fromHex(file.keyHex));
-        if (cancelled) return;
-        createdUrl = URL.createObjectURL(new Blob([dec as any], { type: 'image/jpeg' }));
-        setThumbUrl(createdUrl);
-      } catch {
-        // Thumbnail load or decrypt failed, keep icon fallback
+        if (!isSubscribed) return;
+        const url = URL.createObjectURL(new Blob([dec as any], { type: 'image/jpeg' }));
+        activeUrlRef.current = url;
+        setThumbUrl(url);
+      } catch (err) {
+        console.warn(`[FileCard] Thumbnail error for "${file.name}":`, err);
       }
     })();
 
     return () => {
-      cancelled = true;
-      if (createdUrl) URL.revokeObjectURL(createdUrl);
+      isSubscribed = false;
     };
-  }, [folderPid, file.pid, file.keyHex, thumbUrl]);
+  }, [folderPid, file.pid, file.keyHex, file.thumb]);
+
+  // Revoke object URL ONLY when unmounting
+  React.useEffect(() => {
+    return () => {
+      if (activeUrlRef.current) {
+        URL.revokeObjectURL(activeUrlRef.current);
+        activeUrlRef.current = null;
+      }
+    };
+  }, []);
 
   const handleMoreClick = (event: React.MouseEvent<HTMLElement>): void => {
     event.stopPropagation();
@@ -90,7 +104,14 @@ export function FileCard({ file, folderName, folderPid, folderKeyHex, onAction }
       <md-elevated-card class="mh-file-card__surface">
         <div className="mh-file-card__thumb">
           {thumbUrl ? (
-            <img src={thumbUrl} alt="" loading="lazy" />
+            <img
+              src={thumbUrl}
+              alt={file.name}
+              onError={() => {
+                console.warn(`[FileCard] Image failed to render for "${file.name}"`);
+                setThumbUrl(null);
+              }}
+            />
           ) : (
             <Icon symbol={KIND_ICONS[file.kind]} className="mh-file-card__icon" filled ariaLabel="" />
           )}

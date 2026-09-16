@@ -411,9 +411,7 @@ function FolderView(): React.JSX.Element {
     const slice = names.slice(start, start + PAGE_SIZE);
     return slice.map((name) => {
       const key = flsMap[name];
-      const sizeBytes = key.slice(44, 52);
-      const v = new DataView(sizeBytes.buffer, sizeBytes.byteOffset, 8);
-      const size = Number(v.getBigUint64(0, true));
+      const size = getOriginalSize(key);
       return {
         pid: getFilePid(key),
         name,
