@@ -8,9 +8,9 @@ import { AppShell } from '@/components/AppShell';
 import { Icon } from '@/components/Icon';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useSessionContext } from '@/context/SessionContext';
-import { decryptFileBytes, getFolderPid, getOriginalSize, fromHex, wipe } from '@/lib/crypto';
-import { mediaUrl } from '@/lib/api';
-import { registerVideoStream, unregisterVideoStream, getVideoStreamUrl } from '@/lib/videoStream';
+import { decryptFileBytes, getFolderPid, getOriginalSize, fromHex, wipe, decryptFolderBlobAsync, saveFolderBlob } from '@/lib/crypto';
+import { mediaUrl, folderNamesUrl } from '@/lib/api';
+import { registerVideoStream, unregisterVideoStream, getVideoStreamUrl, getDirectStreamUrl } from '@/lib/videoStream';
 
 export default function ViewerPage(): React.JSX.Element {
   return (
@@ -69,23 +69,34 @@ function Viewer(): React.JSX.Element {
         const folderPid = folderKeyHex ? getFolderPid(fromHex(folderKeyHex)) : storedFolderId;
         if (!folderPid) throw new Error('Missing folder identifier');
 
-        // Video: Stream on-the-fly via Service Worker without loading the entire file into RAM
+        // Video: Stream on-the-fly without loading the entire file into RAM
         if (isVideo) {
           const fk = fromHex(fileKeyHex);
           const origSize = getOriginalSize(fk);
-          const registered = await registerVideoStream({
-            folderId: folderPid,
-            filePid,
-            fileKeyHex,
-            originalSize: origSize,
-            fileName,
-          });
-          if (cancelled) return;
-          if (registered) {
-            setStreamUrl(getVideoStreamUrl(folderPid, filePid));
-            return;
+
+          // 1. Try Service Worker on-the-fly streaming first
+          try {
+            const registered = await registerVideoStream({
+              folderId: folderPid,
+              filePid,
+              fileKeyHex,
+              originalSize: origSize,
+              fileName,
+            });
+            if (cancelled) return;
+            if (registered && navigator.serviceWorker?.controller) {
+              setStreamUrl(getVideoStreamUrl(folderPid, filePid));
+              return;
+            }
+          } catch (swErr) {
+            console.warn('[Viewer] Service Worker streaming skipped:', swErr);
           }
-          throw new Error('Could not establish secure streaming connection. Please retry.');
+
+          // 2. Direct on-the-fly streaming fallback (0 RAM buffering, no SSL cert issues)
+          if (!cancelled) {
+            setStreamUrl(getDirectStreamUrl(folderPid, filePid, fileKeyHex, fileName));
+          }
+          return;
         }
 
         // Non-video files only: download and decrypt buffer for static display
@@ -165,8 +176,35 @@ function Viewer(): React.JSX.Element {
     try {
       const folderPid = folderKeyHex ? getFolderPid(fromHex(folderKeyHex)) : storedFolderId;
       if (folderPid) {
-        await fetch(mediaUrl(folderPid, filePid, 'dat'), { method: 'DELETE' });
-        await fetch(mediaUrl(folderPid, filePid, 'thumb'), { method: 'DELETE' });
+        if (folderKeyHex) {
+          try {
+            const fk = fromHex(folderKeyHex);
+            const metaRes = await fetch(folderNamesUrl(folderPid));
+            if (metaRes.ok) {
+              const buf = new Uint8Array(await metaRes.arrayBuffer());
+              const flsMap = await decryptFolderBlobAsync(fk, buf);
+              if (flsMap[fileName]) {
+                delete flsMap[fileName];
+                const enc = await saveFolderBlob(folderPid, fk, flsMap);
+                await fetch(folderNamesUrl(folderPid), {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/octet-stream', 'X-User-Hash': session.userHash },
+                  body: enc as any,
+                });
+              }
+            }
+          } catch (err) {
+            console.warn('Failed to update folder map after delete:', err);
+          }
+        }
+        await fetch(mediaUrl(folderPid, filePid, 'dat'), {
+          method: 'DELETE',
+          headers: { 'X-User-Hash': session.userHash },
+        });
+        await fetch(mediaUrl(folderPid, filePid, 'thumb'), {
+          method: 'DELETE',
+          headers: { 'X-User-Hash': session.userHash },
+        });
       }
       router.replace(`/folder?folder=${encodeURIComponent(folder)}`);
     } catch (e) {
