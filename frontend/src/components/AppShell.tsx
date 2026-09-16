@@ -14,6 +14,8 @@ export interface AppShellProps {
   children: React.ReactNode;
   showSidebar?: boolean;
   onLogout?: () => void;
+  folders?: string[];
+  onSelectFolder?: (folder: string) => void;
 }
 
 export function AppShell({
@@ -24,6 +26,8 @@ export function AppShell({
   children,
   showSidebar = true,
   onLogout,
+  folders,
+  onSelectFolder,
 }: AppShellProps): React.JSX.Element {
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [themeMode, setThemeMode] = React.useState<'light' | 'dark'>('light');
@@ -79,6 +83,8 @@ export function AppShell({
               activeFolder={activeFolder}
               username={username}
               onCreateFolder={onCreateFolder}
+              folders={folders}
+              onSelectFolder={onSelectFolder}
             />
           )}
           <main className="mh-main" role="main">

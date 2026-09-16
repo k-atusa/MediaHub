@@ -33,7 +33,7 @@ function Viewer(): React.JSX.Element {
   const storedFolderId = typeof window !== 'undefined' ? sessionStorage.getItem('currentFolderId') || '' : '';
 
   const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
-  const isVideo = ['mp4', 'webm', 'mov', 'mkv'].includes(ext);
+  const isVideo = ['mp4', 'webm', 'mov', 'mkv', 'm4v', 'ogv'].includes(ext);
 
   const [bytes, setBytes] = React.useState<Uint8Array | null>(null);
   const [objectUrl, setObjectUrl] = React.useState<string | null>(null);
@@ -46,6 +46,18 @@ function Viewer(): React.JSX.Element {
   React.useEffect(() => {
     if (!session) router.replace('/');
   }, [session, router]);
+
+  const filePidRef = React.useRef(filePid);
+  filePidRef.current = filePid;
+
+  // Cleanup registered stream on unmount
+  React.useEffect(() => {
+    return () => {
+      if (filePidRef.current && isVideo) {
+        unregisterVideoStream(filePidRef.current);
+      }
+    };
+  }, [isVideo]);
 
   React.useEffect(() => {
     if (!router.isReady && !fileKeyHex) return;
@@ -73,10 +85,10 @@ function Viewer(): React.JSX.Element {
             setStreamUrl(getVideoStreamUrl(folderPid, filePid));
             return;
           }
-          console.warn('[Viewer] Service worker registration timed out, falling back to direct download');
+          throw new Error('Could not establish secure streaming connection. Please retry.');
         }
 
-        // Non-video (or fallback): download and decrypt full buffer
+        // Non-video files only: download and decrypt buffer for static display
         const resp = await fetch(mediaUrl(folderPid, filePid, 'dat'));
         if (!resp.ok) throw new Error(`Failed to fetch media file (${resp.status})`);
         const dat = new Uint8Array(await resp.arrayBuffer());
@@ -89,9 +101,6 @@ function Viewer(): React.JSX.Element {
         if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) {
           const blob = new Blob([out as any], { type: `image/${ext === 'jpg' ? 'jpeg' : ext === 'svg' ? 'svg+xml' : ext}` });
           setObjectUrl(URL.createObjectURL(blob));
-        } else if (['mp4', 'webm', 'mov', 'mkv'].includes(ext)) {
-          const mime = ext === 'mp4' ? 'video/mp4' : ext === 'webm' ? 'video/webm' : 'video/mp4';
-          setObjectUrl(URL.createObjectURL(new Blob([out as any], { type: mime })));
         } else if (['txt', 'md', 'json', 'csv', 'log', 'xml', 'html', 'css', 'js', 'ts', 'tsx', 'jsx'].includes(ext)) {
           setTextPreview(new TextDecoder().decode(out));
         } else if (ext === 'pdf') {
@@ -108,9 +117,6 @@ function Viewer(): React.JSX.Element {
 
     return () => {
       cancelled = true;
-      if (isVideo) {
-        unregisterVideoStream(filePid);
-      }
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -175,6 +181,7 @@ function Viewer(): React.JSX.Element {
       username={session.username}
       activeFolder={folder}
       showSidebar
+      onSelectFolder={(fName) => router.push(`/folder?folder=${encodeURIComponent(fName)}`)}
       onLogout={() => {
         clearSession();
         router.replace('/');
@@ -213,7 +220,19 @@ function Viewer(): React.JSX.Element {
             </div>
           )}
           {error && (
-            <div style={{ color: 'var(--md-sys-color-error)' }}>{error}</div>
+            <div style={{ color: 'var(--md-sys-color-error)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+              <span>{error}</span>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <md-filled-button onClick={() => window.location.reload()}>
+                  <Icon symbol="refresh" slot="icon" ariaLabel="" />
+                  Retry
+                </md-filled-button>
+                <md-text-button onClick={handleDownload} disabled={downloading}>
+                  <Icon symbol="download" slot="icon" ariaLabel="" />
+                  Download
+                </md-text-button>
+              </div>
+            </div>
           )}
           {streamUrl && isVideo && (
             <video
@@ -229,9 +248,6 @@ function Viewer(): React.JSX.Element {
           )}
           {objectUrl && ext === 'pdf' && (
             <iframe src={objectUrl} title={fileName} className="mh-viewer__content" style={{ width: '90vw', height: '75vh' }} />
-          )}
-          {objectUrl && !streamUrl && isVideo && (
-            <video src={objectUrl} controls className="mh-viewer__content" />
           )}
           {!objectUrl && !streamUrl && textPreview && (
             <pre

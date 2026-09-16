@@ -290,9 +290,10 @@ function FolderView(): React.JSX.Element {
   };
 
   const handleDeleteConfirm = async (): Promise<void> => {
-    if (!deleteTarget || !session || !currentKey) return;
+    if (!deleteTarget || !session) return;
     try {
       if (deleteTarget.kind === 'file') {
+        if (!currentKey) return;
         const f = deleteTarget.entry as FileEntry;
         const updated = { ...flsMap };
         delete updated[f.name];
@@ -301,15 +302,23 @@ function FolderView(): React.JSX.Element {
         await persistFolderBlob(updated);
       } else {
         const fd = deleteTarget.entry as FolderEntry;
+        const targetKey = fromHex(fd.keyHex);
+        const targetPid = getFolderPid(targetKey);
         const updated = { ...fldMap };
         delete updated[fd.name];
         setFldMap(updated);
-        await deleteFolder_(getFolderPid(fromHex(fd.keyHex)), session.userHash);
+        await deleteFolder_(targetPid, session.userHash);
         await persistUserBlob(updated);
         if (fd.name === currentName) {
-          setCurrentName('');
-          setCurrentKey(null);
-          setFlsMap({});
+          const remainingNames = Object.keys(updated);
+          if (remainingNames.length > 0) {
+            const nextName = remainingNames[0];
+            switchToFolder(nextName, updated[nextName]);
+          } else {
+            setCurrentName('');
+            setCurrentKey(null);
+            setFlsMap({});
+          }
         }
       }
     } catch (e) {
@@ -431,6 +440,12 @@ function FolderView(): React.JSX.Element {
     <AppShell
       username={session.username}
       activeFolder={currentName}
+      folders={Object.keys(fldMap)}
+      onSelectFolder={(name) => {
+        if (fldMap[name]) {
+          switchToFolder(name, fldMap[name]);
+        }
+      }}
       onCreateFolder={handleCreateFolder}
       onLogout={handleLogout}
       onSearch={() => {
@@ -458,7 +473,19 @@ function FolderView(): React.JSX.Element {
             </md-text-button>
           )}
           {currentKey && (
-            <md-text-button onClick={() => setDeleteOpen(true)}>
+            <md-text-button
+              onClick={() => {
+                setDeleteTarget({
+                  kind: 'folder',
+                  entry: {
+                    pid: getFolderPid(currentKey),
+                    name: currentName,
+                    keyHex: toHex(currentKey),
+                  },
+                });
+                setDeleteOpen(true);
+              }}
+            >
               <Icon symbol="delete" slot="icon" ariaLabel="" />
               Delete folder
             </md-text-button>

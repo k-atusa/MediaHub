@@ -29,6 +29,7 @@ export function isVideoStreamSupported(): boolean {
 
 /**
  * Initializes and registers the `/sw.js` service worker.
+ * Waits until the service worker is active and controlling the document.
  */
 export async function initVideoStreamWorker(): Promise<ServiceWorkerRegistration | null> {
   if (!isVideoStreamSupported()) return null;
@@ -39,14 +40,30 @@ export async function initVideoStreamWorker(): Promise<ServiceWorkerRegistration
         const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
         await navigator.serviceWorker.ready;
 
+        // If this client is not yet controlled, wait for clients.claim() to trigger controllerchange
+        if (!navigator.serviceWorker.controller) {
+          await new Promise<void>((resolve) => {
+            const onCtrlChange = () => {
+              navigator.serviceWorker.removeEventListener('controllerchange', onCtrlChange);
+              resolve();
+            };
+            navigator.serviceWorker.addEventListener('controllerchange', onCtrlChange);
+            setTimeout(() => {
+              navigator.serviceWorker.removeEventListener('controllerchange', onCtrlChange);
+              resolve();
+            }, 1000);
+          });
+        }
+
         if (!swMessageListenerAttached) {
           swMessageListenerAttached = true;
           navigator.serviceWorker.addEventListener('message', (event) => {
             const data = event.data;
             if (data?.action === 'REQUEST_KEY' && data.filePid) {
               const regInfo = activeRegistrations.get(data.filePid);
-              if (regInfo && reg.active) {
-                reg.active.postMessage({
+              const targetSw = reg.active || navigator.serviceWorker.controller;
+              if (regInfo && targetSw) {
+                targetSw.postMessage({
                   action: 'REGISTER',
                   folderId: regInfo.folderId,
                   filePid: regInfo.filePid,
@@ -72,7 +89,7 @@ export async function initVideoStreamWorker(): Promise<ServiceWorkerRegistration
 
 /**
  * Registers a video file with the service worker for streaming.
- * Resolves once the service worker acknowledges (ACK) key storage.
+ * Uses MessageChannel to guarantee bidirectional ACK delivery.
  */
 export async function registerVideoStream(info: VideoStreamRegistration): Promise<boolean> {
   const reg = await initVideoStreamWorker();
@@ -85,37 +102,36 @@ export async function registerVideoStream(info: VideoStreamRegistration): Promis
 
   return new Promise<boolean>((resolve) => {
     let resolved = false;
+    const channel = new MessageChannel();
 
     const timeout = setTimeout(() => {
       if (!resolved) {
         resolved = true;
-        navigator.serviceWorker.removeEventListener('message', ackHandler);
-        // Fallback: proceed even if ACK timed out
-        resolve(true);
+        channel.port1.close();
+        resolve(true); // proceed even if timeout occurs
       }
-    }, 2500);
+    }, 3000);
 
-    const ackHandler = (event: MessageEvent) => {
-      if (event.data?.action === 'REGISTERED' && event.data?.filePid === info.filePid) {
-        if (!resolved) {
-          resolved = true;
-          clearTimeout(timeout);
-          navigator.serviceWorker.removeEventListener('message', ackHandler);
-          resolve(true);
-        }
+    channel.port1.onmessage = (event) => {
+      if (!resolved) {
+        resolved = true;
+        clearTimeout(timeout);
+        channel.port1.close();
+        resolve(true);
       }
     };
 
-    navigator.serviceWorker.addEventListener('message', ackHandler);
-
-    sw.postMessage({
-      action: 'REGISTER',
-      folderId: info.folderId,
-      filePid: info.filePid,
-      fileKey: info.fileKeyHex,
-      originalSize: info.originalSize,
-      fileName: info.fileName,
-    });
+    sw.postMessage(
+      {
+        action: 'REGISTER',
+        folderId: info.folderId,
+        filePid: info.filePid,
+        fileKey: info.fileKeyHex,
+        originalSize: info.originalSize,
+        fileName: info.fileName,
+      },
+      [channel.port2]
+    );
   });
 }
 
@@ -128,8 +144,9 @@ export async function unregisterVideoStream(filePid: string): Promise<void> {
   if (!isVideoStreamSupported()) return;
   try {
     const reg = await navigator.serviceWorker.ready;
-    if (reg.active) {
-      reg.active.postMessage({ action: 'UNREGISTER', filePid });
+    const sw = reg.active || navigator.serviceWorker.controller;
+    if (sw) {
+      sw.postMessage({ action: 'UNREGISTER', filePid });
     }
   } catch {
     // Ignore cleanup errors

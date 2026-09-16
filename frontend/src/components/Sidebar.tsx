@@ -10,6 +10,8 @@ export interface SidebarProps {
   activeFolder?: string;
   username?: string;
   onCreateFolder?: () => void;
+  folders?: string[];
+  onSelectFolder?: (folder: string) => void;
 }
 
 interface NavItem {
@@ -26,7 +28,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'trash', label: 'Trash', icon: 'delete', href: '/folder?folder=Trash' },
 ];
 
-export function Sidebar({ open, onClose, activeFolder, username, onCreateFolder }: SidebarProps): React.JSX.Element {
+export function Sidebar({ open, onClose, activeFolder, username, onCreateFolder, folders, onSelectFolder }: SidebarProps): React.JSX.Element {
   const handleLinkClick = (): void => {
     onClose();
   };
@@ -54,6 +56,56 @@ export function Sidebar({ open, onClose, activeFolder, username, onCreateFolder 
             New folder
           </md-filled-button>
         </div>
+
+        {folders && folders.length > 0 && (
+          <div style={{ padding: '0 var(--mh-space-2) var(--mh-space-3)' }}>
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                color: 'var(--md-sys-color-on-surface-variant)',
+                textTransform: 'uppercase',
+                letterSpacing: 0.8,
+                padding: 'var(--mh-space-2) var(--mh-space-3)',
+              }}
+            >
+              Folders
+            </div>
+            <nav className="mh-sidebar__nav" aria-label="User folders">
+              {folders.map((fName) => {
+                const isActive = fName === activeFolder;
+                return (
+                  <button
+                    key={fName}
+                    type="button"
+                    className={`mh-sidebar__link ${isActive ? 'mh-sidebar__link--active' : ''}`}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      font: 'inherit',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--mh-space-3)',
+                    }}
+                    onClick={() => {
+                      onClose();
+                      onSelectFolder?.(fName);
+                    }}
+                    aria-current={isActive ? 'page' : undefined}
+                  >
+                    <Icon symbol="folder" filled={isActive} ariaLabel="" />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {fName}
+                    </span>
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+        )}
 
         <nav className="mh-sidebar__nav" aria-label="Drive navigation">
           {NAV_ITEMS.map((item) => {

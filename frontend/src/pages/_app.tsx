@@ -4,9 +4,14 @@ import Head from 'next/head';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { SessionProvider } from '@/context/SessionContext';
 import { MaterialLoader } from '@/components/MaterialLoader';
+import { initVideoStreamWorker } from '@/lib/videoStream';
 import '@/styles/globals.css';
 
 export default function App({ Component, pageProps }: AppProps): React.JSX.Element {
+  React.useEffect(() => {
+    initVideoStreamWorker().catch(() => {});
+  }, []);
+
   return (
     <>
       <Head>
