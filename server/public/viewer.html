@@ -4,113 +4,299 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MediaHub - Viewer</title>
+    <title>MediaHub - Google Drive Preview</title>
     <link rel="icon" type="image/png" href="./favicon.png">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/dark.css">
+
+    <!-- Google Fonts & Material Symbols -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@400;500&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+
     <style>
-        /* Flexible block layout for media rendering */
-        .body-box {
-            width: 100%;
-            min-height: 300px;
-            background: #0f0f10;
-            border-radius: 6px;
-            padding: 10px;
+        :root {
+            /* Google Drive Previewer Theme (Clean Solid Dark, No Glassmorphism) */
+            --preview-bg: #0e0e0e;
+            --preview-topbar: #18191b;
+            --preview-surface: #1e1f20;
+            --preview-hover: #282a2c;
+            --preview-outline: #303134;
+            --preview-primary: #a8c7fa;
+            --preview-on-primary: #062e6f;
+            --preview-text: #e3e3e3;
+            --preview-subtext: #c4c7c5;
+            --preview-danger: #f2b8b5;
+        }
+
+        * {
             box-sizing: border-box;
-            border: 1px solid #333;
-            text-align: center;
-        }
-
-        textarea {
-            width: 100%;
-            height: 480px;
-            background: inherit;
-            color: inherit;
-            border: 1px solid #444;
-            font-family: inherit;
-            padding: 12px;
-            font-size: 14px;
-            box-sizing: border-box;
-        }
-
-        video,
-        img {
-            width: 100%;
-            max-width: 100%;
-            height: auto;
-            display: block;
-            margin: 0 auto;
-        }
-
-        iframe {
-            width: 100%;
-            height: 75vh;
-            border: none;
+            margin: 0;
+            padding: 0;
         }
 
         body {
-            max-width: 1200px !important;
-            width: 100% !important;
-            margin: 0 auto !important;
-            box-sizing: border-box;
+            font-family: 'Google Sans', 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--preview-bg);
+            color: var(--preview-text);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
         }
 
         .hidden {
             display: none !important;
         }
 
-        /* Mobile (<600px) */
-        @media (max-width: 599px) {
-            body {
-                font-size: 13px !important;
-                padding: 10px !important;
-            }
-
-            button,
-            input,
-            select,
-            textarea {
-                font-size: 13px !important;
-                padding: 6px 10px !important;
-            }
+        /* 1. Google Drive Preview Top Bar */
+        .preview-topbar {
+            height: 56px;
+            background-color: var(--preview-topbar);
+            border-bottom: 1px solid var(--preview-outline);
+            padding: 0 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 10;
+            flex-shrink: 0;
+            gap: 12px;
         }
 
-        /* Desktop (>=600px) */
-        @media (min-width: 600px) {
-            body {
-                font-size: 17px !important;
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .icon-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            color: var(--preview-text);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.15s;
+            flex-shrink: 0;
+        }
+
+        .icon-btn:hover {
+            background-color: var(--preview-hover);
+        }
+
+        /* Google Drive Style File Name Field */
+        #txName {
+            height: 38px;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            color: var(--preview-text);
+            font-family: inherit;
+            font-size: 15px;
+            font-weight: 500;
+            padding: 0 10px;
+            outline: none;
+            max-width: 460px;
+            flex: 1;
+            transition: background-color 0.15s, border-color 0.15s;
+        }
+
+        #txName:hover {
+            background-color: var(--preview-hover);
+        }
+
+        #txName:focus {
+            background-color: var(--preview-surface);
+            border-color: var(--preview-primary);
+        }
+
+        .topbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .btn-danger:hover {
+            color: var(--preview-danger);
+            background-color: rgba(242, 184, 181, 0.15);
+        }
+
+        /* 2. Main Media Preview Canvas */
+        .preview-canvas {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            padding: 16px;
+        }
+
+        /* body-box (Dynamic in viewer.js) */
+        .body-box {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        video,
+        img {
+            max-width: 90vw;
+            max-height: 84vh;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            border-radius: 6px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+            display: block;
+            margin: auto;
+        }
+
+        iframe {
+            width: 90vw;
+            height: 84vh;
+            border: none;
+            border-radius: 8px;
+            background: #ffffff;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+        }
+
+        textarea {
+            width: 90vw;
+            height: 84vh;
+            background-color: var(--preview-topbar);
+            color: var(--preview-text);
+            border: 1px solid var(--preview-outline);
+            border-radius: 8px;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            padding: 24px;
+            box-sizing: border-box;
+            outline: none;
+            resize: none;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+        }
+
+        textarea:focus {
+            border-color: var(--preview-primary);
+        }
+
+        /* 3. Google Drive Floating Side Navigation Buttons */
+        .btn-floating-nav {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background-color: rgba(30, 31, 32, 0.85);
+            border: 1px solid var(--preview-outline);
+            color: var(--preview-text);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 20;
+            transition: background-color 0.15s, transform 0.15s, filter 0.15s;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+        }
+
+        .btn-floating-nav:hover {
+            background-color: var(--preview-hover);
+            filter: brightness(1.2);
+            transform: translateY(-50%) scale(1.05);
+        }
+
+        #btnPrevFile {
+            left: 20px;
+        }
+
+        #btnNextFile {
+            right: 20px;
+        }
+
+        /* Mobile (<600px) */
+        @media (max-width: 599px) {
+            .preview-topbar {
+                padding: 0 10px;
             }
 
-            button,
-            input,
-            select,
+            #txName {
+                font-size: 13px;
+            }
+
+            .btn-floating-nav {
+                width: 40px;
+                height: 40px;
+            }
+
+            #btnPrevFile {
+                left: 8px;
+            }
+
+            #btnNextFile {
+                right: 8px;
+            }
+
+            video,
+            img,
+            iframe,
             textarea {
-                font-size: 16px !important;
-                padding: 10px 16px !important;
+                max-width: 96vw;
+                max-height: 80vh;
             }
         }
     </style>
 </head>
 
 <body>
-    <main style="padding: 10px; max-width: 1200px; width: 100%; margin: 0 auto; box-sizing: border-box;">
-        <div style="display: flex; gap: 4px; align-items: center; flex-wrap: wrap; margin-bottom: 10px;">
-            <button onclick="window.location.href='./folder.html'" style="margin: 0; padding: 6px 10px;"
-                title="Back to list">◀</button>
-            <input type="text" id="txName" style="margin: 0; flex: 1; min-width: 100px; padding: 6px; font-size: 13px;">
-            <button id="btnEdit" style="margin: 0; padding: 6px 10px;" title="Rename">✏️</button>
-            <button id="btnDown" style="margin: 0; padding: 6px 10px;" title="Download">📥</button>
-            <button id="btnDelete" class="btn-danger" style="margin: 0; padding: 6px 10px;" title="Delete">🗑️</button>
+    <!-- 1. Google Drive Preview Top Bar -->
+    <header class="preview-topbar">
+        <div class="topbar-left">
+            <button onclick="window.location.href='./folder.html'" class="icon-btn" title="닫기 / 드라이브로 돌아가기">
+                <span class="material-symbols-outlined">arrow_back</span>
+            </button>
+            <input type="text" id="txName" placeholder="파일 이름">
         </div>
 
+        <div class="topbar-actions">
+            <button id="btnEdit" class="icon-btn" title="이름 바꾸기 (Rename)">
+                <span class="material-symbols-outlined">edit</span>
+            </button>
+            <button id="btnDown" class="icon-btn" title="다운로드 (Download)">
+                <span class="material-symbols-outlined">download</span>
+            </button>
+            <button id="btnDelete" class="icon-btn btn-danger" title="삭제 (Delete)">
+                <span class="material-symbols-outlined">delete</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- 2. Google Drive Media Canvas -->
+    <main class="preview-canvas">
         <div id="viewBody" class="body-box">
-            <p style="color: #666; font-size: 12px; margin: 20px 0;">Loading...</p>
-        </div>
-
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
-            <button id="btnPrevFile" style="margin: 0;" class="hidden">◀ Prev</button>
-            <button id="btnNextFile" style="margin: 0;" class="hidden">Next ▶</button>
+            <p style="color: var(--preview-subtext); font-size: 14px;">파일 로드 중...</p>
         </div>
     </main>
+
+    <!-- 3. Google Drive Floating Side Navigation (Previous / Next) -->
+    <button id="btnPrevFile" class="btn-floating-nav hidden" title="이전 파일">
+        <span class="material-symbols-outlined" style="font-size: 28px;">chevron_left</span>
+    </button>
+    <button id="btnNextFile" class="btn-floating-nav hidden" title="다음 파일">
+        <span class="material-symbols-outlined" style="font-size: 28px;">chevron_right</span>
+    </button>
+
     <script type="module" src="./viewer.js"></script>
 </body>
 

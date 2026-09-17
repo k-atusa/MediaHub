@@ -4,192 +4,999 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MediaHub - Storage</title>
+    <title>MediaHub</title>
     <link rel="icon" type="image/png" href="./favicon.png">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/dark.css">
+
+    <!-- Google Fonts & Material Symbols -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@400;500&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+
     <style>
+        :root {
+            /* Google Drive Exact Light Theme Palette */
+            --g-bg: #ffffff;
+            --g-surface: #ffffff;
+            --g-search-bg: #edf2fc;
+            --g-border: #e0e2ec;
+            --g-border-subtle: #f0f1f4;
+            --g-primary-blue: #0b57d0;
+            --g-primary-hover: #0842a0;
+            --g-fab-bg: #d3e3fd;
+            --g-fab-hover: #c2e7ff;
+            --g-fab-text: #041e49;
+            --g-text-main: #1f1f1f;
+            --g-text-muted: #5f6368;
+            --g-hover-bg: #f0f4f9;
+            --g-active-bg: #d3e3fd;
+            --g-danger: #b3261e;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Google Sans', 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--g-bg);
+            color: var(--g-text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
         .hidden {
             display: none !important;
         }
 
-        body {
-            max-width: 1200px !important;
-            width: 100% !important;
-            margin: 0 auto !important;
-            box-sizing: border-box;
+        /* 1. Header (Navbar) */
+        .drive-header {
+            height: 64px;
+            padding: 0 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: var(--g-bg);
+            flex-shrink: 0;
+            border-bottom: 1px solid var(--g-border-subtle);
+            gap: 16px;
         }
 
-        .media-grid {
-            display: grid;
-            margin-top: 10px;
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 220px;
         }
 
-        .media-card {
-            background: #222;
-            border-radius: 6px;
-            border: 1px solid #333;
-            text-align: center;
+        .menu-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            color: var(--g-text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.15s;
+        }
+
+        .menu-btn:hover {
+            background-color: var(--g-hover-bg);
+        }
+
+        .logo-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
             cursor: pointer;
         }
 
-        .thumb-img {
-            width: 100%;
-            object-fit: cover;
-            border-radius: 4px;
+        .cloud-logo-icon {
+            font-size: 28px;
+            color: var(--g-primary-blue);
         }
 
-        .file-title {
-            color: #bbb;
+        .app-title {
+            font-size: 22px;
+            font-weight: 400;
+            color: var(--g-text-main);
+            letter-spacing: -0.2px;
+        }
+
+        /* Search Bar */
+        .header-search-box {
+            flex: 1;
+            max-width: 720px;
+            height: 46px;
+            background-color: var(--g-search-bg);
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            gap: 12px;
+            transition: background-color 0.2s, box-shadow 0.2s;
+        }
+
+        .header-search-box:focus-within {
+            background-color: #ffffff;
+            box-shadow: 0 1px 3px 1px rgba(60, 64, 67, 0.2), 0 2px 8px 4px rgba(60, 64, 67, 0.1);
+        }
+
+        .search-input {
+            flex: 1;
+            border: none;
+            background: transparent;
+            font-family: inherit;
+            font-size: 15px;
+            color: var(--g-text-main);
+            outline: none;
+        }
+
+        .search-input::placeholder {
+            color: var(--g-text-muted);
+        }
+
+        .search-icon {
+            color: var(--g-text-muted);
+            font-size: 22px;
+            cursor: pointer;
+        }
+
+        /* Header Right Actions */
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .header-icon-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            color: var(--g-text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.15s;
+        }
+
+        .header-icon-btn:hover {
+            background-color: var(--g-hover-bg);
+        }
+
+        .profile-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-color: var(--g-fab-bg);
+            color: var(--g-fab-text);
+            font-size: 13px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            margin-left: 4px;
+        }
+
+        /* 2. Body Area (Sidebar + Workspace) */
+        .drive-body {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .drive-sidebar {
+            width: 250px;
+            background-color: var(--g-bg);
+            display: flex;
+            flex-direction: column;
+            padding: 16px 16px 20px 16px;
+            gap: 16px;
+            flex-shrink: 0;
+            border-right: 1px solid var(--g-border-subtle);
+        }
+
+        /* New folder pill button */
+        .btn-new-folder {
+            height: 48px;
+            border-radius: 16px;
+            background-color: var(--g-primary-blue);
+            color: #ffffff;
+            border: none;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0 22px;
+            cursor: pointer;
+            box-shadow: 0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
+            transition: background-color 0.15s, box-shadow 0.15s;
+            width: fit-content;
+        }
+
+        .btn-new-folder:hover {
+            background-color: var(--g-primary-hover);
+            box-shadow: 0 2px 6px 2px rgba(60, 64, 67, 0.3);
+        }
+
+        .btn-new-folder .material-symbols-outlined {
+            font-size: 20px;
+        }
+
+        /* Sidebar Navigation & Folder List */
+        .sidebar-nav-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .sidebar-section-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            height: 40px;
+            padding: 0 14px;
+            color: var(--g-text-muted);
+            font-size: 14px;
+            font-weight: 500;
+            user-select: none;
+        }
+
+        .sidebar-folder-list {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            padding-left: 8px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        /* Individual Folder Item (Replaces dropdown) */
+        .nav-folder-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            height: 40px;
+            padding: 0 14px;
+            border-radius: 20px;
+            color: var(--g-text-main);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.15s, color 0.15s;
+        }
+
+        .nav-folder-item:hover {
+            background-color: var(--g-hover-bg);
+        }
+
+        .nav-folder-item.active {
+            background-color: var(--g-active-bg);
+            color: var(--g-fab-text);
+            font-weight: 600;
+        }
+
+        .nav-folder-item .material-symbols-outlined {
+            font-size: 20px;
+            color: inherit;
+        }
+
+        .folder-name-label {
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
         }
 
-        .pid-text {
-            color: #666;
-            font-family: monospace;
+        /* Sidebar Bottom Profile */
+        .sidebar-bottom-profile {
+            margin-top: auto;
+            border-top: 1px solid var(--g-border);
+            padding-top: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
-        /* Mobile (<600px) */
-        @media (max-width: 599px) {
-            body {
-                font-size: 13px !important;
-                padding: 10px !important;
-            }
-
-            button,
-            input,
-            select,
-            textarea {
-                font-size: 13px !important;
-                padding: 6px 10px !important;
-            }
-
-            .media-grid {
-                grid-template-columns: repeat(2, 1fr) !important;
-                gap: 8px !important;
-            }
-
-            .media-card {
-                padding: 8px !important;
-            }
-
-            .thumb-img {
-                height: 90px !important;
-            }
-
-            .file-title {
-                font-size: 10px !important;
-                margin-top: 4px !important;
-            }
-
-            .pid-text {
-                display: none !important;
-            }
+        .user-pid-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--g-text-main);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
-        /* Desktop (>=600px) */
-        @media (min-width: 600px) {
-            body {
-                font-size: 17px !important;
-            }
+        /* 3. Main Workspace */
+        .drive-workspace {
+            flex: 1;
+            background-color: var(--g-bg);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            padding: 12px 24px 24px 16px;
+            position: relative;
+        }
 
-            button,
-            input,
-            select,
-            textarea {
-                font-size: 16px !important;
-                padding: 10px 16px !important;
-            }
+        /* Workspace Top Bar (Breadcrumb + Actions) */
+        .workspace-top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 8px;
+        }
 
-            .media-grid {
-                grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)) !important;
-                gap: 12px !important;
-            }
+        .breadcrumb-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
 
-            .media-card {
-                padding: 12px !important;
-            }
+        .breadcrumb-trail {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+        }
 
-            .thumb-img {
-                height: 120px !important;
-            }
+        .breadcrumb-link {
+            color: var(--g-primary-blue);
+            text-decoration: underline;
+            cursor: pointer;
+        }
 
-            .file-title {
-                font-size: 12px !important;
-                margin-top: 6px !important;
-            }
+        .breadcrumb-separator {
+            color: var(--g-text-muted);
+        }
 
-            .pid-text {
-                font-size: 12px !important;
+        .breadcrumb-current {
+            color: var(--g-text-main);
+        }
+
+        .workspace-folder-title {
+            font-size: 26px;
+            font-weight: 400;
+            color: var(--g-text-main);
+            letter-spacing: -0.3px;
+        }
+
+        /* Workspace Right Action Buttons */
+        .workspace-action-group {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .top-action-btn {
+            background: transparent;
+            border: none;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--g-primary-blue);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.15s;
+        }
+
+        .top-action-btn:hover {
+            background-color: var(--g-hover-bg);
+        }
+
+        .top-action-btn .material-symbols-outlined {
+            font-size: 19px;
+            color: var(--g-primary-blue);
+        }
+
+        /* 4. Empty State Area */
+        .empty-state-view {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            gap: 16px;
+            padding: 40px;
+        }
+
+        .empty-cloud-icon {
+            font-size: 88px;
+            color: #747775;
+            user-select: none;
+        }
+
+        .empty-title {
+            font-size: 20px;
+            font-weight: 500;
+            color: var(--g-text-main);
+        }
+
+        .empty-subtitle {
+            font-size: 13px;
+            color: var(--g-text-muted);
+            max-width: 360px;
+            line-height: 1.5;
+        }
+
+        .btn-empty-upload {
+            height: 38px;
+            padding: 0 22px;
+            border-radius: 19px;
+            background-color: var(--g-primary-blue);
+            color: #ffffff;
+            border: none;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            margin-top: 4px;
+            transition: background-color 0.15s;
+        }
+
+        .btn-empty-upload:hover {
+            background-color: var(--g-primary-hover);
+        }
+
+        /* 5. Media Grid (When files exist) */
+        .media-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+            gap: 16px;
+            width: 100%;
+            padding: 10px 0;
+        }
+
+        /* Google Drive Style Card (.media-card dynamic from folder.js) */
+        .media-card {
+            background-color: #f8fafd;
+            border: 1px solid var(--g-border);
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            cursor: pointer;
+            transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .media-card:hover {
+            background-color: #f0f4f9;
+            border-color: var(--g-primary-blue);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .thumb-img {
+            width: 100%;
+            height: 140px;
+            object-fit: cover;
+            background-color: #e9eef6;
+            display: block;
+        }
+
+        .file-title {
+            padding: 12px 14px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--g-text-main);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            border-top: 1px solid var(--g-border);
+            background-color: #ffffff;
+        }
+
+        /* 6. Floating Bottom Right FAB (Upload) */
+        .fab-upload-btn {
+            position: fixed;
+            bottom: 32px;
+            right: 32px;
+            height: 48px;
+            padding: 0 22px;
+            border-radius: 16px;
+            background-color: var(--g-fab-bg);
+            color: var(--g-fab-text);
+            border: 1px solid rgba(11, 87, 208, 0.2);
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.08);
+            transition: background-color 0.15s, box-shadow 0.15s, transform 0.15s;
+            z-index: 50;
+        }
+
+        .fab-upload-btn:hover {
+            background-color: var(--g-fab-hover);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.18);
+            transform: translateY(-1px);
+        }
+
+        .fab-upload-btn .material-symbols-outlined {
+            font-size: 20px;
+        }
+
+        /* Pagination Bar */
+        .pagination-container {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding: 12px 0;
+            gap: 12px;
+            margin-top: auto;
+        }
+
+        #pageIndicator {
+            font-size: 13px;
+            color: var(--g-text-muted);
+            font-family: 'Roboto Mono', monospace;
+        }
+
+        .page-icon-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 1px solid var(--g-border);
+            background: #ffffff;
+            color: var(--g-text-main);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .page-icon-btn:hover {
+            background-color: var(--g-hover-bg);
+        }
+
+        /* Hidden Controls Required for folder.js compatibility */
+        #hiddenControls {
+            display: none;
+        }
+
+        /* Dialogs */
+        dialog#newFolderModal,
+        dialog#pwModal {
+            background-color: #ffffff;
+            color: var(--g-text-main);
+            border: 1px solid var(--g-border);
+            border-radius: 28px;
+            padding: 24px 28px;
+            max-width: 420px;
+            width: 90%;
+            margin: auto;
+            outline: none;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+        }
+
+        dialog::backdrop {
+            background: rgba(0, 0, 0, 0.4);
+        }
+
+        .dialog-title {
+            font-size: 20px;
+            font-weight: 500;
+            margin-bottom: 16px;
+        }
+
+        .dialog-input {
+            width: 100%;
+            height: 48px;
+            padding: 0 14px;
+            border: 1px solid var(--g-border);
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 14px;
+            margin-bottom: 20px;
+            outline: none;
+        }
+
+        .dialog-input:focus {
+            border-color: var(--g-primary-blue);
+            box-shadow: 0 0 0 1px var(--g-primary-blue);
+        }
+
+        .dialog-btn-group {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .btn-dialog-cancel {
+            height: 36px;
+            padding: 0 16px;
+            border: none;
+            background: transparent;
+            color: var(--g-primary-blue);
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 18px;
+            cursor: pointer;
+        }
+
+        .btn-dialog-cancel:hover {
+            background-color: var(--g-hover-bg);
+        }
+
+        .btn-dialog-confirm {
+            height: 36px;
+            padding: 0 20px;
+            border: none;
+            background-color: var(--g-primary-blue);
+            color: #ffffff;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 18px;
+            cursor: pointer;
+        }
+
+        .btn-dialog-confirm:hover {
+            background-color: var(--g-primary-hover);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .drive-sidebar {
+                display: none;
+            }
+            .header-search-box {
+                display: none;
+            }
+            .drive-workspace {
+                padding: 16px;
             }
         }
     </style>
 </head>
 
 <body>
-    <main style="padding: 10px; max-width: 1200px; width: 100%; margin: 0 auto; box-sizing: border-box;">
-        <div
-            style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
-            <div style="display: flex; align-items: baseline; gap: 6px;">
-                <h3 style="margin: 0; font-size: 20px;">MediaHub 📂</h3>
-                <span class="pid-text">PID: <span id="lblUserHash" style="color: #007acc;"></span></span>
-            </div>
-            <div style="display: flex; gap: 4px;">
-                <button id="btnTrim" title="Trim orphan files" style="margin: 0; padding: 4px 8px; font-size: 12px;">✂️
-                    Trim</button>
-                <button id="btnExport" title="Export share token"
-                    style="margin: 0; padding: 4px 8px; font-size: 12px;">📤 Export</button>
-                <button id="btnImport" title="Import share token"
-                    style="margin: 0; padding: 4px 8px; font-size: 12px;">📥 Import</button>
-                <button id="btnChangePassword" title="Change Password"
-                    style="margin: 0; padding: 4px 8px; font-size: 12px;">🔑 Reset</button>
+    <!-- 1. Google Drive Top Navigation Bar -->
+    <header class="drive-header">
+        <div class="header-left">
+            <button class="menu-btn" title="Main menu">
+                <span class="material-symbols-outlined">menu</span>
+            </button>
+            <div class="logo-wrap" onclick="window.location.reload()">
+                <span class="material-symbols-outlined cloud-logo-icon">cloud</span>
+                <span class="app-title">MediaHub</span>
             </div>
         </div>
 
-        <section style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 10px;">
-            <select id="folderSelect" style="margin: 0; flex: 2; min-width: 100px; padding: 6px; font-size: 13px;">
-                <option value="">-- Folder --</option>
-            </select>
-            <button id="btnDeleteFolder" class="btn-danger hidden" title="Delete folder"
-                style="margin: 0; padding: 6px 10px;">🗑️</button>
-            <input type="text" id="newFolderName" placeholder="New folder"
-                style="margin: 0; flex: 2; min-width: 80px; padding: 6px; font-size: 13px;">
-            <button id="btnCreateFolder" title="Create folder" style="margin: 0; padding: 6px 10px;">➕</button>
-        </section>
+        <div class="header-search-box">
+            <input type="text" class="search-input" placeholder="Search in MediaHub" id="topSearchInput">
+            <span class="material-symbols-outlined search-icon">search</span>
+        </div>
 
-        <section id="uploadContainer" class="hidden"
-            style="border: 1px solid #333; padding: 8px; border-radius: 6px; margin-bottom: 10px;">
-            <div style="display: flex; gap: 6px; align-items: center;">
-                <input type="file" id="fileInput" style="margin: 0; flex: 1; padding: 4px; font-size: 12px;" multiple>
-                <button id="btnUpload" style="margin: 0; white-space: nowrap; padding: 6px 12px; font-size: 13px;">🚀
-                    Upload</button>
+        <div class="header-right">
+            <button class="header-icon-btn" title="Dark mode">
+                <span class="material-symbols-outlined">dark_mode</span>
+            </button>
+            <button class="header-icon-btn" title="Help">
+                <span class="material-symbols-outlined">help</span>
+            </button>
+            <button class="header-icon-btn" title="Logout" onclick="sessionStorage.clear(); window.location.href='./index.html';">
+                <span class="material-symbols-outlined">logout</span>
+            </button>
+            <div class="profile-avatar" title="Account profile">TE</div>
+        </div>
+    </header>
+
+    <!-- 2. Main Drive Layout -->
+    <div class="drive-body">
+        <!-- Sidebar Navigation Drawer -->
+        <aside class="drive-sidebar">
+            <!-- New Folder Blue Pill Button -->
+            <button class="btn-new-folder" id="btnOpenNewFolderModal">
+                <span class="material-symbols-outlined">create_new_folder</span>
+                <span>New folder</span>
+            </button>
+
+            <!-- Navigation Links -->
+            <nav class="sidebar-nav-list">
+                <div class="sidebar-section-header">
+                    <span class="material-symbols-outlined" style="font-size: 20px;">hard_drive</span>
+                    <span>My Drive</span>
+                </div>
+
+                <!-- Dynamic Folder List (Directly displayed here without dropdown) -->
+                <div id="sidebarFolderList" class="sidebar-folder-list">
+                    <!-- Populated dynamically from folder.js data -->
+                </div>
+            </nav>
+
+            <!-- Bottom Profile Section -->
+            <div class="sidebar-bottom-profile">
+                <div class="profile-avatar">TE</div>
+                <span class="user-pid-label" id="lblUserHash">test</span>
             </div>
-        </section>
+        </aside>
 
-        <section id="mediaContainer" class="hidden">
-            <div id="mediaGrid" class="media-grid"></div>
-            <div style="display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 15px;">
-                <button id="btnPrevPage" style="margin: 0; padding: 4px 10px;">◀</button>
-                <span id="pageIndicator"
-                    style="font-size: 11px; font-weight: bold; min-width: 50px; text-align: center;">1 / 1</span>
-                <button id="btnNextPage" style="margin: 0; padding: 4px 10px;">▶</button>
+        <!-- Main Workspace -->
+        <main class="drive-workspace">
+            <!-- Workspace Top Breadcrumb & Action Bar -->
+            <div class="workspace-top-bar">
+                <div class="breadcrumb-container">
+                    <div class="breadcrumb-trail">
+                        <span class="breadcrumb-link" onclick="window.location.reload()">My Drive</span>
+                        <span class="breadcrumb-separator">/</span>
+                        <span class="breadcrumb-current" id="breadcrumbFolderName">test2</span>
+                    </div>
+                    <h1 class="workspace-folder-title" id="currentFolderTitle">test2</h1>
+                </div>
+
+                <div class="workspace-action-group">
+                    <button class="top-action-btn" id="btnImport" title="Import share token">
+                        <span class="material-symbols-outlined">file_download</span>
+                        <span>Import</span>
+                    </button>
+                    <button class="top-action-btn" id="btnExport" title="Share folder token">
+                        <span class="material-symbols-outlined">share</span>
+                        <span>Share</span>
+                    </button>
+                    <button class="top-action-btn" id="btnDeleteFolder" title="Delete folder">
+                        <span class="material-symbols-outlined">delete_outline</span>
+                        <span>Delete folder</span>
+                    </button>
+                    <button class="top-action-btn" id="btnChangePassword" title="Change password">
+                        <span class="material-symbols-outlined">sync</span>
+                        <span>Change password</span>
+                    </button>
+                </div>
             </div>
-        </section>
-    </main>
 
-    <!-- Change Password Dialog -->
-    <dialog id="pwModal" style="padding: 20px; max-width: 480px;">
-        <h3 style="margin-top: 0;">🔑 Change Password</h3>
-        <input type="password" id="newPassword" placeholder="New Password"
-            style="width: 100%; box-sizing: border-box; margin-bottom: 10px;">
-        <input type="password" id="newPasswordConfirm" placeholder="Confirm Password"
-            style="width: 100%; box-sizing: border-box; margin-bottom: 10px;">
-        <div style="text-align: right; display: flex; gap: 8px; justify-content: flex-end;">
-            <button id="btnCancelPw" style="margin: 0; background: #555;">Cancel</button>
-            <button id="btnConfirmPw" style="margin: 0;">Change</button>
+            <!-- Upload Container Section (Required by folder.js) -->
+            <section id="uploadContainer" class="hidden"></section>
+
+            <!-- Media Container (Contains empty state and grid) -->
+            <section id="mediaContainer">
+                <!-- Grid where media-card elements are appended -->
+                <div id="mediaGrid" class="media-grid"></div>
+
+                <!-- Empty State (Shown when folder is empty) -->
+                <div class="empty-state-view" id="emptyStateContainer">
+                    <span class="material-symbols-outlined empty-cloud-icon">cloud_upload</span>
+                    <div class="empty-title">This folder is empty</div>
+                    <div class="empty-subtitle">Drag and drop files anywhere on the page, or use the upload button.</div>
+                    <button class="btn-empty-upload" id="btnEmptyUploadAction">
+                        <span class="material-symbols-outlined">add</span>
+                        <span>Upload</span>
+                    </button>
+                </div>
+
+                <!-- Pagination -->
+                <div class="pagination-container" id="paginationBar">
+                    <span id="pageIndicator">1 / 1</span>
+                    <button id="btnPrevPage" class="page-icon-btn" title="Previous page">
+                        <span class="material-symbols-outlined" style="font-size: 20px;">chevron_left</span>
+                    </button>
+                    <button id="btnNextPage" class="page-icon-btn" title="Next page">
+                        <span class="material-symbols-outlined" style="font-size: 20px;">chevron_right</span>
+                    </button>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Floating Upload FAB (Bottom Right) -->
+    <button class="fab-upload-btn" id="btnFabUpload">
+        <span class="material-symbols-outlined">upload</span>
+        <span>Upload</span>
+    </button>
+
+    <!-- Hidden Native JS Control Elements (Kept for 100% folder.js compatibility) -->
+    <div id="hiddenControls">
+        <select id="folderSelect">
+            <option value="">-- Folder Select --</option>
+        </select>
+        <input type="file" id="fileInput" multiple>
+        <button id="btnUpload">Upload</button>
+        <button id="btnTrim">Trim</button>
+        <input type="text" id="newFolderName">
+        <button id="btnCreateFolder">Create</button>
+    </div>
+
+    <!-- New Folder Dialog (Triggered by '+ New folder') -->
+    <dialog id="newFolderModal">
+        <div class="dialog-title">New folder</div>
+        <input type="text" id="modalFolderNameInput" class="dialog-input" placeholder="Untitled folder">
+        <div class="dialog-btn-group">
+            <button class="btn-dialog-cancel" id="btnCancelNewFolder">Cancel</button>
+            <button class="btn-dialog-confirm" id="btnConfirmNewFolder">Create</button>
         </div>
     </dialog>
+
+    <!-- Change Password Dialog -->
+    <dialog id="pwModal">
+        <div class="dialog-title">Change Password</div>
+        <input type="password" id="newPassword" class="dialog-input" placeholder="New Password">
+        <input type="password" id="newPasswordConfirm" class="dialog-input" placeholder="Confirm Password">
+        <div class="dialog-btn-group">
+            <button id="btnCancelPw" class="btn-dialog-cancel">Cancel</button>
+            <button id="btnConfirmPw" class="btn-dialog-confirm">Save</button>
+        </div>
+    </dialog>
+
+    <!-- Native JavaScript UI Binding (Does not alter folder.js) -->
+    <script>
+        // Synchronize Folder List from folderSelect (No dropdown)
+        const folderSelect = document.getElementById("folderSelect");
+        const sidebarFolderList = document.getElementById("sidebarFolderList");
+        const breadcrumbName = document.getElementById("breadcrumbFolderName");
+        const folderTitle = document.getElementById("currentFolderTitle");
+        const emptyState = document.getElementById("emptyStateContainer");
+        const mediaGrid = document.getElementById("mediaGrid");
+        const paginationBar = document.getElementById("paginationBar");
+
+        function updateFolderDisplay() {
+            const current = folderSelect.value || sessionStorage.getItem("oldFold") || "";
+            if (current) {
+                breadcrumbName.textContent = current;
+                folderTitle.textContent = current;
+            } else {
+                breadcrumbName.textContent = "Select a folder";
+                folderTitle.textContent = "My Drive";
+            }
+        }
+
+        function syncFolderList() {
+            if (!sidebarFolderList) return;
+            sidebarFolderList.innerHTML = "";
+            const options = Array.from(folderSelect.options).filter(opt => opt.value !== "");
+            const currentSelected = folderSelect.value || sessionStorage.getItem("oldFold") || (options[0]?.value || "");
+
+            if (options.length === 0) {
+                sidebarFolderList.innerHTML = '<div style="padding: 10px 14px; font-size: 13px; color: var(--g-text-muted);">No folders</div>';
+                return;
+            }
+
+            options.forEach(opt => {
+                const item = document.createElement("div");
+                const isSelected = opt.value === currentSelected;
+                item.className = "nav-folder-item" + (isSelected ? " active" : "");
+                item.dataset.folderName = opt.value;
+                item.innerHTML = `
+                    <span class="material-symbols-outlined">folder</span>
+                    <span class="folder-name-label">${opt.textContent}</span>
+                `;
+                item.addEventListener("click", () => {
+                    document.querySelectorAll(".nav-folder-item").forEach(el => el.classList.remove("active"));
+                    item.classList.add("active");
+                    if (folderSelect.value !== opt.value) {
+                        folderSelect.value = opt.value;
+                        folderSelect.dispatchEvent(new Event("change"));
+                    }
+                    updateFolderDisplay();
+                });
+                sidebarFolderList.appendChild(item);
+            });
+        }
+
+        // Observe options added/removed in folderSelect by folder.js
+        const folderObserver = new MutationObserver(() => {
+            syncFolderList();
+            updateFolderDisplay();
+        });
+        folderObserver.observe(folderSelect, { childList: true });
+
+        folderSelect.addEventListener("change", () => {
+            document.querySelectorAll(".nav-folder-item").forEach(item => {
+                if (item.dataset.folderName === folderSelect.value) {
+                    item.classList.add("active");
+                } else {
+                    item.classList.remove("active");
+                }
+            });
+            updateFolderDisplay();
+        });
+
+        // Observe mediaGrid children to toggle Empty State
+        const observer = new MutationObserver(() => {
+            if (mediaGrid.children.length === 0) {
+                emptyState.style.display = "flex";
+                paginationBar.style.display = "none";
+            } else {
+                emptyState.style.display = "none";
+                paginationBar.style.display = "flex";
+            }
+        });
+        observer.observe(mediaGrid, { childList: true });
+
+        // New folder modal binding
+        const newFolderModal = document.getElementById("newFolderModal");
+        const btnOpenNewFolder = document.getElementById("btnOpenNewFolderModal");
+        const modalInput = document.getElementById("modalFolderNameInput");
+        const nativeInput = document.getElementById("newFolderName");
+        const nativeCreateBtn = document.getElementById("btnCreateFolder");
+        const btnCancelNewFolder = document.getElementById("btnCancelNewFolder");
+        const btnConfirmNewFolder = document.getElementById("btnConfirmNewFolder");
+
+        btnOpenNewFolder.addEventListener("click", () => {
+            modalInput.value = "";
+            newFolderModal.showModal();
+            modalInput.focus();
+        });
+
+        btnCancelNewFolder.addEventListener("click", () => {
+            newFolderModal.close();
+        });
+
+        btnConfirmNewFolder.addEventListener("click", () => {
+            const name = modalInput.value.trim();
+            if (name) {
+                nativeInput.value = name;
+                nativeCreateBtn.click();
+            }
+            newFolderModal.close();
+        });
+
+        modalInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                btnConfirmNewFolder.click();
+            }
+        });
+
+        // Upload Button Bindings (FAB and Empty State button)
+        const fileInput = document.getElementById("fileInput");
+        const btnUpload = document.getElementById("btnUpload");
+        const btnFabUpload = document.getElementById("btnFabUpload");
+        const btnEmptyUpload = document.getElementById("btnEmptyUploadAction");
+
+        function triggerUploadFlow() {
+            if (!folderSelect.value) {
+                alert("⚠️ Please select or create a folder first.");
+                return;
+            }
+            fileInput.click();
+        }
+
+        btnFabUpload.addEventListener("click", triggerUploadFlow);
+        btnEmptyUpload.addEventListener("click", triggerUploadFlow);
+
+        fileInput.addEventListener("change", () => {
+            if (fileInput.files.length > 0) {
+                btnUpload.click();
+            }
+        });
+
+        // Initial setup
+        window.addEventListener("DOMContentLoaded", () => {
+            syncFolderList();
+            updateFolderDisplay();
+        });
+    </script>
 
     <script type="module" src="./folder.js"></script>
 </body>

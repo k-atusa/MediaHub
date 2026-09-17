@@ -4,67 +4,326 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MediaHub - Auth</title>
+    <title>MediaHub - Sign in</title>
     <link rel="icon" type="image/png" href="./favicon.png">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.css">
-    <style>
-        /* Mobile optimization */
-        @media (max-width: 599px) {
-            body {
-                font-size: 15px !important;
-                padding: 15px !important;
-            }
 
-            input,
-            button {
-                font-size: 15px !important;
-                padding: 10px 12px !important;
-            }
+    <!-- Google Fonts & Material Symbols -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+
+    <style>
+        :root {
+            /* Google Light Theme Palette */
+            --g-bg: #f0f4f9;
+            --g-surface: #ffffff;
+            --g-border: #747775;
+            --g-border-card: #c4c7c5;
+            --g-primary-blue: #0b57d0;
+            --g-primary-hover: #0842a0;
+            --g-text-main: #1f1f1f;
+            --g-text-sub: #444746;
         }
 
-        @media (min-width: 600px) {
-            body {
-                font-size: 17px !important;
-            }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
-            input,
-            button {
-                font-size: 16px !important;
-                padding: 12px 18px !important;
+        body {
+            font-family: 'Google Sans', 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--g-bg);
+            color: var(--g-text-main);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Google Sign-in Card */
+        .signin-card {
+            width: 100%;
+            max-width: 440px;
+            background-color: var(--g-surface);
+            border: 1px solid var(--g-border-card);
+            border-radius: 28px;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
+            box-shadow: 0 1px 3px rgba(60, 64, 67, 0.1);
+        }
+
+        .header-section {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .drive-logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .cloud-icon {
+            font-size: 32px;
+            color: var(--g-primary-blue);
+        }
+
+        .drive-title {
+            font-size: 22px;
+            font-weight: 500;
+            color: var(--g-text-main);
+            letter-spacing: -0.2px;
+        }
+
+        .sub-header {
+            margin-top: 4px;
+        }
+
+        .sub-header h2 {
+            font-size: 24px;
+            font-weight: 400;
+            color: var(--g-text-main);
+        }
+
+        .sub-header p {
+            font-size: 14px;
+            color: var(--g-text-sub);
+            margin-top: 6px;
+        }
+
+        /* Google Outlined Inputs */
+        .input-fields {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .input-wrapper {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            height: 54px;
+            padding: 0 16px;
+            font-family: inherit;
+            font-size: 15px;
+            color: var(--g-text-main);
+            background-color: transparent;
+            border: 1px solid var(--g-border);
+            border-radius: 8px;
+            outline: none;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        input[type="text"]::placeholder,
+        input[type="password"]::placeholder {
+            color: var(--g-text-sub);
+            font-size: 14px;
+        }
+
+        input[type="text"]:focus,
+        input[type="password"]:focus {
+            border-color: var(--g-primary-blue);
+            box-shadow: 0 0 0 1px var(--g-primary-blue);
+        }
+
+        /* Action Buttons */
+        .actions-section {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 8px;
+        }
+
+        #btnRegister {
+            background: transparent;
+            color: var(--g-primary-blue);
+            border: none;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 500;
+            padding: 10px 14px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+        }
+
+        #btnRegister:hover {
+            background-color: rgba(11, 87, 208, 0.08);
+        }
+
+        #btnLogin {
+            background-color: var(--g-primary-blue);
+            color: #ffffff;
+            border: none;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 500;
+            padding: 0 24px;
+            height: 40px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: background-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        #btnLogin:hover {
+            background-color: var(--g-primary-hover);
+            box-shadow: 0 1px 3px 1px rgba(60, 64, 67, 0.3);
+        }
+
+        #btnLogin:active,
+        #btnRegister:active {
+            transform: scale(0.98);
+        }
+
+        /* Google Dialogs */
+        dialog {
+            background-color: var(--g-surface);
+            color: var(--g-text-main);
+            border: 1px solid var(--g-border-card);
+            border-radius: 28px;
+            padding: 24px 28px;
+            max-width: 420px;
+            width: 90%;
+            margin: auto;
+            outline: none;
+            box-shadow: 0 8px 24px rgba(60, 64, 67, 0.2);
+        }
+
+        dialog::backdrop {
+            background: rgba(0, 0, 0, 0.38);
+        }
+
+        .dialog-title {
+            font-size: 18px;
+            font-weight: 500;
+            color: var(--g-text-main);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .dialog-body {
+            font-size: 14px;
+            color: var(--g-text-sub);
+            line-height: 1.5;
+            margin-bottom: 24px;
+            white-space: pre-wrap;
+        }
+
+        .dialog-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .btn-dialog-text {
+            background: transparent;
+            color: var(--g-primary-blue);
+            border: none;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 500;
+            padding: 0 16px;
+            height: 38px;
+            border-radius: 19px;
+            cursor: pointer;
+        }
+
+        .btn-dialog-text:hover {
+            background-color: rgba(11, 87, 208, 0.08);
+        }
+
+        .btn-dialog-primary {
+            background-color: var(--g-primary-blue);
+            color: #ffffff;
+            border: none;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 500;
+            padding: 0 20px;
+            height: 38px;
+            border-radius: 19px;
+            cursor: pointer;
+        }
+
+        .btn-dialog-primary:hover {
+            background-color: var(--g-primary-hover);
+        }
+
+        @media (max-width: 480px) {
+            .signin-card {
+                padding: 28px 20px;
+                border-radius: 20px;
             }
         }
     </style>
 </head>
 
 <body>
-    <main style="max-width: 480px; width: 100%; margin: 60px auto; padding: 10px; box-sizing: border-box;">
-        <h2 style="text-align: center; margin-bottom: 20px;">MediaHub 🔒</h2>
-        <div style="display: flex; gap: 8px; margin-bottom: 10px;">
-            <input type="text" id="username" placeholder="Username" style="margin: 0; flex: 1; min-width: 0;">
-            <input type="password" id="password" placeholder="Password" style="margin: 0; flex: 1; min-width: 0;">
+    <main class="signin-card">
+        <div class="header-section">
+            <div class="drive-logo">
+                <span class="material-symbols-outlined cloud-icon">cloud</span>
+                <span class="drive-title">MediaHub</span>
+            </div>
+            <div class="sub-header">
+                <h2>Sign in</h2>
+                <p>to continue to Google Drive Style MediaHub</p>
+            </div>
         </div>
-        <div style="display: flex; gap: 8px;">
-            <button id="btnLogin" style="margin: 0; flex: 1;">🔑 Login</button>
-            <button id="btnRegister" style="margin: 0; flex: 1; background: #555;">📝 Register</button>
+
+        <div class="input-fields">
+            <div class="input-wrapper">
+                <input type="text" id="username" placeholder="Username" autocomplete="username">
+            </div>
+            <div class="input-wrapper">
+                <input type="password" id="password" placeholder="Password" autocomplete="current-password">
+            </div>
+        </div>
+
+        <div class="actions-section">
+            <button id="btnRegister">Create account</button>
+            <button id="btnLogin">Next</button>
         </div>
     </main>
 
     <!-- Notice Dialog -->
-    <dialog id="noticeModal" style="padding: 20px; max-width: 480px;">
-        <h3 style="margin-top: 0;">📢 Notice</h3>
-        <p id="noticeText" style="white-space: pre-wrap;"></p>
-        <div style="text-align: right;">
-            <button id="btnConfirmNotice" style="margin: 0;">Confirm</button>
+    <dialog id="noticeModal">
+        <div class="dialog-title">
+            <span class="material-symbols-outlined" style="color: var(--g-primary-blue);">campaign</span>
+            <span>Notice</span>
+        </div>
+        <div id="noticeText" class="dialog-body"></div>
+        <div class="dialog-actions">
+            <button id="btnConfirmNotice" class="btn-dialog-primary">OK</button>
         </div>
     </dialog>
 
     <!-- Invite Dialog -->
-    <dialog id="inviteModal" style="padding: 20px; max-width: 480px;">
-        <h3 style="margin-top: 0;">🔑 Invite Code Required</h3>
-        <input type="text" id="inviteCodeInput" placeholder="Enter Invite Code" style="width: 100%; box-sizing: border-box; margin-bottom: 10px;">
-        <div style="text-align: right; display: flex; gap: 8px; justify-content: flex-end;">
-            <button id="btnCancelInvite" style="margin: 0; background: #555;">Cancel</button>
-            <button id="btnConfirmInvite" style="margin: 0;">Confirm</button>
+    <dialog id="inviteModal">
+        <div class="dialog-title">
+            <span class="material-symbols-outlined" style="color: var(--g-primary-blue);">key</span>
+            <span>Invite Code Required</span>
+        </div>
+        <div style="margin-bottom: 20px;">
+            <input type="text" id="inviteCodeInput" placeholder="Enter Invite Code" style="width: 100%; height: 48px; padding: 0 14px; border: 1px solid var(--g-border); border-radius: 8px; outline: none;">
+        </div>
+        <div class="dialog-actions">
+            <button id="btnCancelInvite" class="btn-dialog-text">Cancel</button>
+            <button id="btnConfirmInvite" class="btn-dialog-primary">Confirm</button>
         </div>
     </dialog>
 
