@@ -22,8 +22,8 @@ import {
 import { mediaUrl, folderNamesUrl } from '@/lib/api';
 import { unregisterVideoStream } from '@/lib/videoStream';
 
-// Option: Disable ServiceWorker for WebKit (Safari), matching commit 92ac2ec4
-const OPT_NOSW_WEBKIT = true;
+// Option: Disable ServiceWorker for WebKit (Safari), set to false so all modern browsers stream on-the-fly
+const OPT_NOSW_WEBKIT = false;
 
 function getKind(name: string): 'video' | 'image' | 'pdf' | 'text' {
   const ext = name.split('.').pop()?.toLowerCase() ?? '';
@@ -128,6 +128,10 @@ function Viewer(): React.JSX.Element {
         origSizeRef.current = DecodeInt(rawFlK.slice(44, 52));
       } else {
         origSizeRef.current = 0;
+      }
+      if (!origSizeRef.current) {
+        const storedSize = parseInt(sessionStorage.getItem('currentFileSize') || '0', 10);
+        if (storedSize > 0) origSizeRef.current = storedSize;
       }
       const keyPrt = rawFlK.slice(0, 44);
       maskedFlKeyRef.current = mask.XOR(keyPrt);
@@ -287,6 +291,34 @@ function Viewer(): React.JSX.Element {
           const reg = await navigator.serviceWorker.register('/sw.js');
           await navigator.serviceWorker.ready;
 
+          // Ensure worker controls the client before starting stream
+          if (!navigator.serviceWorker.controller) {
+            await new Promise<void>((resolve) => {
+              const onCtrl = () => {
+                navigator.serviceWorker.removeEventListener('controllerchange', onCtrl);
+                resolve();
+              };
+              navigator.serviceWorker.addEventListener('controllerchange', onCtrl);
+              setTimeout(resolve, 800);
+            });
+          }
+
+          // If originalSize is still 0, deduce from cipher length via HEAD request
+          if (!origSizeRef.current || origSizeRef.current <= 0) {
+            try {
+              const hRes = await fetch(`/api/media/${fldId}/${flPid}/dat`, { method: 'HEAD' });
+              const cl = parseInt(hRes.headers.get('Content-Length') || '0', 10);
+              if (cl > 12) {
+                const rem = cl - 12;
+                const full = Math.floor(rem / 1048592);
+                const last = rem % 1048592;
+                origSizeRef.current = full * 1048576 + (last > 16 ? last - 16 : 0);
+              }
+            } catch (err) {
+              console.warn('Could not deduce originalSize via HEAD:', err);
+            }
+          }
+
           if (!maskedFlKeyRef.current) return;
           const rawKey = mask.XOR(maskedFlKeyRef.current);
           const keyHex = toHex(rawKey);
@@ -301,7 +333,7 @@ function Viewer(): React.JSX.Element {
               }
             };
             navigator.serviceWorker.addEventListener('message', h);
-            setTimeout(resolve, 1500);
+            setTimeout(resolve, 1000);
           });
 
           // Handle SW key request if worker restarted
@@ -324,17 +356,19 @@ function Viewer(): React.JSX.Element {
           };
           navigator.serviceWorker.addEventListener('message', handleReqKey);
 
-          const targetSw = reg.active || navigator.serviceWorker.controller || reg.waiting || reg.installing;
-          if (!targetSw) throw new Error('Service Worker could not be activated');
-
-          targetSw.postMessage({
+          const payload = {
             action: 'REGISTER',
             folderId: fldId,
             filePid: flPid,
             fileKey: keyHex,
             originalSize: origSizeRef.current,
             fileName: flName,
-          });
+          };
+
+          if (reg.active) reg.active.postMessage(payload);
+          if (navigator.serviceWorker.controller && navigator.serviceWorker.controller !== reg.active) {
+            navigator.serviceWorker.controller.postMessage(payload);
+          }
 
           await ack;
 

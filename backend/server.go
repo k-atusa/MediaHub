@@ -16,6 +16,7 @@ import (
 	"io/fs"
 	"log"
 	"math/big"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -76,14 +77,34 @@ func initEnv() {
 	os.MkdirAll(filepath.Join(cfg.StorageDir, "users"), 0755)
 	os.MkdirAll(filepath.Join(cfg.StorageDir, "data"), 0755)
 
-	// make certificate if not exists
+	// make certificate if not exists or if missing SAN
 	certDir := filepath.Dir(cfg.CertFile)
 	if err := os.MkdirAll(certDir, 0755); err != nil {
 		log.Printf("failed to create certs directory: %v", err)
 	}
 
+	needCert := false
 	if _, err := os.Stat(cfg.CertFile); os.IsNotExist(err) {
-		log.Println("making self-signed certificate")
+		needCert = true
+	} else {
+		certBytes, err := os.ReadFile(cfg.CertFile)
+		if err == nil {
+			block, _ := pem.Decode(certBytes)
+			if block != nil {
+				parsed, err := x509.ParseCertificate(block.Bytes)
+				if err != nil || len(parsed.DNSNames) == 0 {
+					needCert = true
+				}
+			} else {
+				needCert = true
+			}
+		} else {
+			needCert = true
+		}
+	}
+
+	if needCert {
+		log.Println("generating self-signed certificate with localhost SAN")
 		makeCert(cfg.CertFile, cfg.KeyFile)
 	}
 }
@@ -410,17 +431,21 @@ func makeCert(certOut string, keyOut string) {
 	limit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serial, _ := rand.Int(rand.Reader, limit)
 
-	// make certificate template
+	// make certificate template with localhost SAN and CA capability
 	template := x509.Certificate{
 		SerialNumber: serial,
 		Subject: pkix.Name{
+			CommonName:   "localhost",
 			Organization: []string{"K-ATUSA Programming Club"},
 		},
+		DNSNames:              []string{"localhost"},
+		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1"), net.IPv6loopback},
 		NotBefore:             notBefore,
 		NotAfter:              notAfter,
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
+		IsCA:                  true,
 	}
 
 	// create certificate

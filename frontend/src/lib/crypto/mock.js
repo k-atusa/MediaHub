@@ -18,5 +18,6 @@ export function EncodeCfg() { return new Uint8Array(0); }
 export function DecodeCfg() { return {}; }
 export function DecodeInt() { return 0; }
 export function EncodeInt() { return new Uint8Array(0); }
+export function PadLen() { return 0; }
 export const Opsec = {};
 export default {};

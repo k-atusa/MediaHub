@@ -9,7 +9,7 @@
 
 import { SHA3256, Random, Masker, HashMaster, SymMaster } from './crypto/Bencrypt.js';
 import { Encode64, Decode64, NormPW } from './crypto/Bencode.js';
-import { EncodeCfg, DecodeCfg, DecodeInt, EncodeInt, Opsec } from './crypto/Opsec.js';
+import { EncodeCfg, DecodeCfg, DecodeInt, EncodeInt, PadLen, Opsec } from './crypto/Opsec.js';
 
 const SECRET_PEPPER = '_PROJECT_WHY_MEDIAHUB_PEPPER_2026_!@#$';
 export const mask = new Masker();
@@ -169,16 +169,12 @@ export function getFilePid(maskedFileKey: Uint8Array): string {
 
 export function getOriginalSize(fileKey: Uint8Array): number {
   if (fileKey.length < 52) return 0;
-  const sizeBytes = fileKey.slice(44, 52);
-  const v = new DataView(sizeBytes.buffer, sizeBytes.byteOffset, 8);
-  return Number(v.getBigUint64(0, true));
+  return DecodeInt(fileKey.slice(44, 52));
 }
 
 export function setOriginalSize(fileKey: Uint8Array, size: number): void {
   if (fileKey.length < 52) return;
-  const sizeBytes = fileKey.slice(44, 52);
-  const v = new DataView(sizeBytes.buffer, sizeBytes.byteOffset, 8);
-  v.setBigUint64(0, BigInt(size), true);
+  fileKey.set(EncodeInt(size, 8), 44);
 }
 
 // Allocate a 52-byte key (32 key + 12 iv + 8 size). Used for file keys so we
@@ -188,8 +184,7 @@ export function createFileKeyWithSize(size: number): Uint8Array {
   const k = new Uint8Array(52);
   k.set(Random(32), 0);
   k.set(Random(12), 32);
-  const v = new DataView(k.slice(44, 52).buffer, k.slice(44, 52).byteOffset, 8);
-  v.setBigUint64(0, BigInt(size), true);
+  k.set(EncodeInt(size, 8), 44);
   return k;
 }
 
@@ -254,7 +249,20 @@ export async function encryptFileBlob(file: Blob, fileKey: Uint8Array): Promise<
   const src = new BlobSrc(file);
   const dst = new BlobWriter();
   await sm.EnFile(src, file.size, dst);
-  return dst.getBytes();
+  const enc = dst.getBytes();
+  const padSize = PadLen(enc.length);
+  if (padSize <= 0) return enc;
+
+  const totSize = enc.length + padSize;
+  const medBuf = new Uint8Array(totSize);
+  medBuf.set(enc, 0);
+  let pOff = enc.length;
+  while (pOff < totSize) {
+    const chunk = Math.min(32768, totSize - pOff);
+    medBuf.set(Random(chunk), pOff);
+    pOff += chunk;
+  }
+  return medBuf;
 }
 
 export async function decryptFileBytes(datBytes: Uint8Array, fileKey: Uint8Array, originalSize: number): Promise<Uint8Array> {
@@ -437,4 +445,4 @@ export function mimeForKind(kind: ReturnType<typeof detectKind>, name?: string):
 }
 
 // Export raw helpers for advanced use cases
-export { toHex, fromHex, wipe, DecodeInt, EncodeInt, EncodeCfg, DecodeCfg, SymMaster };
+export { toHex, fromHex, wipe, DecodeInt, EncodeInt, EncodeCfg, DecodeCfg, PadLen, SymMaster };

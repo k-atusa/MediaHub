@@ -92,6 +92,7 @@ export function FileCard({ file, folderName, folderPid, folderKeyHex, onAction }
       sessionStorage.setItem('currentFileKey', file.keyHex);
       sessionStorage.setItem('currentFileName', file.name);
       sessionStorage.setItem('currentFolderName', folderName);
+      sessionStorage.setItem('currentFileSize', String(file.size || 0));
     }
   };
 
