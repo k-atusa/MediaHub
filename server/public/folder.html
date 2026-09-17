@@ -376,7 +376,7 @@
             flex: 1;
         }
 
-        /* Individual Folder Item (Replaces dropdown) */
+        /* Individual Folder Item */
         .nav-folder-item {
             display: flex;
             align-items: center;
@@ -644,7 +644,7 @@
             padding: 10px 0;
         }
 
-        /* Google Drive Style Grid Card (.media-card dynamic from folder.js) */
+        /* Google Drive Style Grid Card */
         .media-card {
             background-color: var(--g-card-bg);
             border: 1px solid var(--g-border);
@@ -682,32 +682,65 @@
             background-color: var(--g-surface);
         }
 
-        /* List View Styles for media-grid */
+        /* --- 7. Google Drive List View Specific Styles --- */
+        .list-view-header {
+            display: none;
+            grid-template-columns: minmax(200px, 1fr) 140px 48px;
+            align-items: center;
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--g-border);
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--g-text-muted);
+            user-select: none;
+            gap: 16px;
+        }
+
+        /* Show list-view header only when list-view is active */
         .media-grid.list-view {
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: 0;
+            padding: 0;
         }
 
+        /* Active List View Header Display */
+        .is-list-mode .list-view-header {
+            display: grid;
+        }
+
+        /* List View Row */
         .media-grid.list-view .media-card {
-            flex-direction: row;
+            display: grid;
+            grid-template-columns: minmax(200px, 1fr) 140px 48px;
             align-items: center;
             height: 48px;
             padding: 0 16px;
-            border-radius: 8px;
-            background-color: var(--g-surface);
-            border: 1px solid var(--g-border);
-            gap: 14px;
+            border: none;
+            border-bottom: 1px solid var(--g-border-subtle);
+            border-radius: 0;
+            background-color: transparent;
+            box-shadow: none;
+            gap: 16px;
         }
 
         .media-grid.list-view .media-card:hover {
             background-color: var(--g-hover-bg);
-            border-color: var(--g-primary-blue);
+            box-shadow: none;
+        }
+
+        /* Columns inside media-card in list-view */
+        .media-grid.list-view .list-col-name {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            overflow: hidden;
+            padding-right: 12px;
         }
 
         .media-grid.list-view .thumb-img {
-            width: 32px;
-            height: 32px;
+            width: 22px;
+            height: 22px;
             border-radius: 4px;
             object-fit: cover;
             flex-shrink: 0;
@@ -718,12 +751,54 @@
             border-top: none;
             background-color: transparent;
             padding: 0;
-            flex: 1;
-            font-size: 14px;
-            font-weight: 500;
+            font-size: 13.5px;
+            font-weight: 400;
+            color: var(--g-text-main);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
-        /* 7. Floating Bottom Right FAB (Upload) */
+        .media-grid.list-view .list-col-size {
+            display: flex;
+            align-items: center;
+            font-size: 13px;
+            color: var(--g-text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .list-header-size {
+            display: flex;
+            align-items: center;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--g-text-muted);
+        }
+
+        .media-grid.list-view .list-col-more {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--g-text-muted);
+        }
+
+        .media-grid.list-view .list-col-more:hover {
+            color: var(--g-text-main);
+        }
+
+        /* In Grid View, hide the extra list columns */
+        .media-grid:not(.list-view) .list-col-size,
+        .media-grid:not(.list-view) .list-col-more {
+            display: none !important;
+        }
+
+        .media-grid:not(.list-view) .list-col-name {
+            display: contents;
+        }
+
+        /* 8. Floating Bottom Right FAB (Upload) */
         .fab-upload-btn {
             position: fixed;
             bottom: 32px;
@@ -895,6 +970,14 @@
             .drive-workspace {
                 padding: 16px;
             }
+            .list-view-header {
+                grid-template-columns: 1fr 80px 36px;
+                gap: 8px;
+            }
+            .media-grid.list-view .media-card {
+                grid-template-columns: 1fr 80px 36px;
+                gap: 8px;
+            }
         }
     </style>
 </head>
@@ -1011,9 +1094,16 @@
             <!-- Upload Container Section (Required by folder.js) -->
             <section id="uploadContainer" class="hidden"></section>
 
-            <!-- Media Container (Contains empty state and grid for selected folder) -->
+            <!-- Media Container (Contains empty state, list header, and grid/list for selected folder) -->
             <section id="mediaContainer" style="display: none; flex-direction: column; flex: 1; overflow-y: auto;">
-                <!-- Grid where media-card elements are appended -->
+                <!-- List View Column Header (Visible only in List Mode) -->
+                <div id="listViewHeader" class="list-view-header">
+                    <div class="list-header-col list-header-name">이름</div>
+                    <div class="list-header-col list-header-size">용량</div>
+                    <div class="list-header-col list-header-more"></div>
+                </div>
+
+                <!-- Grid / List items container -->
                 <div id="mediaGrid" class="media-grid"></div>
 
                 <!-- Empty State (Shown when folder is empty) -->
@@ -1081,7 +1171,71 @@
     </dialog>
 
     <!-- Native JavaScript UI Binding (Does not alter folder.js) -->
-    <script>
+    <script type="module">
+        import { SymMaster, Masker } from './Bencrypt.js';
+        import { DecodeCfg, DecodeInt } from './Opsec.js';
+
+        const fromHex = (hex) => new Uint8Array(hex.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+        const toHex = (buf) => Array.from(buf).map(b => b.toString(16).padStart(2, '0')).join('');
+        const getObjPid = (key) => toHex(key.slice(32, 44));
+
+        function formatBytes(bytes) {
+            if (bytes === undefined || bytes === null || isNaN(bytes)) return "-";
+            if (bytes === 0) return "0 B";
+            const k = 1024;
+            const sizes = ["B", "KB", "MB", "GB", "TB"];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            const val = parseFloat((bytes / Math.pow(k, i)).toFixed(1));
+            return `${val} ${sizes[i]}`;
+        }
+
+        let fileSizeCache = {};
+
+        async function fetchFolderFileSizes(folderName) {
+            if (!folderName) return {};
+            if (fileSizeCache[folderName]) return fileSizeCache[folderName];
+
+            try {
+                const usrHsh = sessionStorage.getItem("userHash");
+                const usrKeyHex = sessionStorage.getItem("userKey");
+                if (!usrHsh || !usrKeyHex) return {};
+
+                const rawUK = fromHex(usrKeyHex);
+                const sm = new SymMaster("gcm1", rawUK);
+                rawUK.fill(0);
+
+                const usrRes = await fetch(`${window.location.origin}/api/userdata/${usrHsh}`);
+                if (!usrRes.ok) return {};
+                const usrDec = await sm.DeBin(new Uint8Array(await usrRes.arrayBuffer()));
+                const fldMap = DecodeCfg(usrDec);
+                usrDec.fill(0);
+
+                const fldKey = fldMap[folderName];
+                if (!fldKey) return {};
+
+                const fldId = getObjPid(fldKey);
+                const fldSm = new SymMaster("gcm1", fldKey.slice(0, 32));
+
+                const flsRes = await fetch(`${window.location.origin}/api/storage/${fldId}/names`);
+                if (!flsRes.ok) return {};
+                const flsDec = await fldSm.DeBin(new Uint8Array(await flsRes.arrayBuffer()));
+                const flsMap = DecodeCfg(flsDec);
+                flsDec.fill(0);
+
+                const sizes = {};
+                for (const [name, flInfo] of Object.entries(flsMap)) {
+                    if (flInfo && flInfo.length >= 52) {
+                        sizes[name] = DecodeInt(flInfo.slice(44, 52));
+                    }
+                }
+                fileSizeCache[folderName] = sizes;
+                return sizes;
+            } catch (e) {
+                console.warn("Could not load file sizes:", e);
+                return {};
+            }
+        }
+
         // 1. Theme Manager (System default as base, supports Light / Dark toggle)
         const btnThemeToggle = document.getElementById("btnThemeToggle");
         const themeIcon = document.getElementById("themeIcon");
@@ -1134,16 +1288,19 @@
         const viewModeIcon = document.getElementById("viewModeIcon");
         const viewModeText = document.getElementById("viewModeText");
         const mediaGrid = document.getElementById("mediaGrid");
+        const mediaContainer = document.getElementById("mediaContainer");
 
         function applyViewMode(mode) {
             localStorage.setItem("driveViewMode", mode);
             if (mode === "list") {
                 mediaGrid.classList.add("list-view");
+                mediaContainer.classList.add("is-list-mode");
                 viewModeIcon.textContent = "grid_view";
                 viewModeText.textContent = "Grid view";
                 btnChangeView.title = "Switch to Grid view";
             } else {
                 mediaGrid.classList.remove("list-view");
+                mediaContainer.classList.remove("is-list-mode");
                 viewModeIcon.textContent = "view_list";
                 viewModeText.textContent = "List view";
                 btnChangeView.title = "Switch to List view";
@@ -1167,7 +1324,6 @@
         const paginationBar = document.getElementById("paginationBar");
         const rootFolderView = document.getElementById("rootFolderView");
         const rootFolderGrid = document.getElementById("rootFolderGrid");
-        const mediaContainer = document.getElementById("mediaContainer");
 
         // Action buttons
         const btnDeleteFolder = document.getElementById("btnDeleteFolder");
@@ -1291,6 +1447,59 @@
             });
         }
 
+        // 4. Enhance Cards to support Name, File Size, and More in List View
+        async function enhanceCardsForListView() {
+            const currentFolder = folderSelect.value;
+            const cards = mediaGrid.querySelectorAll(".media-card");
+            if (cards.length === 0) return;
+
+            // 1) First pass: DOM wrapper and structure
+            cards.forEach(card => {
+                if (!card.dataset.enhanced) {
+                    card.dataset.enhanced = "true";
+
+                    const img = card.querySelector(".thumb-img");
+                    const title = card.querySelector(".file-title");
+
+                    // Wrapper for name column
+                    const nameCol = document.createElement("div");
+                    nameCol.className = "list-col-name";
+                    if (img) nameCol.appendChild(img);
+                    if (title) nameCol.appendChild(title);
+                    card.appendChild(nameCol);
+
+                    // File size column
+                    const sizeCol = document.createElement("div");
+                    sizeCol.className = "list-col-size";
+                    sizeCol.textContent = "...";
+                    card.appendChild(sizeCol);
+
+                    // More column
+                    const moreCol = document.createElement("div");
+                    moreCol.className = "list-col-more";
+                    moreCol.innerHTML = `<span class="material-symbols-outlined">more_vert</span>`;
+                    card.appendChild(moreCol);
+                }
+            });
+
+            // 2) Second pass: populate file sizes asynchronously
+            if (currentFolder) {
+                const sizes = await fetchFolderFileSizes(currentFolder);
+                cards.forEach(card => {
+                    const titleEl = card.querySelector(".file-title");
+                    const sizeEl = card.querySelector(".list-col-size");
+                    if (titleEl && sizeEl) {
+                        const fileName = titleEl.textContent;
+                        if (sizes && sizes[fileName] !== undefined) {
+                            sizeEl.textContent = formatBytes(sizes[fileName]);
+                        } else {
+                            sizeEl.textContent = "-";
+                        }
+                    }
+                });
+            }
+        }
+
         // Observe options added/removed in folderSelect by folder.js
         const folderObserver = new MutationObserver(() => {
             syncSidebarFolderList();
@@ -1300,10 +1509,11 @@
         folderObserver.observe(folderSelect, { childList: true });
 
         folderSelect.addEventListener("change", () => {
+            fileSizeCache = {};
             updateFolderDisplay();
         });
 
-        // Observe mediaGrid children to toggle Empty State
+        // Observe mediaGrid children to toggle Empty State & enhance list view
         const observer = new MutationObserver(() => {
             if (mediaGrid.children.length === 0) {
                 emptyState.style.display = "flex";
@@ -1311,6 +1521,7 @@
             } else {
                 emptyState.style.display = "none";
                 paginationBar.style.display = "flex";
+                enhanceCardsForListView();
             }
         });
         observer.observe(mediaGrid, { childList: true });
@@ -1368,6 +1579,7 @@
 
         fileInput.addEventListener("change", () => {
             if (fileInput.files.length > 0) {
+                fileSizeCache = {};
                 btnUpload.click();
             }
         });
