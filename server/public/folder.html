@@ -348,17 +348,30 @@
             gap: 12px;
             height: 40px;
             padding: 0 14px;
-            color: var(--g-text-muted);
+            color: var(--g-text-main);
             font-size: 14px;
             font-weight: 500;
             user-select: none;
+            cursor: pointer;
+            border-radius: 20px;
+            transition: background-color 0.15s;
+        }
+
+        .sidebar-section-header:hover {
+            background-color: var(--g-hover-bg);
+        }
+
+        .sidebar-section-header.active {
+            background-color: var(--g-active-bg);
+            color: var(--g-fab-text);
+            font-weight: 600;
         }
 
         .sidebar-folder-list {
             display: flex;
             flex-direction: column;
             gap: 2px;
-            padding-left: 8px;
+            padding-left: 12px;
             overflow-y: auto;
             flex: 1;
         }
@@ -368,11 +381,11 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            height: 40px;
+            height: 38px;
             padding: 0 14px;
-            border-radius: 20px;
+            border-radius: 19px;
             color: var(--g-text-main);
-            font-size: 14px;
+            font-size: 13.5px;
             font-weight: 500;
             cursor: pointer;
             user-select: none;
@@ -390,7 +403,7 @@
         }
 
         .nav-folder-item .material-symbols-outlined {
-            font-size: 20px;
+            font-size: 19px;
             color: inherit;
         }
 
@@ -479,7 +492,7 @@
         .workspace-action-group {
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 12px;
             flex-wrap: wrap;
         }
 
@@ -493,7 +506,7 @@
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            padding: 6px 8px;
+            padding: 6px 10px;
             border-radius: 8px;
             cursor: pointer;
             transition: background-color 0.15s;
@@ -508,7 +521,63 @@
             color: var(--g-primary-blue);
         }
 
-        /* 4. Empty State Area */
+        /* 4. Root Folder View (Shown when landing / no folder selected) */
+        .root-folder-view {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 10px 0;
+            overflow-y: auto;
+        }
+
+        .root-folder-header {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--g-text-muted);
+            margin-bottom: 14px;
+        }
+
+        .root-folder-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 16px;
+            width: 100%;
+        }
+
+        .root-folder-card {
+            background-color: var(--g-card-bg);
+            border: 1px solid var(--g-border);
+            border-radius: 12px;
+            padding: 14px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .root-folder-card:hover {
+            background-color: var(--g-hover-bg);
+            border-color: var(--g-primary-blue);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .root-folder-card .material-symbols-outlined {
+            font-size: 24px;
+            color: var(--g-primary-blue);
+        }
+
+        .root-folder-card-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--g-text-main);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* 5. Empty State Area */
         .empty-state-view {
             flex: 1;
             display: flex;
@@ -566,7 +635,7 @@
             background-color: var(--g-primary-hover);
         }
 
-        /* 5. Media Grid (When files exist) */
+        /* 6. Media Grid (Grid View default) */
         .media-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
@@ -575,7 +644,7 @@
             padding: 10px 0;
         }
 
-        /* Google Drive Style Card (.media-card dynamic from folder.js) */
+        /* Google Drive Style Grid Card (.media-card dynamic from folder.js) */
         .media-card {
             background-color: var(--g-card-bg);
             border: 1px solid var(--g-border);
@@ -613,7 +682,48 @@
             background-color: var(--g-surface);
         }
 
-        /* 6. Floating Bottom Right FAB (Upload) */
+        /* List View Styles for media-grid */
+        .media-grid.list-view {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .media-grid.list-view .media-card {
+            flex-direction: row;
+            align-items: center;
+            height: 48px;
+            padding: 0 16px;
+            border-radius: 8px;
+            background-color: var(--g-surface);
+            border: 1px solid var(--g-border);
+            gap: 14px;
+        }
+
+        .media-grid.list-view .media-card:hover {
+            background-color: var(--g-hover-bg);
+            border-color: var(--g-primary-blue);
+        }
+
+        .media-grid.list-view .thumb-img {
+            width: 32px;
+            height: 32px;
+            border-radius: 4px;
+            object-fit: cover;
+            flex-shrink: 0;
+            background-color: transparent;
+        }
+
+        .media-grid.list-view .file-title {
+            border-top: none;
+            background-color: transparent;
+            padding: 0;
+            flex: 1;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* 7. Floating Bottom Right FAB (Upload) */
         .fab-upload-btn {
             position: fixed;
             bottom: 32px;
@@ -796,7 +906,7 @@
             <button class="menu-btn" title="Main menu">
                 <span class="material-symbols-outlined">menu</span>
             </button>
-            <div class="logo-wrap" onclick="window.location.reload()">
+            <div class="logo-wrap" onclick="navToRoot()">
                 <span class="material-symbols-outlined cloud-logo-icon">cloud</span>
                 <span class="app-title">MediaHub</span>
             </div>
@@ -834,7 +944,7 @@
 
             <!-- Navigation Links -->
             <nav class="sidebar-nav-list">
-                <div class="sidebar-section-header">
+                <div class="sidebar-section-header" id="sidebarMyDriveHeader" onclick="navToRoot()">
                     <span class="material-symbols-outlined" style="font-size: 20px;">hard_drive</span>
                     <span>My Drive</span>
                 </div>
@@ -858,14 +968,19 @@
             <div class="workspace-top-bar">
                 <div class="breadcrumb-container">
                     <div class="breadcrumb-trail">
-                        <span class="breadcrumb-link" onclick="window.location.reload()">My Drive</span>
-                        <span class="breadcrumb-separator">/</span>
-                        <span class="breadcrumb-current" id="breadcrumbFolderName">test2</span>
+                        <span class="breadcrumb-link" onclick="navToRoot()">My Drive</span>
+                        <span class="breadcrumb-separator" id="breadcrumbSeparator">/</span>
+                        <span class="breadcrumb-current" id="breadcrumbFolderName"></span>
                     </div>
-                    <h1 class="workspace-folder-title" id="currentFolderTitle">test2</h1>
+                    <h1 class="workspace-folder-title" id="currentFolderTitle">My Drive</h1>
                 </div>
 
                 <div class="workspace-action-group">
+                    <!-- Change View (Grid / List) Button placed to the left of Import -->
+                    <button class="top-action-btn" id="btnChangeView" title="Change view (Grid / List)">
+                        <span class="material-symbols-outlined" id="viewModeIcon">view_list</span>
+                        <span id="viewModeText">List view</span>
+                    </button>
                     <button class="top-action-btn" id="btnImport" title="Import share token">
                         <span class="material-symbols-outlined">file_download</span>
                         <span>Import</span>
@@ -885,11 +1000,19 @@
                 </div>
             </div>
 
+            <!-- Root Folder View (Shown when no folder is selected / on initial landing) -->
+            <section id="rootFolderView" class="root-folder-view">
+                <div class="root-folder-header">Folders</div>
+                <div id="rootFolderGrid" class="root-folder-grid">
+                    <!-- Populated with folder cards -->
+                </div>
+            </section>
+
             <!-- Upload Container Section (Required by folder.js) -->
             <section id="uploadContainer" class="hidden"></section>
 
-            <!-- Media Container (Contains empty state and grid) -->
-            <section id="mediaContainer">
+            <!-- Media Container (Contains empty state and grid for selected folder) -->
+            <section id="mediaContainer" style="display: none; flex-direction: column; flex: 1; overflow-y: auto;">
                 <!-- Grid where media-card elements are appended -->
                 <div id="mediaGrid" class="media-grid"></div>
 
@@ -999,7 +1122,6 @@
             }
         });
 
-        // Listen for OS theme changes when in 'system' mode
         window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
             if ((localStorage.getItem("theme") || "system") === "system") {
                 updateThemeUI();
@@ -1007,31 +1129,142 @@
         });
         updateThemeUI();
 
-        // 2. Synchronize Folder List from folderSelect (No dropdown)
-        const folderSelect = document.getElementById("folderSelect");
-        const sidebarFolderList = document.getElementById("sidebarFolderList");
-        const breadcrumbName = document.getElementById("breadcrumbFolderName");
-        const folderTitle = document.getElementById("currentFolderTitle");
-        const emptyState = document.getElementById("emptyStateContainer");
+        // 2. Grid View vs List View Toggle
+        const btnChangeView = document.getElementById("btnChangeView");
+        const viewModeIcon = document.getElementById("viewModeIcon");
+        const viewModeText = document.getElementById("viewModeText");
         const mediaGrid = document.getElementById("mediaGrid");
-        const paginationBar = document.getElementById("paginationBar");
 
-        function updateFolderDisplay() {
-            const current = folderSelect.value || sessionStorage.getItem("oldFold") || "";
-            if (current) {
-                breadcrumbName.textContent = current;
-                folderTitle.textContent = current;
+        function applyViewMode(mode) {
+            localStorage.setItem("driveViewMode", mode);
+            if (mode === "list") {
+                mediaGrid.classList.add("list-view");
+                viewModeIcon.textContent = "grid_view";
+                viewModeText.textContent = "Grid view";
+                btnChangeView.title = "Switch to Grid view";
             } else {
-                breadcrumbName.textContent = "Select a folder";
-                folderTitle.textContent = "My Drive";
+                mediaGrid.classList.remove("list-view");
+                viewModeIcon.textContent = "view_list";
+                viewModeText.textContent = "List view";
+                btnChangeView.title = "Switch to List view";
             }
         }
 
-        function syncFolderList() {
+        btnChangeView.addEventListener("click", () => {
+            const currentMode = localStorage.getItem("driveViewMode") || "grid";
+            applyViewMode(currentMode === "grid" ? "list" : "grid");
+        });
+        applyViewMode(localStorage.getItem("driveViewMode") || "grid");
+
+        // 3. Folder Navigation & Root Folder List Display
+        const folderSelect = document.getElementById("folderSelect");
+        const sidebarFolderList = document.getElementById("sidebarFolderList");
+        const sidebarMyDriveHeader = document.getElementById("sidebarMyDriveHeader");
+        const breadcrumbName = document.getElementById("breadcrumbFolderName");
+        const breadcrumbSeparator = document.getElementById("breadcrumbSeparator");
+        const folderTitle = document.getElementById("currentFolderTitle");
+        const emptyState = document.getElementById("emptyStateContainer");
+        const paginationBar = document.getElementById("paginationBar");
+        const rootFolderView = document.getElementById("rootFolderView");
+        const rootFolderGrid = document.getElementById("rootFolderGrid");
+        const mediaContainer = document.getElementById("mediaContainer");
+
+        // Action buttons
+        const btnDeleteFolder = document.getElementById("btnDeleteFolder");
+        const btnExport = document.getElementById("btnExport");
+
+        function navToRoot() {
+            folderSelect.value = "";
+            sessionStorage.removeItem("oldFold");
+            updateFolderDisplay();
+            syncRootFolderGrid();
+        }
+
+        function updateFolderDisplay() {
+            const current = folderSelect.value || "";
+            if (current) {
+                // Folder Selected
+                breadcrumbName.textContent = current;
+                breadcrumbName.style.display = "inline";
+                breadcrumbSeparator.style.display = "inline";
+                folderTitle.textContent = current;
+
+                rootFolderView.style.display = "none";
+                mediaContainer.style.display = "flex";
+                sidebarMyDriveHeader.classList.remove("active");
+
+                btnDeleteFolder.style.display = "";
+                btnExport.style.display = "";
+                btnChangeView.style.display = "";
+
+                // Highlight active in sidebar
+                document.querySelectorAll(".nav-folder-item").forEach(item => {
+                    if (item.dataset.folderName === current) {
+                        item.classList.add("active");
+                    } else {
+                        item.classList.remove("active");
+                    }
+                });
+            } else {
+                // Root Landing (No folder selected) -> Display folders in main workspace!
+                breadcrumbName.textContent = "";
+                breadcrumbName.style.display = "none";
+                breadcrumbSeparator.style.display = "none";
+                folderTitle.textContent = "My Drive";
+
+                rootFolderView.style.display = "flex";
+                mediaContainer.style.display = "none";
+                sidebarMyDriveHeader.classList.add("active");
+
+                btnDeleteFolder.style.display = "none";
+                btnExport.style.display = "none";
+                btnChangeView.style.display = "none";
+
+                document.querySelectorAll(".nav-folder-item").forEach(item => {
+                    item.classList.remove("active");
+                });
+
+                syncRootFolderGrid();
+            }
+        }
+
+        function syncRootFolderGrid() {
+            if (!rootFolderGrid) return;
+            rootFolderGrid.innerHTML = "";
+            const options = Array.from(folderSelect.options).filter(opt => opt.value !== "");
+
+            if (options.length === 0) {
+                rootFolderGrid.innerHTML = `
+                    <div style="grid-column: 1 / -1; padding: 40px; text-align: center; color: var(--g-text-muted);">
+                        <span class="material-symbols-outlined" style="font-size: 48px; margin-bottom: 8px;">folder_off</span>
+                        <div style="font-size: 16px; font-weight: 500; color: var(--g-text-main); margin-bottom: 4px;">No folders created</div>
+                        <div style="font-size: 13px;">Click "+ New folder" to create your first folder.</div>
+                    </div>
+                `;
+                return;
+            }
+
+            options.forEach(opt => {
+                const card = document.createElement("div");
+                card.className = "root-folder-card";
+                card.innerHTML = `
+                    <span class="material-symbols-outlined">folder</span>
+                    <span class="root-folder-card-name">${opt.textContent}</span>
+                `;
+                card.addEventListener("click", () => {
+                    folderSelect.value = opt.value;
+                    folderSelect.dispatchEvent(new Event("change"));
+                    updateFolderDisplay();
+                });
+                rootFolderGrid.appendChild(card);
+            });
+        }
+
+        function syncSidebarFolderList() {
             if (!sidebarFolderList) return;
             sidebarFolderList.innerHTML = "";
             const options = Array.from(folderSelect.options).filter(opt => opt.value !== "");
-            const currentSelected = folderSelect.value || sessionStorage.getItem("oldFold") || (options[0]?.value || "");
+            const currentSelected = folderSelect.value || "";
 
             if (options.length === 0) {
                 sidebarFolderList.innerHTML = '<div style="padding: 10px 14px; font-size: 13px; color: var(--g-text-muted);">No folders</div>';
@@ -1048,8 +1281,6 @@
                     <span class="folder-name-label">${opt.textContent}</span>
                 `;
                 item.addEventListener("click", () => {
-                    document.querySelectorAll(".nav-folder-item").forEach(el => el.classList.remove("active"));
-                    item.classList.add("active");
                     if (folderSelect.value !== opt.value) {
                         folderSelect.value = opt.value;
                         folderSelect.dispatchEvent(new Event("change"));
@@ -1062,19 +1293,13 @@
 
         // Observe options added/removed in folderSelect by folder.js
         const folderObserver = new MutationObserver(() => {
-            syncFolderList();
+            syncSidebarFolderList();
+            syncRootFolderGrid();
             updateFolderDisplay();
         });
         folderObserver.observe(folderSelect, { childList: true });
 
         folderSelect.addEventListener("change", () => {
-            document.querySelectorAll(".nav-folder-item").forEach(item => {
-                if (item.dataset.folderName === folderSelect.value) {
-                    item.classList.add("active");
-                } else {
-                    item.classList.remove("active");
-                }
-            });
             updateFolderDisplay();
         });
 
@@ -1149,7 +1374,8 @@
 
         // Initial setup
         window.addEventListener("DOMContentLoaded", () => {
-            syncFolderList();
+            syncSidebarFolderList();
+            syncRootFolderGrid();
             updateFolderDisplay();
         });
     </script>
