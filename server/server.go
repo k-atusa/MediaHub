@@ -25,8 +25,8 @@ import (
 	"time"
 )
 
-//go:embed all:dist
-var distFS embed.FS
+//go:embed all:public
+var publicFS embed.FS
 
 // server config
 type Config struct {
@@ -76,35 +76,16 @@ func initEnv() {
 	// make directories
 	os.MkdirAll(filepath.Join(cfg.StorageDir, "users"), 0755)
 	os.MkdirAll(filepath.Join(cfg.StorageDir, "data"), 0755)
+	os.MkdirAll("./public", 0755)
 
-	// make certificate if not exists or if missing SAN
+	// make certificate if not exists
 	certDir := filepath.Dir(cfg.CertFile)
 	if err := os.MkdirAll(certDir, 0755); err != nil {
 		log.Printf("failed to create certs directory: %v", err)
 	}
 
-	needCert := false
 	if _, err := os.Stat(cfg.CertFile); os.IsNotExist(err) {
-		needCert = true
-	} else {
-		certBytes, err := os.ReadFile(cfg.CertFile)
-		if err == nil {
-			block, _ := pem.Decode(certBytes)
-			if block != nil {
-				parsed, err := x509.ParseCertificate(block.Bytes)
-				if err != nil || len(parsed.DNSNames) == 0 {
-					needCert = true
-				}
-			} else {
-				needCert = true
-			}
-		} else {
-			needCert = true
-		}
-	}
-
-	if needCert {
-		log.Println("generating self-signed certificate with localhost SAN")
+		log.Println("making self-signed certificate")
 		makeCert(cfg.CertFile, cfg.KeyFile)
 	}
 }
@@ -126,7 +107,7 @@ func serveUser(w http.ResponseWriter, r *http.Request) {
 
 	path := filepath.Join(cfg.StorageDir, "users", filepath.Clean(userHash))
 	switch r.Method {
-	case http.MethodGet, http.MethodHead: // read userdata or check existence
+	case http.MethodGet: // read userdata
 		http.ServeFile(w, r, path)
 	case http.MethodPost: // create/update userdata
 		isNewUser := false
@@ -208,7 +189,7 @@ func serveMeta(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch r.Method {
-	case http.MethodGet, http.MethodHead: // read metadata or check existence
+	case http.MethodGet: // read metadata
 		http.ServeFile(w, r, path)
 	case http.MethodPost: // create/update metadata
 		os.MkdirAll(filepath.Dir(path), 0755)
@@ -241,7 +222,7 @@ func serveMedia(w http.ResponseWriter, r *http.Request) {
 	path := filepath.Join(cfg.StorageDir, "data", filepath.Clean(folderID), fileName)
 
 	switch r.Method {
-	case http.MethodGet, http.MethodHead: // read media file or check existence
+	case http.MethodGet: // read media file
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Header().Set("Accept-Ranges", "bytes")
 		http.ServeFile(w, r, path)
@@ -269,7 +250,6 @@ func serveMedia(w http.ResponseWriter, r *http.Request) {
 		postError(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 	}
 }
-
 
 // handles notice fetch
 func serveNotice(w http.ResponseWriter, r *http.Request) {
@@ -431,7 +411,7 @@ func makeCert(certOut string, keyOut string) {
 	limit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serial, _ := rand.Int(rand.Reader, limit)
 
-	// make certificate template with localhost SAN and CA capability
+	// make certificate template
 	template := x509.Certificate{
 		SerialNumber: serial,
 		Subject: pkix.Name{
@@ -463,96 +443,15 @@ func makeCert(certOut string, keyOut string) {
 	pem.Encode(kFile, &pem.Block{Type: "EC PRIVATE KEY", Bytes: b})
 }
 
-func hasLocalIndex(dir string) bool {
-	info, err := os.Stat(dir)
-	if err != nil || !info.IsDir() {
-		return false
-	}
-	idx, err := os.Stat(filepath.Join(dir, "index.html"))
-	return err == nil && !idx.IsDir()
-}
-
-// frontendHandler serves static frontend assets from disk (if available) or from embedded FS
 func frontendHandler() http.Handler {
-	var staticFS http.FileSystem
-
-	// Check local override directories containing index.html first
-	if hasLocalIndex("./dist") {
-		staticFS = http.Dir("./dist")
-		log.Println("Serving frontend from local ./dist directory")
-	} else if hasLocalIndex("./public") {
-		staticFS = http.Dir("./public")
-		log.Println("Serving frontend from local ./public directory")
-	} else {
-		sub, err := fs.Sub(distFS, "dist")
-		if err != nil {
-			log.Fatalf("failed to initialize embedded frontend fs: %v", err)
-		}
-		staticFS = http.FS(sub)
-		log.Println("Serving frontend from embedded binary filesystem")
+	if info, err := os.Stat("./public"); err == nil && info.IsDir() {
+		return http.FileServer(http.Dir("./public"))
 	}
-
-	fileServer := http.FileServer(staticFS)
-
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cleanPath := strings.TrimPrefix(filepath.Clean(r.URL.Path), "/")
-		if cleanPath == "" || cleanPath == "." {
-			cleanPath = "index.html"
-		}
-
-		if cleanPath == "sw.js" {
-			w.Header().Set("Service-Worker-Allowed", "/")
-		}
-
-		// Try opening requested file
-		f, err := staticFS.Open(cleanPath)
-		if err == nil {
-			stat, statErr := f.Stat()
-			f.Close()
-			if statErr == nil {
-				if stat.IsDir() {
-					if !strings.HasSuffix(r.URL.Path, "/") {
-						http.Redirect(w, r, r.URL.Path+"/", http.StatusMovedPermanently)
-						return
-					}
-				}
-				fileServer.ServeHTTP(w, r)
-				return
-			}
-		}
-
-		// Check if cleanPath/index.html exists (e.g. /folder -> /folder/)
-		dirIndexPath := filepath.Join(cleanPath, "index.html")
-		if fDir, errDir := staticFS.Open(dirIndexPath); errDir == nil {
-			fDir.Close()
-			if !strings.HasSuffix(r.URL.Path, "/") {
-				http.Redirect(w, r, r.URL.Path+"/", http.StatusMovedPermanently)
-				return
-			}
-			fileServer.ServeHTTP(w, r)
-			return
-		}
-
-		// Check if cleanPath.html exists (e.g. /folder -> /folder.html)
-		htmlPath := cleanPath + ".html"
-		if fHtml, errHtml := staticFS.Open(htmlPath); errHtml == nil {
-			fHtml.Close()
-			r.URL.Path = "/" + htmlPath
-			fileServer.ServeHTTP(w, r)
-			return
-		}
-
-		// Fallback to 404.html if present
-		if f404, err404 := staticFS.Open("404.html"); err404 == nil {
-			f404.Close()
-			w.WriteHeader(http.StatusNotFound)
-			r.URL.Path = "/404.html"
-			fileServer.ServeHTTP(w, r)
-			return
-		}
-
-		fileServer.ServeHTTP(w, r)
-	})
+	sub, err := fs.Sub(publicFS, "public")
+	if err != nil {
+		log.Fatalf("failed to initialize embedded filesystem: %v", err)
+	}
+	return http.FileServer(http.FS(sub))
 }
 
 func main() {

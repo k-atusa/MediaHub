@@ -2,6 +2,17 @@
 __pycache__/
 *.pyc
 .venv/
+certs/
+config/
+users/
+data/
+server/certs/
+server/config/
+server/users/
+server/data/
+server/server
+server/mediahub-server-*
+server/server*.exe
 backend/certs/
 backend/config/
 backend/users/
