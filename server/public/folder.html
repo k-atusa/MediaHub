@@ -340,7 +340,7 @@
             position: absolute;
             top: calc(100% + 6px);
             left: 0;
-            min-width: 250px;
+            min-width: 200px;
             background-color: var(--g-surface);
             border-radius: 8px;
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.24), 0 1px 4px rgba(0, 0, 0, 0.12);
@@ -371,7 +371,7 @@
             align-items: center;
             gap: 14px;
             height: 40px;
-            padding: 0 16px;
+            padding: 0 18px 0 16px;
             cursor: pointer;
             user-select: none;
             font-size: 13.5px;
@@ -391,13 +391,6 @@
         .drive-menu-item .menu-label {
             flex: 1;
             font-weight: 400;
-        }
-
-        .drive-menu-item .menu-shortcut {
-            font-size: 11.5px;
-            color: var(--g-text-muted);
-            margin-left: auto;
-            letter-spacing: 0.2px;
         }
 
         .drive-menu-divider {
@@ -486,24 +479,7 @@
             white-space: nowrap;
         }
 
-        /* Sidebar Bottom Profile */
-        .sidebar-bottom-profile {
-            margin-top: auto;
-            border-top: 1px solid var(--g-border);
-            padding-top: 16px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
 
-        .user-pid-label {
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--g-text-main);
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
 
         /* 3. Main Workspace */
         .drive-workspace {
@@ -1069,19 +1045,16 @@
                 <div class="new-drive-menu" id="newDriveMenu">
                     <div class="drive-menu-item" id="menuItemNewFolder">
                         <span class="material-symbols-outlined menu-icon">create_new_folder</span>
-                        <span class="menu-label">새 폴더</span>
-                        <span class="menu-shortcut">^C 다음 F</span>
+                        <span class="menu-label">New folder</span>
                     </div>
                     <div class="drive-menu-divider"></div>
                     <div class="drive-menu-item" id="menuItemFileUpload">
                         <span class="material-symbols-outlined menu-icon">upload_file</span>
-                        <span class="menu-label">파일 업로드</span>
-                        <span class="menu-shortcut">^C 다음 U</span>
+                        <span class="menu-label">File upload</span>
                     </div>
                     <div class="drive-menu-item" id="menuItemFolderUpload">
                         <span class="material-symbols-outlined menu-icon">drive_folder_upload</span>
-                        <span class="menu-label">폴더 업로드</span>
-                        <span class="menu-shortcut">^C 다음 I</span>
+                        <span class="menu-label">Folder upload</span>
                     </div>
                 </div>
             </div>
@@ -1098,12 +1071,6 @@
                     <!-- Populated dynamically from folder.js data -->
                 </div>
             </nav>
-
-            <!-- Bottom Profile Section -->
-            <div class="sidebar-bottom-profile">
-                <div class="profile-avatar">TE</div>
-                <span class="user-pid-label" id="lblUserHash">test</span>
-            </div>
         </aside>
 
         <!-- Main Workspace -->
@@ -1203,6 +1170,7 @@
         <button id="btnTrim">Trim</button>
         <input type="text" id="newFolderName">
         <button id="btnCreateFolder">Create</button>
+        <span id="lblUserHash" style="display: none;"></span>
     </div>
 
     <!-- New Folder Dialog (Triggered by '+ New folder') -->
@@ -1690,7 +1658,7 @@
         if (menuItemFolderUpload) {
             menuItemFolderUpload.addEventListener("click", () => {
                 if (newDriveMenu) newDriveMenu.classList.remove("open");
-                alert("ℹ️ 새 폴더를 먼저 생성한 후 해당 폴더 내에서 파일을 업로드해주세요.");
+                alert("ℹ️ Please create a folder first and upload files inside it.");
                 openNewFolderDialog();
             });
         }
