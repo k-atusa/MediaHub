@@ -13,19 +13,79 @@
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@400;500&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
 
+    <!-- Theme Initialization Script (Prevents FOUC) -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('theme') || 'system';
+            if (saved === 'dark' || saved === 'light') {
+                document.documentElement.setAttribute('data-theme', saved);
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+            }
+        })();
+    </script>
+
     <style>
         :root {
-            /* Google Drive Previewer Theme (Clean Solid Dark, No Glassmorphism) */
+            /* Default: System Theme determined by prefers-color-scheme */
+            --preview-bg: #f8fafd;
+            --preview-topbar: #ffffff;
+            --preview-surface: #ffffff;
+            --preview-hover: #f0f4f9;
+            --preview-outline: #e0e2ec;
+            --preview-primary: #0b57d0;
+            --preview-text: #1f1f1f;
+            --preview-subtext: #5f6368;
+            --preview-danger: #b3261e;
+            --preview-nav-bg: rgba(255, 255, 255, 0.9);
+            --preview-nav-shadow: rgba(0, 0, 0, 0.15);
+        }
+
+        /* Automatic System Dark Theme */
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                --preview-bg: #0e0e0e;
+                --preview-topbar: #18191b;
+                --preview-surface: #1e1f20;
+                --preview-hover: #282a2c;
+                --preview-outline: #303134;
+                --preview-primary: #a8c7fa;
+                --preview-text: #e3e3e3;
+                --preview-subtext: #c4c7c5;
+                --preview-danger: #f2b8b5;
+                --preview-nav-bg: rgba(30, 31, 32, 0.85);
+                --preview-nav-shadow: rgba(0, 0, 0, 0.5);
+            }
+        }
+
+        /* Explicit Dark Mode */
+        [data-theme="dark"] {
             --preview-bg: #0e0e0e;
             --preview-topbar: #18191b;
             --preview-surface: #1e1f20;
             --preview-hover: #282a2c;
             --preview-outline: #303134;
             --preview-primary: #a8c7fa;
-            --preview-on-primary: #062e6f;
             --preview-text: #e3e3e3;
             --preview-subtext: #c4c7c5;
             --preview-danger: #f2b8b5;
+            --preview-nav-bg: rgba(30, 31, 32, 0.85);
+            --preview-nav-shadow: rgba(0, 0, 0, 0.5);
+        }
+
+        /* Explicit Light Mode */
+        [data-theme="light"] {
+            --preview-bg: #f8fafd;
+            --preview-topbar: #ffffff;
+            --preview-surface: #ffffff;
+            --preview-hover: #f0f4f9;
+            --preview-outline: #e0e2ec;
+            --preview-primary: #0b57d0;
+            --preview-text: #1f1f1f;
+            --preview-subtext: #5f6368;
+            --preview-danger: #b3261e;
+            --preview-nav-bg: rgba(255, 255, 255, 0.9);
+            --preview-nav-shadow: rgba(0, 0, 0, 0.15);
         }
 
         * {
@@ -42,6 +102,7 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            transition: background-color 0.2s ease, color 0.2s ease;
         }
 
         .hidden {
@@ -60,6 +121,7 @@
             z-index: 10;
             flex-shrink: 0;
             gap: 12px;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
         }
 
         .topbar-left {
@@ -81,7 +143,7 @@
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: background-color 0.15s;
+            transition: background-color 0.15s, color 0.15s;
             flex-shrink: 0;
         }
 
@@ -103,7 +165,7 @@
             outline: none;
             max-width: 460px;
             flex: 1;
-            transition: background-color 0.15s, border-color 0.15s;
+            transition: background-color 0.15s, border-color 0.15s, color 0.15s;
         }
 
         #txName:hover {
@@ -156,7 +218,7 @@
             height: auto;
             object-fit: contain;
             border-radius: 6px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
             display: block;
             margin: auto;
         }
@@ -167,7 +229,7 @@
             border: none;
             border-radius: 8px;
             background: #ffffff;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
         }
 
         textarea {
@@ -184,7 +246,7 @@
             box-sizing: border-box;
             outline: none;
             resize: none;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
         }
 
         textarea:focus {
@@ -199,7 +261,7 @@
             width: 48px;
             height: 48px;
             border-radius: 50%;
-            background-color: rgba(30, 31, 32, 0.85);
+            background-color: var(--preview-nav-bg);
             border: 1px solid var(--preview-outline);
             color: var(--preview-text);
             display: flex;
@@ -208,12 +270,12 @@
             cursor: pointer;
             z-index: 20;
             transition: background-color 0.15s, transform 0.15s, filter 0.15s;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 2px 8px var(--preview-nav-shadow);
         }
 
         .btn-floating-nav:hover {
             background-color: var(--preview-hover);
-            filter: brightness(1.2);
+            filter: brightness(1.1);
             transform: translateY(-50%) scale(1.05);
         }
 
@@ -263,20 +325,24 @@
     <!-- 1. Google Drive Preview Top Bar -->
     <header class="preview-topbar">
         <div class="topbar-left">
-            <button onclick="window.location.href='./folder.html'" class="icon-btn" title="닫기 / 드라이브로 돌아가기">
+            <button onclick="window.location.href='./folder.html'" class="icon-btn" title="Close / Back to Drive">
                 <span class="material-symbols-outlined">arrow_back</span>
             </button>
-            <input type="text" id="txName" placeholder="파일 이름">
+            <input type="text" id="txName" placeholder="File name">
         </div>
 
         <div class="topbar-actions">
-            <button id="btnEdit" class="icon-btn" title="이름 바꾸기 (Rename)">
+            <!-- Theme Toggle Button -->
+            <button class="icon-btn" id="btnThemeToggle" title="Theme: System (Auto)">
+                <span class="material-symbols-outlined" id="themeIcon">brightness_auto</span>
+            </button>
+            <button id="btnEdit" class="icon-btn" title="Rename">
                 <span class="material-symbols-outlined">edit</span>
             </button>
-            <button id="btnDown" class="icon-btn" title="다운로드 (Download)">
+            <button id="btnDown" class="icon-btn" title="Download">
                 <span class="material-symbols-outlined">download</span>
             </button>
-            <button id="btnDelete" class="icon-btn btn-danger" title="삭제 (Delete)">
+            <button id="btnDelete" class="icon-btn btn-danger" title="Delete">
                 <span class="material-symbols-outlined">delete</span>
             </button>
         </div>
@@ -285,17 +351,66 @@
     <!-- 2. Google Drive Media Canvas -->
     <main class="preview-canvas">
         <div id="viewBody" class="body-box">
-            <p style="color: var(--preview-subtext); font-size: 14px;">파일 로드 중...</p>
+            <p style="color: var(--preview-subtext); font-size: 14px;">Loading...</p>
         </div>
     </main>
 
     <!-- 3. Google Drive Floating Side Navigation (Previous / Next) -->
-    <button id="btnPrevFile" class="btn-floating-nav hidden" title="이전 파일">
+    <button id="btnPrevFile" class="btn-floating-nav hidden" title="Previous file">
         <span class="material-symbols-outlined" style="font-size: 28px;">chevron_left</span>
     </button>
-    <button id="btnNextFile" class="btn-floating-nav hidden" title="다음 파일">
+    <button id="btnNextFile" class="btn-floating-nav hidden" title="Next file">
         <span class="material-symbols-outlined" style="font-size: 28px;">chevron_right</span>
     </button>
+
+    <!-- Theme Manager Script -->
+    <script>
+        const btnThemeToggle = document.getElementById("btnThemeToggle");
+        const themeIcon = document.getElementById("themeIcon");
+
+        function updateThemeUI() {
+            const mode = localStorage.getItem("theme") || "system";
+            if (mode === "dark") {
+                themeIcon.textContent = "dark_mode";
+                btnThemeToggle.title = "Theme: Dark";
+            } else if (mode === "light") {
+                themeIcon.textContent = "light_mode";
+                btnThemeToggle.title = "Theme: Light";
+            } else {
+                themeIcon.textContent = "brightness_auto";
+                btnThemeToggle.title = "Theme: System default";
+            }
+        }
+
+        function setTheme(mode) {
+            if (mode === "system") {
+                localStorage.setItem("theme", "system");
+                document.documentElement.removeAttribute("data-theme");
+            } else {
+                localStorage.setItem("theme", mode);
+                document.documentElement.setAttribute("data-theme", mode);
+            }
+            updateThemeUI();
+        }
+
+        btnThemeToggle.addEventListener("click", () => {
+            const current = localStorage.getItem("theme") || "system";
+            if (current === "system") {
+                setTheme("dark");
+            } else if (current === "dark") {
+                setTheme("light");
+            } else {
+                setTheme("system");
+            }
+        });
+
+        window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+            if ((localStorage.getItem("theme") || "system") === "system") {
+                updateThemeUI();
+            }
+        });
+        updateThemeUI();
+    </script>
 
     <script type="module" src="./viewer.js"></script>
 </body>

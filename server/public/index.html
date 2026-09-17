@@ -10,8 +10,23 @@
     <!-- Google Fonts & Material Symbols -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+
+    <!-- Theme Initialization Script (Prevents FOUC) -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('theme') || 'system';
+            if (saved === 'dark' || saved === 'light') {
+                document.documentElement.setAttribute('data-theme', saved);
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+            }
+        })();
+    </script>
 
     <style>
         :root {
@@ -24,6 +39,48 @@
             --g-primary-hover: #0842a0;
             --g-text-main: #1f1f1f;
             --g-text-sub: #444746;
+            --g-card-shadow: rgba(60, 64, 67, 0.1);
+        }
+
+        /* Automatic System Dark Theme */
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                --g-bg: #131314;
+                --g-surface: #1e1f20;
+                --g-border: #8e918f;
+                --g-border-card: #444746;
+                --g-primary-blue: #a8c7fa;
+                --g-primary-hover: #d3e3fd;
+                --g-text-main: #e3e3e3;
+                --g-text-sub: #c4c7c5;
+                --g-card-shadow: rgba(0, 0, 0, 0.5);
+            }
+        }
+
+        /* Explicit Dark Mode */
+        [data-theme="dark"] {
+            --g-bg: #131314;
+            --g-surface: #1e1f20;
+            --g-border: #8e918f;
+            --g-border-card: #444746;
+            --g-primary-blue: #a8c7fa;
+            --g-primary-hover: #d3e3fd;
+            --g-text-main: #e3e3e3;
+            --g-text-sub: #c4c7c5;
+            --g-card-shadow: rgba(0, 0, 0, 0.5);
+        }
+
+        /* Explicit Light Mode */
+        [data-theme="light"] {
+            --g-bg: #f0f4f9;
+            --g-surface: #ffffff;
+            --g-border: #747775;
+            --g-border-card: #c4c7c5;
+            --g-primary-blue: #0b57d0;
+            --g-primary-hover: #0842a0;
+            --g-text-main: #1f1f1f;
+            --g-text-sub: #444746;
+            --g-card-shadow: rgba(60, 64, 67, 0.1);
         }
 
         * {
@@ -42,6 +99,34 @@
             justify-content: center;
             padding: 20px;
             -webkit-font-smoothing: antialiased;
+            transition: background-color 0.2s ease, color 0.2s ease;
+            position: relative;
+        }
+
+        /* Top-Right Theme Toggle */
+        .theme-toggle-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+        }
+
+        .header-icon-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            color: var(--g-text-sub);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.15s, color 0.15s;
+        }
+
+        .header-icon-btn:hover {
+            background-color: rgba(128, 128, 128, 0.12);
+            color: var(--g-text-main);
         }
 
         /* Google Sign-in Card */
@@ -55,7 +140,8 @@
             display: flex;
             flex-direction: column;
             gap: 28px;
-            box-shadow: 0 1px 3px rgba(60, 64, 67, 0.1);
+            box-shadow: 0 1px 3px var(--g-card-shadow);
+            transition: background-color 0.2s ease, border-color 0.2s ease;
         }
 
         .header-section {
@@ -90,12 +176,6 @@
             font-size: 24px;
             font-weight: 400;
             color: var(--g-text-main);
-        }
-
-        .sub-header p {
-            font-size: 14px;
-            color: var(--g-text-sub);
-            margin-top: 6px;
         }
 
         /* Google Outlined Inputs */
@@ -175,6 +255,11 @@
             border-radius: 20px;
             cursor: pointer;
             transition: background-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        [data-theme="dark"] #btnLogin,
+        :root:not([data-theme="light"]) #btnLogin {
+            color: #062e6f;
         }
 
         #btnLogin:hover {
@@ -259,6 +344,11 @@
             cursor: pointer;
         }
 
+        [data-theme="dark"] .btn-dialog-primary,
+        :root:not([data-theme="light"]) .btn-dialog-primary {
+            color: #062e6f;
+        }
+
         .btn-dialog-primary:hover {
             background-color: var(--g-primary-hover);
         }
@@ -273,6 +363,13 @@
 </head>
 
 <body>
+    <!-- Theme Toggle Button -->
+    <div class="theme-toggle-container">
+        <button class="header-icon-btn" id="btnThemeToggle" title="Theme: System (Auto)">
+            <span class="material-symbols-outlined" id="themeIcon">brightness_auto</span>
+        </button>
+    </div>
+
     <main class="signin-card">
         <div class="header-section">
             <div class="drive-logo">
@@ -281,7 +378,6 @@
             </div>
             <div class="sub-header">
                 <h2>Sign in</h2>
-                <p>to continue to Google Drive Style MediaHub</p>
             </div>
         </div>
 
@@ -319,13 +415,63 @@
             <span>Invite Code Required</span>
         </div>
         <div style="margin-bottom: 20px;">
-            <input type="text" id="inviteCodeInput" placeholder="Enter Invite Code" style="width: 100%; height: 48px; padding: 0 14px; border: 1px solid var(--g-border); border-radius: 8px; outline: none;">
+            <input type="text" id="inviteCodeInput" placeholder="Enter Invite Code"
+                style="width: 100%; height: 48px; padding: 0 14px; border: 1px solid var(--g-border); border-radius: 8px; outline: none; background-color: transparent; color: var(--g-text-main);">
         </div>
         <div class="dialog-actions">
             <button id="btnCancelInvite" class="btn-dialog-text">Cancel</button>
             <button id="btnConfirmInvite" class="btn-dialog-primary">Confirm</button>
         </div>
     </dialog>
+
+    <!-- Theme Manager Script -->
+    <script>
+        const btnThemeToggle = document.getElementById("btnThemeToggle");
+        const themeIcon = document.getElementById("themeIcon");
+
+        function updateThemeUI() {
+            const mode = localStorage.getItem("theme") || "system";
+            if (mode === "dark") {
+                themeIcon.textContent = "dark_mode";
+                btnThemeToggle.title = "Theme: Dark";
+            } else if (mode === "light") {
+                themeIcon.textContent = "light_mode";
+                btnThemeToggle.title = "Theme: Light";
+            } else {
+                themeIcon.textContent = "brightness_auto";
+                btnThemeToggle.title = "Theme: System default";
+            }
+        }
+
+        function setTheme(mode) {
+            if (mode === "system") {
+                localStorage.setItem("theme", "system");
+                document.documentElement.removeAttribute("data-theme");
+            } else {
+                localStorage.setItem("theme", mode);
+                document.documentElement.setAttribute("data-theme", mode);
+            }
+            updateThemeUI();
+        }
+
+        btnThemeToggle.addEventListener("click", () => {
+            const current = localStorage.getItem("theme") || "system";
+            if (current === "system") {
+                setTheme("dark");
+            } else if (current === "dark") {
+                setTheme("light");
+            } else {
+                setTheme("system");
+            }
+        });
+
+        window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+            if ((localStorage.getItem("theme") || "system") === "system") {
+                updateThemeUI();
+            }
+        });
+        updateThemeUI();
+    </script>
 
     <script type="module" src="./login.js"></script>
 </body>

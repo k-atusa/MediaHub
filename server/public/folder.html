@@ -13,9 +13,21 @@
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@400;500&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
 
+    <!-- Theme Initialization Script (Prevents FOUC) -->
+    <script>
+        (function() {
+            const saved = localStorage.getItem('theme') || 'system';
+            if (saved === 'dark' || saved === 'light') {
+                document.documentElement.setAttribute('data-theme', saved);
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+            }
+        })();
+    </script>
+
     <style>
         :root {
-            /* Google Drive Exact Light Theme Palette */
+            /* Default: System Light Theme */
             --g-bg: #ffffff;
             --g-surface: #ffffff;
             --g-search-bg: #edf2fc;
@@ -31,6 +43,77 @@
             --g-hover-bg: #f0f4f9;
             --g-active-bg: #d3e3fd;
             --g-danger: #b3261e;
+            --g-card-bg: #f8fafd;
+            --g-dialog-bg: #ffffff;
+            --g-dialog-shadow: rgba(60, 64, 67, 0.2);
+        }
+
+        /* Automatic System Dark Theme */
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                --g-bg: #131314;
+                --g-surface: #1e1f20;
+                --g-search-bg: #282a2c;
+                --g-border: #444746;
+                --g-border-subtle: #303134;
+                --g-primary-blue: #a8c7fa;
+                --g-primary-hover: #d3e3fd;
+                --g-fab-bg: #004a77;
+                --g-fab-hover: #005c94;
+                --g-fab-text: #d3e3fd;
+                --g-text-main: #e3e3e3;
+                --g-text-muted: #c4c7c5;
+                --g-hover-bg: #282a2c;
+                --g-active-bg: #004a77;
+                --g-danger: #f2b8b5;
+                --g-card-bg: #1e1f20;
+                --g-dialog-bg: #1e1f20;
+                --g-dialog-shadow: rgba(0, 0, 0, 0.5);
+            }
+        }
+
+        /* Explicit Dark Mode */
+        [data-theme="dark"] {
+            --g-bg: #131314;
+            --g-surface: #1e1f20;
+            --g-search-bg: #282a2c;
+            --g-border: #444746;
+            --g-border-subtle: #303134;
+            --g-primary-blue: #a8c7fa;
+            --g-primary-hover: #d3e3fd;
+            --g-fab-bg: #004a77;
+            --g-fab-hover: #005c94;
+            --g-fab-text: #d3e3fd;
+            --g-text-main: #e3e3e3;
+            --g-text-muted: #c4c7c5;
+            --g-hover-bg: #282a2c;
+            --g-active-bg: #004a77;
+            --g-danger: #f2b8b5;
+            --g-card-bg: #1e1f20;
+            --g-dialog-bg: #1e1f20;
+            --g-dialog-shadow: rgba(0, 0, 0, 0.5);
+        }
+
+        /* Explicit Light Mode */
+        [data-theme="light"] {
+            --g-bg: #ffffff;
+            --g-surface: #ffffff;
+            --g-search-bg: #edf2fc;
+            --g-border: #e0e2ec;
+            --g-border-subtle: #f0f1f4;
+            --g-primary-blue: #0b57d0;
+            --g-primary-hover: #0842a0;
+            --g-fab-bg: #d3e3fd;
+            --g-fab-hover: #c2e7ff;
+            --g-fab-text: #041e49;
+            --g-text-main: #1f1f1f;
+            --g-text-muted: #5f6368;
+            --g-hover-bg: #f0f4f9;
+            --g-active-bg: #d3e3fd;
+            --g-danger: #b3261e;
+            --g-card-bg: #f8fafd;
+            --g-dialog-bg: #ffffff;
+            --g-dialog-shadow: rgba(60, 64, 67, 0.2);
         }
 
         * {
@@ -48,6 +131,7 @@
             flex-direction: column;
             overflow: hidden;
             -webkit-font-smoothing: antialiased;
+            transition: background-color 0.2s ease, color 0.2s ease;
         }
 
         .hidden {
@@ -65,6 +149,7 @@
             flex-shrink: 0;
             border-bottom: 1px solid var(--g-border-subtle);
             gap: 16px;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
         }
 
         .header-left {
@@ -127,7 +212,7 @@
         }
 
         .header-search-box:focus-within {
-            background-color: #ffffff;
+            background-color: var(--g-surface);
             box-shadow: 0 1px 3px 1px rgba(60, 64, 67, 0.2), 0 2px 8px 4px rgba(60, 64, 67, 0.1);
         }
 
@@ -169,11 +254,13 @@
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: background-color 0.15s;
+            transition: background-color 0.15s, color 0.15s;
+            position: relative;
         }
 
         .header-icon-btn:hover {
             background-color: var(--g-hover-bg);
+            color: var(--g-text-main);
         }
 
         .profile-avatar {
@@ -209,6 +296,7 @@
             gap: 16px;
             flex-shrink: 0;
             border-right: 1px solid var(--g-border-subtle);
+            transition: background-color 0.2s ease, border-color 0.2s ease;
         }
 
         /* New folder pill button */
@@ -229,6 +317,11 @@
             box-shadow: 0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
             transition: background-color 0.15s, box-shadow 0.15s;
             width: fit-content;
+        }
+
+        [data-theme="dark"] .btn-new-folder,
+        :root:not([data-theme="light"]) .btn-new-folder {
+            color: #062e6f;
         }
 
         .btn-new-folder:hover {
@@ -335,6 +428,7 @@
             overflow: hidden;
             padding: 12px 24px 24px 16px;
             position: relative;
+            transition: background-color 0.2s ease;
         }
 
         /* Workspace Top Bar (Breadcrumb + Actions) */
@@ -428,7 +522,7 @@
 
         .empty-cloud-icon {
             font-size: 88px;
-            color: #747775;
+            color: var(--g-text-muted);
             user-select: none;
         }
 
@@ -463,6 +557,11 @@
             transition: background-color 0.15s;
         }
 
+        [data-theme="dark"] .btn-empty-upload,
+        :root:not([data-theme="light"]) .btn-empty-upload {
+            color: #062e6f;
+        }
+
         .btn-empty-upload:hover {
             background-color: var(--g-primary-hover);
         }
@@ -478,7 +577,7 @@
 
         /* Google Drive Style Card (.media-card dynamic from folder.js) */
         .media-card {
-            background-color: #f8fafd;
+            background-color: var(--g-card-bg);
             border: 1px solid var(--g-border);
             border-radius: 12px;
             overflow: hidden;
@@ -489,7 +588,7 @@
         }
 
         .media-card:hover {
-            background-color: #f0f4f9;
+            background-color: var(--g-hover-bg);
             border-color: var(--g-primary-blue);
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
@@ -498,7 +597,7 @@
             width: 100%;
             height: 140px;
             object-fit: cover;
-            background-color: #e9eef6;
+            background-color: var(--g-hover-bg);
             display: block;
         }
 
@@ -511,7 +610,7 @@
             overflow: hidden;
             text-overflow: ellipsis;
             border-top: 1px solid var(--g-border);
-            background-color: #ffffff;
+            background-color: var(--g-surface);
         }
 
         /* 6. Floating Bottom Right FAB (Upload) */
@@ -568,12 +667,13 @@
             height: 36px;
             border-radius: 50%;
             border: 1px solid var(--g-border);
-            background: #ffffff;
+            background: var(--g-surface);
             color: var(--g-text-main);
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
+            transition: background-color 0.15s;
         }
 
         .page-icon-btn:hover {
@@ -588,7 +688,7 @@
         /* Dialogs */
         dialog#newFolderModal,
         dialog#pwModal {
-            background-color: #ffffff;
+            background-color: var(--g-dialog-bg);
             color: var(--g-text-main);
             border: 1px solid var(--g-border);
             border-radius: 28px;
@@ -597,11 +697,11 @@
             width: 90%;
             margin: auto;
             outline: none;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 8px 24px var(--g-dialog-shadow);
         }
 
         dialog::backdrop {
-            background: rgba(0, 0, 0, 0.4);
+            background: rgba(0, 0, 0, 0.5);
         }
 
         .dialog-title {
@@ -620,6 +720,8 @@
             font-size: 14px;
             margin-bottom: 20px;
             outline: none;
+            background-color: transparent;
+            color: var(--g-text-main);
         }
 
         .dialog-input:focus {
@@ -663,6 +765,11 @@
             cursor: pointer;
         }
 
+        [data-theme="dark"] .btn-dialog-confirm,
+        :root:not([data-theme="light"]) .btn-dialog-confirm {
+            color: #062e6f;
+        }
+
         .btn-dialog-confirm:hover {
             background-color: var(--g-primary-hover);
         }
@@ -701,8 +808,9 @@
         </div>
 
         <div class="header-right">
-            <button class="header-icon-btn" title="Dark mode">
-                <span class="material-symbols-outlined">dark_mode</span>
+            <!-- Theme Toggle Button (Cycles: System -> Dark -> Light -> System) -->
+            <button class="header-icon-btn" id="btnThemeToggle" title="Theme: System (Auto)">
+                <span class="material-symbols-outlined" id="themeIcon">brightness_auto</span>
             </button>
             <button class="header-icon-btn" title="Help">
                 <span class="material-symbols-outlined">help</span>
@@ -851,7 +959,55 @@
 
     <!-- Native JavaScript UI Binding (Does not alter folder.js) -->
     <script>
-        // Synchronize Folder List from folderSelect (No dropdown)
+        // 1. Theme Manager (System default as base, supports Light / Dark toggle)
+        const btnThemeToggle = document.getElementById("btnThemeToggle");
+        const themeIcon = document.getElementById("themeIcon");
+
+        function updateThemeUI() {
+            const mode = localStorage.getItem("theme") || "system";
+            if (mode === "dark") {
+                themeIcon.textContent = "dark_mode";
+                btnThemeToggle.title = "Theme: Dark";
+            } else if (mode === "light") {
+                themeIcon.textContent = "light_mode";
+                btnThemeToggle.title = "Theme: Light";
+            } else {
+                themeIcon.textContent = "brightness_auto";
+                btnThemeToggle.title = "Theme: System default";
+            }
+        }
+
+        function setTheme(mode) {
+            if (mode === "system") {
+                localStorage.setItem("theme", "system");
+                document.documentElement.removeAttribute("data-theme");
+            } else {
+                localStorage.setItem("theme", mode);
+                document.documentElement.setAttribute("data-theme", mode);
+            }
+            updateThemeUI();
+        }
+
+        btnThemeToggle.addEventListener("click", () => {
+            const current = localStorage.getItem("theme") || "system";
+            if (current === "system") {
+                setTheme("dark");
+            } else if (current === "dark") {
+                setTheme("light");
+            } else {
+                setTheme("system");
+            }
+        });
+
+        // Listen for OS theme changes when in 'system' mode
+        window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+            if ((localStorage.getItem("theme") || "system") === "system") {
+                updateThemeUI();
+            }
+        });
+        updateThemeUI();
+
+        // 2. Synchronize Folder List from folderSelect (No dropdown)
         const folderSelect = document.getElementById("folderSelect");
         const sidebarFolderList = document.getElementById("sidebarFolderList");
         const breadcrumbName = document.getElementById("breadcrumbFolderName");
