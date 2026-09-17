@@ -1062,6 +1062,87 @@
             background-color: var(--g-primary-hover);
         }
 
+        /* 9. Full Window Drag & Drop Overlay (Google Drive style) */
+        .drag-drop-overlay {
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            right: 16px;
+            bottom: 16px;
+            z-index: 9999;
+            background-color: rgba(11, 87, 208, 0.08);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            border: 2px dashed var(--g-primary-blue);
+            border-radius: 24px;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            user-select: none;
+            animation: overlayFadeIn 0.15s ease;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+
+        [data-theme="dark"] .drag-drop-overlay,
+        :root:not([data-theme="light"]) .drag-drop-overlay {
+            background-color: rgba(168, 199, 250, 0.06);
+        }
+
+        .drag-drop-overlay.active {
+            display: flex;
+        }
+
+        @keyframes overlayFadeIn {
+            from {
+                opacity: 0;
+                transform: scale(0.98);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .drag-drop-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            background-color: var(--g-surface);
+            padding: 32px 48px;
+            border-radius: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            border: 1px solid var(--g-border-subtle);
+        }
+
+        .drag-drop-icon {
+            font-size: 56px;
+            color: var(--g-primary-blue);
+            animation: bounceUpDown 1.2s infinite ease-in-out;
+        }
+
+        @keyframes bounceUpDown {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-8px);
+            }
+        }
+
+        .drag-drop-title {
+            font-size: 18px;
+            font-weight: 500;
+            color: var(--g-text-main);
+        }
+
+        .drag-drop-subtitle {
+            font-size: 13.5px;
+            color: var(--g-text-muted);
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .drive-sidebar {
@@ -1298,6 +1379,15 @@
             <button id="btnConfirmPw" class="btn-dialog-confirm">Save</button>
         </div>
     </dialog>
+
+    <!-- Full-window Drag & Drop Overlay (Google Drive style) -->
+    <div id="dragDropOverlay" class="drag-drop-overlay">
+        <div class="drag-drop-content">
+            <span class="material-symbols-outlined drag-drop-icon">cloud_upload</span>
+            <div class="drag-drop-title">Drop files to upload</div>
+            <div class="drag-drop-subtitle" id="dragDropSubtitle">Upload to current folder</div>
+        </div>
+    </div>
 
     <!-- Native JavaScript UI Binding (Does not alter folder.js) -->
     <script type="module">
@@ -1846,6 +1936,72 @@
                 }
             }
         }
+
+        // 7. Full Window Drag & Drop File Upload (Google Drive style)
+        const dragDropOverlay = document.getElementById("dragDropOverlay");
+        const dragDropSubtitle = document.getElementById("dragDropSubtitle");
+        let dragCounter = 0;
+
+        function showDragOverlay() {
+            if (!dragDropOverlay) return;
+            const current = folderSelect.value;
+            if (dragDropSubtitle) {
+                dragDropSubtitle.textContent = current ? `Upload to "${current}"` : "Please select a folder first";
+            }
+            dragDropOverlay.classList.add("active");
+        }
+
+        function hideDragOverlay() {
+            if (!dragDropOverlay) return;
+            dragDropOverlay.classList.remove("active");
+        }
+
+        window.addEventListener("dragenter", (e) => {
+            e.preventDefault();
+            if (e.dataTransfer && e.dataTransfer.types && Array.from(e.dataTransfer.types).includes("Files")) {
+                dragCounter++;
+                if (dragCounter === 1) {
+                    showDragOverlay();
+                }
+            }
+        });
+
+        window.addEventListener("dragleave", (e) => {
+            e.preventDefault();
+            dragCounter--;
+            if (dragCounter <= 0) {
+                dragCounter = 0;
+                hideDragOverlay();
+            }
+        });
+
+        window.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            if (e.dataTransfer) {
+                e.dataTransfer.dropEffect = "copy";
+            }
+        });
+
+        window.addEventListener("drop", (e) => {
+            e.preventDefault();
+            dragCounter = 0;
+            hideDragOverlay();
+
+            const files = e.dataTransfer ? e.dataTransfer.files : null;
+            if (!files || files.length === 0) return;
+
+            if (!folderSelect.value) {
+                alert("⚠️ Please select or create a folder first before uploading files.");
+                return;
+            }
+
+            const dt = new DataTransfer();
+            for (let i = 0; i < files.length; i++) {
+                dt.items.add(files[i]);
+            }
+            fileInput.files = dt.files;
+            fileInput.dispatchEvent(new Event("change"));
+        });
 
         // Initial setup
         function initSetup() {
