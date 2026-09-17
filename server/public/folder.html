@@ -299,38 +299,111 @@
             transition: background-color 0.2s ease, border-color 0.2s ease;
         }
 
-        /* New folder pill button */
-        .btn-new-folder {
+        /* Google Drive "+ New" Pill Button & Dropdown Menu */
+        .new-action-wrapper {
+            position: relative;
+            display: inline-block;
+            width: fit-content;
+        }
+
+        .btn-new-drive {
             height: 48px;
             border-radius: 16px;
-            background-color: var(--g-primary-blue);
-            color: #ffffff;
-            border: none;
+            background-color: var(--g-surface);
+            color: var(--g-text-main);
+            border: 1px solid var(--g-border-subtle);
             font-family: inherit;
             font-size: 14px;
             font-weight: 500;
             display: inline-flex;
             align-items: center;
-            gap: 10px;
-            padding: 0 22px;
+            gap: 12px;
+            padding: 0 20px 0 16px;
             cursor: pointer;
-            box-shadow: 0 1px 3px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
-            transition: background-color 0.15s, box-shadow 0.15s;
-            width: fit-content;
+            box-shadow: 0 1px 3px rgba(60, 64, 67, 0.25), 0 1px 2px rgba(60, 64, 67, 0.15);
+            transition: background-color 0.15s, box-shadow 0.15s, border-color 0.15s;
+            user-select: none;
         }
 
-        [data-theme="dark"] .btn-new-folder,
-        :root:not([data-theme="light"]) .btn-new-folder {
-            color: #062e6f;
+        .btn-new-drive:hover {
+            background-color: var(--g-hover-bg);
+            box-shadow: 0 2px 6px 2px rgba(60, 64, 67, 0.2);
         }
 
-        .btn-new-folder:hover {
-            background-color: var(--g-primary-hover);
-            box-shadow: 0 2px 6px 2px rgba(60, 64, 67, 0.3);
+        .btn-new-drive .plus-icon {
+            font-size: 24px;
+            color: var(--g-primary-blue);
         }
 
-        .btn-new-folder .material-symbols-outlined {
+        /* Dropdown Popup Menu */
+        .new-drive-menu {
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0;
+            min-width: 250px;
+            background-color: var(--g-surface);
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.24), 0 1px 4px rgba(0, 0, 0, 0.12);
+            border: 1px solid var(--g-border-subtle);
+            padding: 6px 0;
+            display: none;
+            z-index: 1000;
+            animation: menuFadeIn 0.12s cubic-bezier(0, 0, 0.2, 1);
+        }
+
+        .new-drive-menu.open {
+            display: block;
+        }
+
+        @keyframes menuFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-4px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .drive-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            height: 40px;
+            padding: 0 16px;
+            cursor: pointer;
+            user-select: none;
+            font-size: 13.5px;
+            color: var(--g-text-main);
+            transition: background-color 0.1s;
+        }
+
+        .drive-menu-item:hover {
+            background-color: var(--g-hover-bg);
+        }
+
+        .drive-menu-item .menu-icon {
             font-size: 20px;
+            color: var(--g-text-main);
+        }
+
+        .drive-menu-item .menu-label {
+            flex: 1;
+            font-weight: 400;
+        }
+
+        .drive-menu-item .menu-shortcut {
+            font-size: 11.5px;
+            color: var(--g-text-muted);
+            margin-left: auto;
+            letter-spacing: 0.2px;
+        }
+
+        .drive-menu-divider {
+            height: 1px;
+            background-color: var(--g-border-subtle);
+            margin: 6px 0;
         }
 
         /* Sidebar Navigation & Folder List */
@@ -798,38 +871,6 @@
             display: contents;
         }
 
-        /* 8. Floating Bottom Right FAB (Upload) */
-        .fab-upload-btn {
-            position: fixed;
-            bottom: 32px;
-            right: 32px;
-            height: 48px;
-            padding: 0 22px;
-            border-radius: 16px;
-            background-color: var(--g-fab-bg);
-            color: var(--g-fab-text);
-            border: 1px solid rgba(11, 87, 208, 0.2);
-            font-family: inherit;
-            font-size: 14px;
-            font-weight: 500;
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            cursor: pointer;
-            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.08);
-            transition: background-color 0.15s, box-shadow 0.15s, transform 0.15s;
-            z-index: 50;
-        }
-
-        .fab-upload-btn:hover {
-            background-color: var(--g-fab-hover);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.18);
-            transform: translateY(-1px);
-        }
-
-        .fab-upload-btn .material-symbols-outlined {
-            font-size: 20px;
-        }
 
         /* Pagination Bar */
         .pagination-container {
@@ -1019,11 +1060,31 @@
     <div class="drive-body">
         <!-- Sidebar Navigation Drawer -->
         <aside class="drive-sidebar">
-            <!-- New Folder Blue Pill Button -->
-            <button class="btn-new-folder" id="btnOpenNewFolderModal">
-                <span class="material-symbols-outlined">create_new_folder</span>
-                <span>New folder</span>
-            </button>
+            <!-- Google Drive "+ New" Button & Dropdown Menu -->
+            <div class="new-action-wrapper" id="newActionWrapper">
+                <button class="btn-new-drive" id="btnNewDropdown" type="button" aria-haspopup="true" aria-expanded="false" title="New">
+                    <span class="material-symbols-outlined plus-icon">add</span>
+                    <span>New</span>
+                </button>
+                <div class="new-drive-menu" id="newDriveMenu">
+                    <div class="drive-menu-item" id="menuItemNewFolder">
+                        <span class="material-symbols-outlined menu-icon">create_new_folder</span>
+                        <span class="menu-label">새 폴더</span>
+                        <span class="menu-shortcut">^C 다음 F</span>
+                    </div>
+                    <div class="drive-menu-divider"></div>
+                    <div class="drive-menu-item" id="menuItemFileUpload">
+                        <span class="material-symbols-outlined menu-icon">upload_file</span>
+                        <span class="menu-label">파일 업로드</span>
+                        <span class="menu-shortcut">^C 다음 U</span>
+                    </div>
+                    <div class="drive-menu-item" id="menuItemFolderUpload">
+                        <span class="material-symbols-outlined menu-icon">drive_folder_upload</span>
+                        <span class="menu-label">폴더 업로드</span>
+                        <span class="menu-shortcut">^C 다음 I</span>
+                    </div>
+                </div>
+            </div>
 
             <!-- Navigation Links -->
             <nav class="sidebar-nav-list">
@@ -1098,8 +1159,8 @@
             <section id="mediaContainer" style="display: none; flex-direction: column; flex: 1; overflow-y: auto;">
                 <!-- List View Column Header (Visible only in List Mode) -->
                 <div id="listViewHeader" class="list-view-header">
-                    <div class="list-header-col list-header-name">이름</div>
-                    <div class="list-header-col list-header-size">용량</div>
+                    <div class="list-header-col list-header-name">Name</div>
+                    <div class="list-header-col list-header-size">Size</div>
                     <div class="list-header-col list-header-more"></div>
                 </div>
 
@@ -1131,11 +1192,6 @@
         </main>
     </div>
 
-    <!-- Floating Upload FAB (Bottom Right) -->
-    <button class="fab-upload-btn" id="btnFabUpload">
-        <span class="material-symbols-outlined">upload</span>
-        <span>Upload</span>
-    </button>
 
     <!-- Hidden Native JS Control Elements (Kept for 100% folder.js compatibility) -->
     <div id="hiddenControls">
@@ -1334,6 +1390,29 @@
             sessionStorage.removeItem("oldFold");
             updateFolderDisplay();
             syncRootFolderGrid();
+            syncSidebarFolderList();
+        }
+        window.navToRoot = navToRoot;
+
+        if (sidebarMyDriveHeader) {
+            sidebarMyDriveHeader.addEventListener("click", (e) => {
+                e.preventDefault();
+                navToRoot();
+            });
+        }
+        const logoWrap = document.querySelector(".logo-wrap");
+        if (logoWrap) {
+            logoWrap.addEventListener("click", (e) => {
+                e.preventDefault();
+                navToRoot();
+            });
+        }
+        const breadcrumbLink = document.querySelector(".breadcrumb-link");
+        if (breadcrumbLink) {
+            breadcrumbLink.addEventListener("click", (e) => {
+                e.preventDefault();
+                navToRoot();
+            });
         }
 
         function updateFolderDisplay() {
@@ -1521,25 +1600,55 @@
             } else {
                 emptyState.style.display = "none";
                 paginationBar.style.display = "flex";
+                if (folderSelect.value && rootFolderView.style.display !== "none") {
+                    updateFolderDisplay();
+                }
                 enhanceCardsForListView();
             }
         });
         observer.observe(mediaGrid, { childList: true });
 
+        // 5. "+ New" Button & Dropdown Menu Bindings
+        const newActionWrapper = document.getElementById("newActionWrapper");
+        const btnNewDropdown = document.getElementById("btnNewDropdown");
+        const newDriveMenu = document.getElementById("newDriveMenu");
+        const menuItemNewFolder = document.getElementById("menuItemNewFolder");
+        const menuItemFileUpload = document.getElementById("menuItemFileUpload");
+        const menuItemFolderUpload = document.getElementById("menuItemFolderUpload");
+
+        if (btnNewDropdown && newDriveMenu) {
+            btnNewDropdown.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const isOpen = newDriveMenu.classList.toggle("open");
+                btnNewDropdown.setAttribute("aria-expanded", isOpen ? "true" : "false");
+            });
+
+            document.addEventListener("click", (e) => {
+                if (newActionWrapper && !newActionWrapper.contains(e.target)) {
+                    newDriveMenu.classList.remove("open");
+                    btnNewDropdown.setAttribute("aria-expanded", "false");
+                }
+            });
+        }
+
         // New folder modal binding
         const newFolderModal = document.getElementById("newFolderModal");
-        const btnOpenNewFolder = document.getElementById("btnOpenNewFolderModal");
         const modalInput = document.getElementById("modalFolderNameInput");
         const nativeInput = document.getElementById("newFolderName");
         const nativeCreateBtn = document.getElementById("btnCreateFolder");
         const btnCancelNewFolder = document.getElementById("btnCancelNewFolder");
         const btnConfirmNewFolder = document.getElementById("btnConfirmNewFolder");
 
-        btnOpenNewFolder.addEventListener("click", () => {
+        function openNewFolderDialog() {
+            if (newDriveMenu) newDriveMenu.classList.remove("open");
             modalInput.value = "";
             newFolderModal.showModal();
             modalInput.focus();
-        });
+        }
+
+        if (menuItemNewFolder) {
+            menuItemNewFolder.addEventListener("click", openNewFolderDialog);
+        }
 
         btnCancelNewFolder.addEventListener("click", () => {
             newFolderModal.close();
@@ -1560,22 +1669,35 @@
             }
         });
 
-        // Upload Button Bindings (FAB and Empty State button)
+        // Upload Button Bindings
         const fileInput = document.getElementById("fileInput");
         const btnUpload = document.getElementById("btnUpload");
-        const btnFabUpload = document.getElementById("btnFabUpload");
         const btnEmptyUpload = document.getElementById("btnEmptyUploadAction");
 
         function triggerUploadFlow() {
+            if (newDriveMenu) newDriveMenu.classList.remove("open");
             if (!folderSelect.value) {
-                alert("⚠️ Please select or create a folder first.");
+                alert("⚠️ Please select or create a folder first to upload files.");
                 return;
             }
             fileInput.click();
         }
 
-        btnFabUpload.addEventListener("click", triggerUploadFlow);
-        btnEmptyUpload.addEventListener("click", triggerUploadFlow);
+        if (menuItemFileUpload) {
+            menuItemFileUpload.addEventListener("click", triggerUploadFlow);
+        }
+
+        if (menuItemFolderUpload) {
+            menuItemFolderUpload.addEventListener("click", () => {
+                if (newDriveMenu) newDriveMenu.classList.remove("open");
+                alert("ℹ️ 새 폴더를 먼저 생성한 후 해당 폴더 내에서 파일을 업로드해주세요.");
+                openNewFolderDialog();
+            });
+        }
+
+        if (btnEmptyUpload) {
+            btnEmptyUpload.addEventListener("click", triggerUploadFlow);
+        }
 
         fileInput.addEventListener("change", () => {
             if (fileInput.files.length > 0) {
@@ -1585,11 +1707,17 @@
         });
 
         // Initial setup
-        window.addEventListener("DOMContentLoaded", () => {
+        function initSetup() {
             syncSidebarFolderList();
             syncRootFolderGrid();
             updateFolderDisplay();
-        });
+        }
+
+        if (document.readyState === "loading") {
+            window.addEventListener("DOMContentLoaded", initSetup);
+        } else {
+            initSetup();
+        }
     </script>
 
     <script type="module" src="./folder.js"></script>
