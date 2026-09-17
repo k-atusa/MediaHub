@@ -263,6 +263,28 @@
             color: var(--g-text-main);
         }
 
+        /* Account Menu Wrapper & Dropdown */
+        .account-menu-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+
+        .profile-avatar-btn {
+            background: transparent;
+            border: none;
+            padding: 4px;
+            cursor: pointer;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.15s;
+        }
+
+        .profile-avatar-btn:hover {
+            background-color: var(--g-hover-bg);
+        }
+
         .profile-avatar {
             width: 32px;
             height: 32px;
@@ -275,8 +297,72 @@
             align-items: center;
             justify-content: center;
             letter-spacing: 0.5px;
-            cursor: pointer;
-            margin-left: 4px;
+            user-select: none;
+        }
+
+        .account-dropdown-menu {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            min-width: 250px;
+            background-color: var(--g-surface);
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.24), 0 1px 4px rgba(0, 0, 0, 0.12);
+            border: 1px solid var(--g-border-subtle);
+            padding: 8px 0;
+            display: none;
+            z-index: 1000;
+            animation: menuFadeIn 0.12s cubic-bezier(0, 0, 0.2, 1);
+        }
+
+        .account-dropdown-menu.open {
+            display: block;
+        }
+
+        .account-menu-header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 10px 18px 12px 18px;
+        }
+
+        .account-avatar-large {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background-color: var(--g-fab-bg);
+            color: var(--g-fab-text);
+            font-size: 16px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            user-select: none;
+        }
+
+        .account-details {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .account-username {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--g-text-main);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .account-badge {
+            font-size: 11.5px;
+            color: var(--g-text-muted);
+            margin-top: 2px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         /* 2. Body Area (Sidebar + Workspace) */
@@ -1018,17 +1104,39 @@
         </div>
 
         <div class="header-right">
-            <!-- Theme Toggle Button (Cycles: System -> Dark -> Light -> System) -->
-            <button class="header-icon-btn" id="btnThemeToggle" title="Theme: System (Auto)">
-                <span class="material-symbols-outlined" id="themeIcon">brightness_auto</span>
-            </button>
-            <button class="header-icon-btn" title="Help">
-                <span class="material-symbols-outlined">help</span>
-            </button>
-            <button class="header-icon-btn" title="Logout" onclick="sessionStorage.clear(); window.location.href='./index.html';">
-                <span class="material-symbols-outlined">logout</span>
-            </button>
-            <div class="profile-avatar" title="Account profile">TE</div>
+            <!-- Account Menu Dropdown (Triggered by Avatar) -->
+            <div class="account-menu-wrapper" id="accountMenuWrapper">
+                <button class="profile-avatar-btn" id="btnAccountMenu" type="button" aria-haspopup="true" aria-expanded="false" title="Account profile">
+                    <div class="profile-avatar" id="headerAvatar">TE</div>
+                </button>
+                <div class="account-dropdown-menu" id="accountDropdownMenu">
+                    <!-- Account Info Header -->
+                    <div class="account-menu-header">
+                        <div class="account-avatar-large" id="menuLargeAvatar">TE</div>
+                        <div class="account-details">
+                            <div class="account-username" id="menuUsername">User</div>
+                            <div class="account-badge" id="menuUserHashShort">E2EE Account</div>
+                        </div>
+                    </div>
+                    <div class="drive-menu-divider"></div>
+                    <!-- Theme Toggle Option -->
+                    <div class="drive-menu-item" id="accountMenuItemTheme">
+                        <span class="material-symbols-outlined menu-icon" id="accountMenuThemeIcon">brightness_auto</span>
+                        <span class="menu-label" id="accountMenuThemeLabel">Theme: System (Auto)</span>
+                    </div>
+                    <!-- Change Password Option -->
+                    <div class="drive-menu-item" id="accountMenuItemPassword">
+                        <span class="material-symbols-outlined menu-icon">lock_reset</span>
+                        <span class="menu-label">Change password</span>
+                    </div>
+                    <div class="drive-menu-divider"></div>
+                    <!-- Logout Option -->
+                    <div class="drive-menu-item" id="accountMenuItemLogout">
+                        <span class="material-symbols-outlined menu-icon">logout</span>
+                        <span class="menu-label">Sign out</span>
+                    </div>
+                </div>
+            </div>
         </div>
     </header>
 
@@ -1104,10 +1212,6 @@
                         <span class="material-symbols-outlined">delete_outline</span>
                         <span>Delete folder</span>
                     </button>
-                    <button class="top-action-btn" id="btnChangePassword" title="Change password">
-                        <span class="material-symbols-outlined">sync</span>
-                        <span>Change password</span>
-                    </button>
                 </div>
             </div>
 
@@ -1170,6 +1274,7 @@
         <button id="btnTrim">Trim</button>
         <input type="text" id="newFolderName">
         <button id="btnCreateFolder">Create</button>
+        <button id="btnChangePassword" style="display: none;"></button>
         <span id="lblUserHash" style="display: none;"></span>
     </div>
 
@@ -1260,21 +1365,22 @@
             }
         }
 
-        // 1. Theme Manager (System default as base, supports Light / Dark toggle)
-        const btnThemeToggle = document.getElementById("btnThemeToggle");
-        const themeIcon = document.getElementById("themeIcon");
+        // 1. Theme Manager (System default as base, supports Light / Dark / System toggle)
+        const accountMenuItemTheme = document.getElementById("accountMenuItemTheme");
+        const accountMenuThemeLabel = document.getElementById("accountMenuThemeLabel");
+        const accountMenuThemeIcon = document.getElementById("accountMenuThemeIcon");
 
         function updateThemeUI() {
             const mode = localStorage.getItem("theme") || "system";
             if (mode === "dark") {
-                themeIcon.textContent = "dark_mode";
-                btnThemeToggle.title = "Theme: Dark";
+                if (accountMenuThemeIcon) accountMenuThemeIcon.textContent = "dark_mode";
+                if (accountMenuThemeLabel) accountMenuThemeLabel.textContent = "Theme: Dark";
             } else if (mode === "light") {
-                themeIcon.textContent = "light_mode";
-                btnThemeToggle.title = "Theme: Light";
+                if (accountMenuThemeIcon) accountMenuThemeIcon.textContent = "light_mode";
+                if (accountMenuThemeLabel) accountMenuThemeLabel.textContent = "Theme: Light";
             } else {
-                themeIcon.textContent = "brightness_auto";
-                btnThemeToggle.title = "Theme: System default";
+                if (accountMenuThemeIcon) accountMenuThemeIcon.textContent = "brightness_auto";
+                if (accountMenuThemeLabel) accountMenuThemeLabel.textContent = "Theme: System (Auto)";
             }
         }
 
@@ -1289,16 +1395,18 @@
             updateThemeUI();
         }
 
-        btnThemeToggle.addEventListener("click", () => {
-            const current = localStorage.getItem("theme") || "system";
-            if (current === "system") {
-                setTheme("dark");
-            } else if (current === "dark") {
-                setTheme("light");
-            } else {
-                setTheme("system");
-            }
-        });
+        if (accountMenuItemTheme) {
+            accountMenuItemTheme.addEventListener("click", () => {
+                const current = localStorage.getItem("theme") || "system";
+                if (current === "system") {
+                    setTheme("dark");
+                } else if (current === "dark") {
+                    setTheme("light");
+                } else {
+                    setTheme("system");
+                }
+            });
+        }
 
         window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
             if ((localStorage.getItem("theme") || "system") === "system") {
@@ -1674,11 +1782,77 @@
             }
         });
 
+        // 6. Account Menu Dropdown Bindings
+        const accountMenuWrapper = document.getElementById("accountMenuWrapper");
+        const btnAccountMenu = document.getElementById("btnAccountMenu");
+        const accountDropdownMenu = document.getElementById("accountDropdownMenu");
+        const accountMenuItemPassword = document.getElementById("accountMenuItemPassword");
+        const accountMenuItemLogout = document.getElementById("accountMenuItemLogout");
+
+        if (btnAccountMenu && accountDropdownMenu) {
+            btnAccountMenu.addEventListener("click", (e) => {
+                e.stopPropagation();
+                if (newDriveMenu) newDriveMenu.classList.remove("open");
+                const isOpen = accountDropdownMenu.classList.toggle("open");
+                btnAccountMenu.setAttribute("aria-expanded", isOpen ? "true" : "false");
+            });
+
+            document.addEventListener("click", (e) => {
+                if (accountMenuWrapper && !accountMenuWrapper.contains(e.target)) {
+                    accountDropdownMenu.classList.remove("open");
+                    btnAccountMenu.setAttribute("aria-expanded", "false");
+                }
+            });
+        }
+
+        if (accountMenuItemPassword) {
+            accountMenuItemPassword.addEventListener("click", () => {
+                if (accountDropdownMenu) accountDropdownMenu.classList.remove("open");
+                const btnChangePassword = document.getElementById("btnChangePassword");
+                if (btnChangePassword) {
+                    btnChangePassword.click();
+                } else {
+                    const pwModal = document.getElementById("pwModal");
+                    if (pwModal) pwModal.showModal();
+                }
+            });
+        }
+
+        if (accountMenuItemLogout) {
+            accountMenuItemLogout.addEventListener("click", () => {
+                sessionStorage.clear();
+                window.location.href = './index.html';
+            });
+        }
+
+        function syncUserProfileUI() {
+            const username = sessionStorage.getItem("username") || "User";
+            const usrHsh = sessionStorage.getItem("userHash") || "";
+            const initial = (username.slice(0, 2) || "TE").toUpperCase();
+
+            const headerAvatar = document.getElementById("headerAvatar");
+            const menuLargeAvatar = document.getElementById("menuLargeAvatar");
+            const menuUsername = document.getElementById("menuUsername");
+            const menuUserHashShort = document.getElementById("menuUserHashShort");
+
+            if (headerAvatar) headerAvatar.textContent = initial;
+            if (menuLargeAvatar) menuLargeAvatar.textContent = initial;
+            if (menuUsername) menuUsername.textContent = username;
+            if (menuUserHashShort) {
+                if (usrHsh) {
+                    menuUserHashShort.textContent = `ID: ${usrHsh.slice(0, 8)}...${usrHsh.slice(-4)}`;
+                } else {
+                    menuUserHashShort.textContent = "E2EE Account";
+                }
+            }
+        }
+
         // Initial setup
         function initSetup() {
             syncSidebarFolderList();
             syncRootFolderGrid();
             updateFolderDisplay();
+            syncUserProfileUI();
         }
 
         if (document.readyState === "loading") {
