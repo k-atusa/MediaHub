@@ -18,23 +18,19 @@ project WHY(Web Hub Yard): Media Hub
 - userdata is Map[folderName]folderKey, and filenames is Map[fileName]fileKey.
 - userdata is encrypted with userKey. filenames is encrypted with folderKey. Thumbnails and media are encrypted with fileKey.
 
-```
-mediahub/
-├── frontend/               # Next.js 14 + Material You 웹 프론트엔드
-│   ├── src/
-│   ├── public/
-│   └── package.json
-├── backend/                # Go 백엔드 서버 (프론트엔드 내장 단일 바이너리)
-│   ├── server.go
-│   ├── go.mod
-│   ├── dist/               # 프론트엔드 정적 빌드 산출물 (embed.FS 내장)
-│   ├── config/
-│   │   └── config.json
-│   ├── certs/
-│   ├── users/
-│   └── data/
-├── build.sh                # 프론트엔드 빌드 + 백엔드 바이너리 단일 패키징 스크립트
-└── icons/
+```python
+server
+config/
+  config.json
+certs/
+  cert.pem
+  key.pem
+users/
+  ...
+data/
+  ...
+public/
+  ...
 ```
 
 | Option | Type | Info | 정보 |
@@ -46,34 +42,24 @@ mediahub/
 | invite | string | invitation auth code | 가입 권한 코드 |
 | notice | string | public notification | 접속 시 보이는 공지 |
 
-## Build & Run
+## Limitation
 
-### 1. 원클릭 빌드 (프론트엔드 HTML 빌드 + 바이너리 내장)
+- It takes time to download and decrypt whole file and show. (Except for videos)
+- For video, it uses real-time streaming. Still, buffering can take time up to 1 minute.
+- With private TLS certificate, you cannot use streaming in Chrome. Streaming is disabled for all WebKit browsers due to its limitation.
+- Uploading with browser limits file size to 2GiB. Use python client to large-scale upload.
+- Python client requires USAG-Lib and OpenCV dependency.
+
+## Build Executable
 
 ```bash
-./build.sh
+go mod init example.com
+go mod tidy
+go build -ldflags="-s -w" -trimpath server.go
 ```
 
-### 2. 단계별 빌드
-
-**프론트엔드 빌드 (Next.js export -> backend/dist):**
 ```bash
-cd frontend
-npm install
-npm run build
-```
-
-**백엔드 바이너리 빌드 (Go 단일 바이너리):**
-```bash
-cd backend
-go build -ldflags="-s -w" -trimpath -o server server.go
-```
-
-### 3. 서버 실행
-
-`server` 바이너리 단일 파일만으로 프론트엔드 HTML 웹 UI와 백엔드 API가 동시에 실행됩니다.
-
-```bash
-cd backend
-./server
+gradlew.bat clean
+gradlew.bat [assembleRelease|assembleDebug]
+cd android/app/build/outputs/apk/debug
 ```
