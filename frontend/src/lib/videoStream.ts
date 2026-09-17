@@ -1,8 +1,8 @@
 /**
- * MediaHub Video Streaming Service Worker Client & Direct Stream Helpers
+ * MediaHub Video Streaming Service Worker Client
  *
- * Coordinates registration of video encryption keys with `/sw.js` for Service Worker streaming,
- * and provides direct on-the-fly backend streaming URLs as a fallback when Service Worker is unavailable.
+ * Coordinates registration of video encryption keys with `/sw.js` for client-side Service Worker streaming.
+ * In accordance with zero-knowledge security, all decryption happens client-side; keys are never sent to the backend.
  */
 
 export interface VideoStreamRegistration {
@@ -62,7 +62,7 @@ export async function initVideoStreamWorker(): Promise<ServiceWorkerRegistration
 
         return reg;
       } catch (err) {
-        console.info('[VideoStream] Service worker unavailable (self-signed SSL cert). Falling back to direct on-the-fly streaming.');
+        console.warn('[VideoStream] Service worker registration failed:', err);
         swRegistrationPromise = null; // Allow future retry
         return null;
       }
@@ -74,7 +74,6 @@ export async function initVideoStreamWorker(): Promise<ServiceWorkerRegistration
 
 /**
  * Registers a video file with the service worker for streaming.
- * Uses MessageChannel and broadcast fallback.
  */
 export async function registerVideoStream(info: VideoStreamRegistration): Promise<boolean> {
   let reg: ServiceWorkerRegistration | null = null;
@@ -92,12 +91,10 @@ export async function registerVideoStream(info: VideoStreamRegistration): Promis
 
   return new Promise<boolean>((resolve) => {
     let resolved = false;
-    const channel = new MessageChannel();
 
     const timeout = setTimeout(() => {
       if (!resolved) {
         resolved = true;
-        channel.port1.close();
         navigator.serviceWorker.removeEventListener('message', onMsg);
         resolve(true); // proceed to stream
       }
@@ -107,7 +104,6 @@ export async function registerVideoStream(info: VideoStreamRegistration): Promis
       if (!resolved) {
         resolved = true;
         clearTimeout(timeout);
-        channel.port1.close();
         navigator.serviceWorker.removeEventListener('message', onMsg);
         resolve(true);
       }
@@ -119,34 +115,19 @@ export async function registerVideoStream(info: VideoStreamRegistration): Promis
       }
     };
 
-    channel.port1.onmessage = done;
     navigator.serviceWorker.addEventListener('message', onMsg);
 
     try {
-      sw.postMessage(
-        {
-          action: 'REGISTER',
-          folderId: info.folderId,
-          filePid: info.filePid,
-          fileKey: info.fileKeyHex,
-          originalSize: info.originalSize,
-          fileName: info.fileName,
-        },
-        [channel.port2]
-      );
+      sw.postMessage({
+        action: 'REGISTER',
+        folderId: info.folderId,
+        filePid: info.filePid,
+        fileKey: info.fileKeyHex,
+        originalSize: info.originalSize,
+        fileName: info.fileName,
+      });
     } catch {
-      try {
-        sw.postMessage({
-          action: 'REGISTER',
-          folderId: info.folderId,
-          filePid: info.filePid,
-          fileKey: info.fileKeyHex,
-          originalSize: info.originalSize,
-          fileName: info.fileName,
-        });
-      } catch {
-        done();
-      }
+      done();
     }
   });
 }
@@ -176,10 +157,3 @@ export function getVideoStreamUrl(folderId: string, filePid: string): string {
   return `/sw-stream/${encodeURIComponent(folderId)}/${encodeURIComponent(filePid)}`;
 }
 
-/**
- * Returns the direct on-the-fly streaming URL served by the backend server.
- * Streams decrypted byte ranges on-the-fly without buffering into browser RAM.
- */
-export function getDirectStreamUrl(folderId: string, filePid: string, fileKeyHex: string, fileName: string): string {
-  return `/api/stream/${encodeURIComponent(folderId)}/${encodeURIComponent(filePid)}?key=${encodeURIComponent(fileKeyHex)}&name=${encodeURIComponent(fileName)}`;
-}

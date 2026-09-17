@@ -66,5 +66,7 @@ Frontend(Next.js) 정적 번들이 임베딩(`//go:embed all:dist`)된 단일 �
    - 프로젝트 루트의 `./build.sh`를 실행하여 프론트엔드 빌드(`frontend/out` -> `backend/dist`) 및 백엔드 Go 바이너리(`backend/server`) 컴파일을 한 번에 수행합니다.
 3. **암호화 라이브러리 보존**:
    - `Bencrypt.js`, `Bencode.js`, `Opsec.js`는 MediaHub의 핵심 암호 엔진이므로 임의로 내부 로직을 변형하지 않습니다.
-4. **스트리밍 파이프라인**:
-   - 비디오 스트리밍은 브라우저 RAM에 대용량 파일을 일시 버퍼링하지 않고 청크(HTTP 206 Range) 단위로 온더플라이 복호화 스트리밍(`sw.js` 클라이언트 SW 스트리밍 + `backend/server.go`의 `/api/stream/` 백엔드 스트리밍 듀얼 구조)을 유지합니다.
+4. **종단간 암호화(E2EE) 및 스트리밍 파이프라인**:
+   - 백엔드는 서비스 제공자가 악의적 스니퍼라는 상황을 가정한 Zero-Knowledge 모델을 따르므로, 암호화 키를 절대 수신하지 않고 복호화를 수행하지 않습니다.
+   - 비디오 스트리밍은 브라우저 클라이언트 사이드 Service Worker(`sw.js`의 `/sw-stream/`)에서 암호화된 청크를 온더플라이(HTTP 206 Range)로 복호화하여 스트리밍하며, SW 미지원/장애 시 브라우저 내 인메모리 복호화(`fullDown`)로 폴백합니다.
+

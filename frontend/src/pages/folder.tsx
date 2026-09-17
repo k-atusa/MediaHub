@@ -24,18 +24,23 @@ import {
   decryptUserBlobAsync,
   detectKind,
   encryptFileBlob,
+  encryptThumbBytes,
   fromHex,
   getFilePid,
   getFolderPid,
+  getPidFromRawKey,
   getOriginalSize,
   loadShareToken,
   makeSession,
   makeShareToken,
   makeThumb,
+  mask,
   recoverSessionKey,
   saveFolderBlob,
   saveUserBlob,
   toHex,
+  wipe,
+  DecodeInt,
 } from '@/lib/crypto';
 import { deleteFolder, deleteMedia, fetchFolderBlob, fetchUserBlob, folderNamesUrl, mediaUrl, userDataUrl } from '@/lib/api';
 import type { FileEntry, FolderEntry } from '@/types/mediahub';
@@ -199,7 +204,9 @@ function FolderView(): React.JSX.Element {
       alert('Invalid or duplicate name.');
       return;
     }
-    const key = createFolderKey();
+    const rawKey = createFolderKey();
+    const key = mask.XOR(rawKey);
+    rawKey.fill(0);
     const next = { ...fldMap, [trimmed]: key };
     setFldMap(next);
     try {
@@ -216,31 +223,32 @@ function FolderView(): React.JSX.Element {
     setSnack({ open: true, message: 'Encrypting & uploading…', progress: 0 });
     try {
       const nextFls = { ...flsMap };
+      const folderPid = getFolderPid(currentKey);
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         setSnack({ open: true, message: `Encrypting ${file.name}…`, progress: (i / files.length) * 0.5 });
-        const fileKey = createFileKeyWithSize(file.size);
-        const pid = getFilePid(fileKey);
+        const rawFileKey = createFileKeyWithSize(file.size);
+        const pid = getPidFromRawKey(rawFileKey);
 
-        const dat = await encryptFileBlob(file, fileKey);
-        await fetch(mediaUrl(getFolderPid(currentKey), pid, 'dat'), {
+        const dat = await encryptFileBlob(file, rawFileKey);
+        await fetch(mediaUrl(folderPid, pid, 'dat'), {
           method: 'POST',
           headers: { 'X-User-Hash': session.userHash, 'Content-Type': 'application/octet-stream' },
           body: dat as any,
         });
 
-        let thumbBytes: Uint8Array | null = null;
         const thumbBlob = await makeThumb(file);
         if (thumbBlob) {
-          thumbBytes = new Uint8Array(await thumbBlob.arrayBuffer());
-          await fetch(mediaUrl(getFolderPid(currentKey), pid, 'thumb'), {
+          const thumbBytes = await encryptThumbBytes(thumbBlob, rawFileKey);
+          await fetch(mediaUrl(folderPid, pid, 'thumb'), {
             method: 'POST',
             headers: { 'X-User-Hash': session.userHash, 'Content-Type': 'application/octet-stream' },
             body: thumbBytes as any,
           });
         }
 
-        nextFls[file.name] = fileKey;
+        nextFls[file.name] = mask.XOR(rawFileKey);
+        rawFileKey.fill(0);
         setFlsMap({ ...nextFls });
         setSnack({ open: true, message: `Saving ${file.name}…`, progress: 0.5 + (i / files.length) * 0.5 });
       }
@@ -309,7 +317,8 @@ function FolderView(): React.JSX.Element {
       } else {
         const fd = deleteTarget.entry as FolderEntry;
         const targetKey = fromHex(fd.keyHex);
-        const targetPid = getFolderPid(targetKey);
+        const targetPid = getPidFromRawKey(targetKey);
+        wipe(targetKey);
         const updated = { ...fldMap };
         delete updated[fd.name];
         setFldMap(updated);
@@ -345,8 +354,9 @@ function FolderView(): React.JSX.Element {
       }
       const datBytes = new Uint8Array(await resp.arrayBuffer());
       const rawKey = fromHex(file.keyHex);
-      const origSize = file.size || getOriginalSize(rawKey);
+      const origSize = file.size || (rawKey.length >= 52 ? DecodeInt(rawKey.slice(44, 52)) : 0);
       const out = await decryptFileBytes(datBytes, rawKey, origSize);
+      wipe(rawKey);
       const blob = new Blob([out as any]);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -354,6 +364,7 @@ function FolderView(): React.JSX.Element {
       a.download = file.name;
       a.click();
       URL.revokeObjectURL(url);
+      wipe(out);
     } catch (e) {
       console.error('Download error:', e);
       setError((e as Error).message);
@@ -408,6 +419,8 @@ function FolderView(): React.JSX.Element {
     const newKey = recoverSessionKey(newMaterial.maskedUserKey);
     const userKey = recoverSessionKey(session.maskedUserKey);
     const enc = await saveUserBlob(newMaterial.userHash, newKey, fldMap);
+    wipe(newKey);
+    wipe(userKey);
     await fetch(userDataUrl(newMaterial.userHash), {
       method: 'POST',
       headers: { 'X-Old-Hash': session.userHash, 'Content-Type': 'application/octet-stream' },
@@ -432,12 +445,29 @@ function FolderView(): React.JSX.Element {
     const start = (page - 1) * PAGE_SIZE;
     const slice = filteredNames.slice(start, start + PAGE_SIZE);
     return slice.map((name) => {
-      const key = flsMap[name];
-      const size = getOriginalSize(key);
+      const maskedKey = flsMap[name];
+      if (!maskedKey) {
+        return {
+          id: name,
+          name,
+          pid: '',
+          keyHex: '',
+          kind: detectKind(name),
+          size: 0,
+          updatedAt: 0,
+        };
+      }
+      const rawFK = mask.XOR(maskedKey);
+      const pid = toHex(rawFK.slice(32, 44));
+      const size = rawFK.length >= 52 ? DecodeInt(rawFK.slice(44, 52)) : 0;
+      const keyHex = toHex(rawFK);
+      rawFK.fill(0);
+
       return {
-        pid: getFilePid(key),
+        id: pid,
+        pid,
         name,
-        keyHex: toHex(key),
+        keyHex,
         kind: detectKind(name),
         size,
         updatedAt: 0,
@@ -492,7 +522,12 @@ function FolderView(): React.JSX.Element {
                   entry: {
                     pid: getFolderPid(currentKey),
                     name: currentName,
-                    keyHex: toHex(currentKey),
+                    keyHex: (() => {
+                      const rawK = mask.XOR(currentKey);
+                      const hex = toHex(rawK);
+                      rawK.fill(0);
+                      return hex;
+                    })(),
                   },
                 });
                 setDeleteOpen(true);
@@ -565,7 +600,16 @@ function FolderView(): React.JSX.Element {
             files={visibleFiles}
             folderName={currentName}
             folderPid={currentKey ? getFolderPid(currentKey) : undefined}
-            folderKeyHex={currentKey ? toHex(currentKey) : undefined}
+            folderKeyHex={
+              currentKey
+                ? (() => {
+                    const rawK = mask.XOR(currentKey);
+                    const hex = toHex(rawK);
+                    rawK.fill(0);
+                    return hex;
+                  })()
+                : undefined
+            }
             onAction={handleAction}
           />
           {totalPages > 1 && (

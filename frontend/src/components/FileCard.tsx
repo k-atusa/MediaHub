@@ -95,9 +95,7 @@ export function FileCard({ file, folderName, folderPid, folderKeyHex, onAction }
     }
   };
 
-  const keyParam = file.keyHex ? `&key=${encodeURIComponent(file.keyHex)}` : '';
-  const fkParam = folderKeyHex ? `&fk=${encodeURIComponent(folderKeyHex)}` : '';
-  const viewerHref = `/viewer?folder=${encodeURIComponent(folderName)}&pid=${encodeURIComponent(file.pid)}&name=${encodeURIComponent(file.name)}${keyParam}${fkParam}`;
+  const viewerHref = `/viewer?folder=${encodeURIComponent(folderName)}&pid=${encodeURIComponent(file.pid)}&name=${encodeURIComponent(file.name)}`;
 
   return (
     <Link href={viewerHref} className="mh-file-card" aria-label={file.name} onClick={handleCardClick}>

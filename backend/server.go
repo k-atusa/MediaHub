@@ -2,15 +2,12 @@
 package main
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"embed"
-	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
@@ -252,210 +249,6 @@ func serveMedia(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// DecryptedStreamReader provides an io.ReadSeeker that decrypts gcmx1 chunks on-the-fly for HTTP streaming.
-type DecryptedStreamReader struct {
-	file        *os.File
-	globalIV    []byte
-	aesKey      []byte
-	origSize    int64
-	offset      int64
-	curChunkIdx int64
-	curChunkBuf []byte
-}
-
-func (r *DecryptedStreamReader) Seek(offset int64, whence int) (int64, error) {
-	var newOffset int64
-	switch whence {
-	case io.SeekStart:
-		newOffset = offset
-	case io.SeekCurrent:
-		newOffset = r.offset + offset
-	case io.SeekEnd:
-		newOffset = r.origSize + offset
-	default:
-		return 0, fmt.Errorf("invalid whence")
-	}
-	if newOffset < 0 {
-		return 0, fmt.Errorf("negative offset")
-	}
-	r.offset = newOffset
-	return r.offset, nil
-}
-
-func (r *DecryptedStreamReader) Read(p []byte) (int, error) {
-	if r.offset >= r.origSize {
-		return 0, io.EOF
-	}
-
-	const plainChunk = 1048576
-	const cipherChunk = plainChunk + 16
-
-	chunkIdx := r.offset / plainChunk
-	chunkOffset := r.offset % plainChunk
-
-	if r.curChunkBuf == nil || r.curChunkIdx != chunkIdx {
-		plainLen := int64(plainChunk)
-		if (chunkIdx+1)*plainChunk > r.origSize {
-			plainLen = r.origSize - chunkIdx*plainChunk
-		}
-		cipherLen := plainLen + 16
-
-		cStart := 12 + chunkIdx*cipherChunk
-		cipherBuf := make([]byte, cipherLen)
-		n, err := r.file.ReadAt(cipherBuf, cStart)
-		if err != nil && err != io.EOF {
-			return 0, err
-		}
-		if int64(n) < cipherLen {
-			cipherBuf = cipherBuf[:n]
-		}
-		if len(cipherBuf) < 16 {
-			return 0, fmt.Errorf("unexpected EOF reading chunk %d (read %d bytes)", chunkIdx, n)
-		}
-
-		iv := make([]byte, 12)
-		copy(iv, r.globalIV)
-		var countBuf [8]byte
-		binary.LittleEndian.PutUint64(countBuf[:], uint64(chunkIdx))
-		for i := 0; i < 8; i++ {
-			iv[4+i] ^= countBuf[i]
-		}
-
-		block, err := aes.NewCipher(r.aesKey)
-		if err != nil {
-			return 0, err
-		}
-		gcm, err := cipher.NewGCM(block)
-		if err != nil {
-			return 0, err
-		}
-		plain, err := gcm.Open(nil, iv, cipherBuf, nil)
-		if err != nil {
-			return 0, fmt.Errorf("decrypt error chunk %d: %w", chunkIdx, err)
-		}
-
-		r.curChunkIdx = chunkIdx
-		r.curChunkBuf = plain
-	}
-
-	avail := int64(len(r.curChunkBuf)) - chunkOffset
-	if avail <= 0 {
-		return 0, io.EOF
-	}
-
-	toCopy := int64(len(p))
-	if toCopy > avail {
-		toCopy = avail
-	}
-
-	copy(p, r.curChunkBuf[chunkOffset:chunkOffset+toCopy])
-	r.offset += toCopy
-	return int(toCopy), nil
-}
-
-// handles on-the-fly streaming decryption for video playback
-func serveStream(w http.ResponseWriter, r *http.Request) {
-	// URL: /api/stream/{folder_pid}/{file_pid}?key={fileKeyHex}&name={fileName}
-	target := strings.TrimPrefix(r.URL.Path, "/api/stream/")
-	parts := strings.Split(target, "/")
-	if len(parts) < 2 {
-		postError(w, "Folder ID and File ID Required", http.StatusBadRequest)
-		return
-	}
-	folderID, fileID := parts[0], parts[1]
-
-	keyHex := r.URL.Query().Get("key")
-	if keyHex == "" {
-		keyHex = r.Header.Get("X-File-Key")
-	}
-	if keyHex == "" {
-		postError(w, "File key required for stream decryption", http.StatusBadRequest)
-		return
-	}
-
-	rawKey, err := hex.DecodeString(keyHex)
-	if err != nil || len(rawKey) < 32 {
-		postError(w, "Invalid file key", http.StatusBadRequest)
-		return
-	}
-	aesKey := rawKey[:32]
-
-	fileName := r.URL.Query().Get("name")
-	if fileName == "" {
-		fileName = fileID + ".mp4"
-	}
-
-	path := filepath.Join(cfg.StorageDir, "data", filepath.Clean(folderID), filepath.Clean(fileID)+".dat")
-	f, err := os.Open(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			postError(w, "File Not Found", http.StatusNotFound)
-		} else {
-			postError(w, "Internal Server Error", http.StatusInternalServerError)
-		}
-		return
-	}
-	defer f.Close()
-
-	fi, err := f.Stat()
-	if err != nil || fi.Size() < 28 {
-		postError(w, "Invalid cipher file", http.StatusBadRequest)
-		return
-	}
-
-	globalIV := make([]byte, 12)
-	if _, err := io.ReadFull(f, globalIV); err != nil {
-		postError(w, "Failed to read cipher header", http.StatusInternalServerError)
-		return
-	}
-
-	const plainChunk = 1048576
-	const cipherChunk = plainChunk + 16
-
-	fileCipherSize := fi.Size() - 12
-	fullChunks := fileCipherSize / cipherChunk
-	remCipher := fileCipherSize % cipherChunk
-	var lastPlain int64
-	if remCipher > 16 {
-		lastPlain = remCipher - 16
-	}
-	origSize := fullChunks*plainChunk + lastPlain
-	if len(rawKey) >= 52 {
-		storedSize := int64(binary.LittleEndian.Uint64(rawKey[44:52]))
-		if storedSize > 0 {
-			origSize = storedSize
-		}
-	}
-	if origSize <= 0 {
-		postError(w, "Empty file", http.StatusBadRequest)
-		return
-	}
-
-	reader := &DecryptedStreamReader{
-		file:        f,
-		globalIV:    globalIV,
-		aesKey:      aesKey,
-		origSize:    origSize,
-		curChunkIdx: -1,
-	}
-
-	w.Header().Set("Accept-Ranges", "bytes")
-	ext := strings.ToLower(filepath.Ext(fileName))
-	switch ext {
-	case ".mp4", ".m4v":
-		w.Header().Set("Content-Type", "video/mp4")
-	case ".webm":
-		w.Header().Set("Content-Type", "video/webm")
-	case ".mov":
-		w.Header().Set("Content-Type", "video/quicktime")
-	case ".mkv":
-		w.Header().Set("Content-Type", "video/x-matroska")
-	default:
-		w.Header().Set("Content-Type", "video/mp4")
-	}
-
-	http.ServeContent(w, r, fileName, fi.ModTime(), reader)
-}
 
 // handles notice fetch
 func serveNotice(w http.ResponseWriter, r *http.Request) {
@@ -745,7 +538,6 @@ func main() {
 	mux.HandleFunc("/api/userdata/", serveUser)
 	mux.HandleFunc("/api/storage/", serveMeta)
 	mux.HandleFunc("/api/media/", serveMedia)
-	mux.HandleFunc("/api/stream/", serveStream)
 	mux.HandleFunc("/api/notice", serveNotice)
 	mux.HandleFunc("/api/trim/", serveTrim)
 	mux.Handle("/", frontendHandler())
