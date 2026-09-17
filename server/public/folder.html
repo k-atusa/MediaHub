@@ -46,6 +46,23 @@
             --g-card-bg: #f8fafd;
             --g-dialog-bg: #ffffff;
             --g-dialog-shadow: rgba(60, 64, 67, 0.2);
+
+            /* Material You (M3) Design Tokens - Light */
+            --m3-primary: #0b57d0;
+            --m3-primary-hover: #0842a0;
+            --m3-on-primary: #ffffff;
+            --m3-primary-container: #d3e3fd;
+            --m3-on-primary-container: #041e49;
+            --m3-surface-container: #f0f4f9;
+            --m3-surface-container-high: #e9eef6;
+            --m3-surface-container-highest: #e0e6f0;
+            --m3-track: #e0e2ec;
+            --m3-stop-dot: #0b57d0;
+            --m3-success: #146c2e;
+            --m3-success-container: #c4eed0;
+            --m3-success-on-container: #072711;
+            --m3-elevation-widget: 0 4px 16px 2px rgba(60, 64, 67, 0.16), 0 1px 4px rgba(60, 64, 67, 0.12);
+            --m3-elevation-dialog: 0 12px 36px 0 rgba(60, 64, 67, 0.24);
         }
 
         /* Automatic System Dark Theme */
@@ -69,6 +86,23 @@
                 --g-card-bg: #1e1f20;
                 --g-dialog-bg: #1e1f20;
                 --g-dialog-shadow: rgba(0, 0, 0, 0.5);
+
+                /* Material You (M3) Design Tokens - Dark */
+                --m3-primary: #a8c7fa;
+                --m3-primary-hover: #d3e3fd;
+                --m3-on-primary: #041e49;
+                --m3-primary-container: #004a77;
+                --m3-on-primary-container: #d3e3fd;
+                --m3-surface-container: #232528;
+                --m3-surface-container-high: #282a2d;
+                --m3-surface-container-highest: #333538;
+                --m3-track: #44474f;
+                --m3-stop-dot: #a8c7fa;
+                --m3-success: #81c995;
+                --m3-success-container: #0f5223;
+                --m3-success-on-container: #c4eed0;
+                --m3-elevation-widget: 0 8px 24px rgba(0, 0, 0, 0.5);
+                --m3-elevation-dialog: 0 16px 40px rgba(0, 0, 0, 0.65);
             }
         }
 
@@ -92,6 +126,23 @@
             --g-card-bg: #1e1f20;
             --g-dialog-bg: #1e1f20;
             --g-dialog-shadow: rgba(0, 0, 0, 0.5);
+
+            /* Material You (M3) Design Tokens - Dark */
+            --m3-primary: #a8c7fa;
+            --m3-primary-hover: #d3e3fd;
+            --m3-on-primary: #041e49;
+            --m3-primary-container: #004a77;
+            --m3-on-primary-container: #d3e3fd;
+            --m3-surface-container: #232528;
+            --m3-surface-container-high: #282a2d;
+            --m3-surface-container-highest: #333538;
+            --m3-track: #44474f;
+            --m3-stop-dot: #a8c7fa;
+            --m3-success: #81c995;
+            --m3-success-container: #0f5223;
+            --m3-success-on-container: #c4eed0;
+            --m3-elevation-widget: 0 8px 24px rgba(0, 0, 0, 0.5);
+            --m3-elevation-dialog: 0 16px 40px rgba(0, 0, 0, 0.65);
         }
 
         /* Explicit Light Mode */
@@ -114,6 +165,23 @@
             --g-card-bg: #f8fafd;
             --g-dialog-bg: #ffffff;
             --g-dialog-shadow: rgba(60, 64, 67, 0.2);
+
+            /* Material You (M3) Design Tokens - Light */
+            --m3-primary: #0b57d0;
+            --m3-primary-hover: #0842a0;
+            --m3-on-primary: #ffffff;
+            --m3-primary-container: #d3e3fd;
+            --m3-on-primary-container: #041e49;
+            --m3-surface-container: #f0f4f9;
+            --m3-surface-container-high: #e9eef6;
+            --m3-surface-container-highest: #e0e6f0;
+            --m3-track: #e0e2ec;
+            --m3-stop-dot: #0b57d0;
+            --m3-success: #146c2e;
+            --m3-success-container: #c4eed0;
+            --m3-success-on-container: #072711;
+            --m3-elevation-widget: 0 4px 16px 2px rgba(60, 64, 67, 0.16), 0 1px 4px rgba(60, 64, 67, 0.12);
+            --m3-elevation-dialog: 0 12px 36px 0 rgba(60, 64, 67, 0.24);
         }
 
         * {
@@ -304,15 +372,15 @@
             position: absolute;
             top: calc(100% + 8px);
             right: 0;
-            min-width: 250px;
-            background-color: var(--g-surface);
-            border-radius: 12px;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.24), 0 1px 4px rgba(0, 0, 0, 0.12);
+            min-width: 260px;
+            background-color: var(--m3-surface-container);
+            border-radius: 20px;
+            box-shadow: var(--m3-elevation-widget);
             border: 1px solid var(--g-border-subtle);
-            padding: 8px 0;
+            padding: 8px;
             display: none;
             z-index: 1000;
-            animation: menuFadeIn 0.12s cubic-bezier(0, 0, 0.2, 1);
+            animation: menuFadeIn 0.15s cubic-bezier(0.2, 0, 0, 1);
         }
 
         .account-dropdown-menu.open {
@@ -323,12 +391,12 @@
             display: flex;
             align-items: center;
             gap: 14px;
-            padding: 10px 18px 12px 18px;
+            padding: 10px 14px 12px 14px;
         }
 
         .account-avatar-large {
-            width: 42px;
-            height: 42px;
+            width: 44px;
+            height: 44px;
             border-radius: 50%;
             background-color: var(--g-fab-bg);
             color: var(--g-fab-text);
@@ -426,15 +494,15 @@
             position: absolute;
             top: calc(100% + 6px);
             left: 0;
-            min-width: 200px;
-            background-color: var(--g-surface);
-            border-radius: 8px;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.24), 0 1px 4px rgba(0, 0, 0, 0.12);
+            min-width: 220px;
+            background-color: var(--m3-surface-container);
+            border-radius: 20px;
+            box-shadow: var(--m3-elevation-widget);
             border: 1px solid var(--g-border-subtle);
-            padding: 6px 0;
+            padding: 8px;
             display: none;
             z-index: 1000;
-            animation: menuFadeIn 0.12s cubic-bezier(0, 0, 0.2, 1);
+            animation: menuFadeIn 0.15s cubic-bezier(0.2, 0, 0, 1);
         }
 
         .new-drive-menu.open {
@@ -444,11 +512,11 @@
         @keyframes menuFadeIn {
             from {
                 opacity: 0;
-                transform: translateY(-4px);
+                transform: translateY(-6px) scale(0.96);
             }
             to {
                 opacity: 1;
-                transform: translateY(0);
+                transform: translateY(0) scale(1);
             }
         }
 
@@ -456,33 +524,36 @@
             display: flex;
             align-items: center;
             gap: 14px;
-            height: 40px;
-            padding: 0 18px 0 16px;
+            height: 44px;
+            padding: 0 16px;
+            border-radius: 12px;
             cursor: pointer;
             user-select: none;
-            font-size: 13.5px;
+            font-size: 14px;
+            font-weight: 500;
             color: var(--g-text-main);
-            transition: background-color 0.1s;
+            transition: background-color 0.15s, color 0.15s;
         }
 
         .drive-menu-item:hover {
             background-color: var(--g-hover-bg);
+            color: var(--m3-primary);
         }
 
         .drive-menu-item .menu-icon {
             font-size: 20px;
-            color: var(--g-text-main);
+            color: inherit;
         }
 
         .drive-menu-item .menu-label {
             flex: 1;
-            font-weight: 400;
+            font-weight: 500;
         }
 
         .drive-menu-divider {
             height: 1px;
             background-color: var(--g-border-subtle);
-            margin: 6px 0;
+            margin: 6px 4px;
         }
 
         /* Sidebar Navigation & Folder List */
@@ -934,38 +1005,302 @@
         }
 
 
-        /* Pagination Bar */
+        /* Pagination Bar (Hidden in favor of smooth infinite scroll) */
         .pagination-container {
+            display: none !important;
+        }
+
+        /* Material You (M3) Circular Progress Indicator for Infinite Scroll */
+        .infinite-scroll-loader {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 24px 0 20px 0;
+            color: var(--g-text-muted);
+            font-size: 13.5px;
+            font-weight: 500;
+        }
+
+        .m3-circular-spinner {
+            width: 28px;
+            height: 28px;
+            animation: m3SpinnerRotate 1.4s linear infinite;
+        }
+
+        .m3-circular-track {
+            stroke: var(--m3-track);
+        }
+
+        .m3-circular-indicator {
+            stroke: var(--m3-primary);
+            stroke-dasharray: 80;
+            stroke-dashoffset: 60;
+            animation: m3SpinnerArc 1.4s ease-in-out infinite;
+        }
+
+        @keyframes m3SpinnerRotate {
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes m3SpinnerArc {
+            0% {
+                stroke-dasharray: 1, 100;
+                stroke-dashoffset: 0;
+            }
+            50% {
+                stroke-dasharray: 70, 100;
+                stroke-dashoffset: -20;
+            }
+            100% {
+                stroke-dasharray: 70, 100;
+                stroke-dashoffset: -90;
+            }
+        }
+
+        /* Material You (M3) Floating Upload Progress Widget (Bottom Right) */
+        .upload-progress-widget {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 380px;
+            background-color: var(--m3-surface-container);
+            border: 1px solid var(--g-border-subtle);
+            border-radius: 24px;
+            box-shadow: var(--m3-elevation-widget);
+            z-index: 2000;
+            overflow: hidden;
+            font-family: inherit;
+            transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1), opacity 0.25s ease;
+            animation: m3WidgetSlideUp 0.3s cubic-bezier(0.2, 0, 0, 1);
+        }
+
+        @keyframes m3WidgetSlideUp {
+            from {
+                transform: translateY(32px) scale(0.96);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0) scale(1);
+                opacity: 1;
+            }
+        }
+
+        .upload-widget-header {
+            height: 54px;
+            padding: 0 12px 0 20px;
             display: flex;
             align-items: center;
-            justify-content: flex-end;
-            padding: 12px 0;
-            gap: 12px;
-            margin-top: auto;
+            justify-content: space-between;
+            background-color: var(--m3-surface-container-high);
+            border-bottom: 1px solid var(--g-border-subtle);
+            user-select: none;
+            cursor: pointer;
         }
 
-        #pageIndicator {
-            font-size: 13px;
-            color: var(--g-text-muted);
-            font-family: 'Roboto Mono', monospace;
+        .upload-widget-title-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            overflow: hidden;
         }
 
-        .page-icon-btn {
+        /* M3 Tonal Status Badge */
+        .m3-status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            background-color: var(--m3-primary-container);
+            color: var(--m3-on-primary-container);
+            font-size: 12.5px;
+            font-weight: 500;
+            transition: background-color 0.25s, color 0.25s;
+        }
+
+        .m3-status-badge.complete {
+            background-color: var(--m3-success-container);
+            color: var(--m3-success-on-container);
+        }
+
+        .upload-widget-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--g-text-main);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .upload-widget-actions {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .widget-action-btn {
             width: 36px;
             height: 36px;
             border-radius: 50%;
-            border: 1px solid var(--g-border);
-            background: var(--g-surface);
-            color: var(--g-text-main);
+            border: none;
+            background: transparent;
+            color: var(--g-text-muted);
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: background-color 0.15s;
+            transition: background-color 0.15s, color 0.15s;
         }
 
-        .page-icon-btn:hover {
-            background-color: var(--g-hover-bg);
+        .widget-action-btn:hover {
+            background-color: var(--m3-surface-container-highest);
+            color: var(--g-text-main);
+        }
+
+        .widget-action-btn .material-symbols-outlined {
+            font-size: 20px;
+        }
+
+        .upload-widget-body {
+            padding: 16px 20px 20px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            background-color: var(--m3-surface-container);
+            transition: max-height 0.3s ease, padding 0.3s ease;
+        }
+
+        .upload-widget-body.collapsed {
+            display: none;
+        }
+
+        /* Material You (M3) Linear Progress Indicator */
+        .m3-linear-progress {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .m3-linear-track {
+            width: 100%;
+            height: 6px;
+            background-color: var(--m3-track);
+            border-radius: 9999px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .m3-linear-indicator {
+            height: 100%;
+            width: 0%;
+            background-color: var(--m3-primary);
+            border-radius: 9999px;
+            transition: width 0.35s cubic-bezier(0.2, 0, 0, 1);
+        }
+
+        .m3-linear-indicator.complete {
+            background-color: var(--m3-success);
+        }
+
+        .m3-linear-stop {
+            position: absolute;
+            right: 0;
+            top: 0;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: var(--m3-primary);
+            opacity: 0.75;
+            transition: opacity 0.2s ease;
+        }
+
+        .m3-linear-stop.hidden {
+            opacity: 0;
+        }
+
+        /* M3 Indeterminate Animation for Metadata Syncing */
+        .m3-linear-progress.indeterminate .m3-linear-indicator {
+            width: 100%;
+            position: absolute;
+            animation: m3LinearIndeterminate 2s cubic-bezier(0.65, 0.815, 0.735, 0.395) infinite;
+        }
+
+        @keyframes m3LinearIndeterminate {
+            0% {
+                transform: translateX(-100%);
+            }
+            50% {
+                transform: translateX(0%);
+            }
+            100% {
+                transform: translateX(100%);
+            }
+        }
+
+        .upload-file-status {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .upload-status-icon-wrap {
+            width: 44px;
+            height: 44px;
+            border-radius: 14px;
+            background-color: var(--m3-primary-container);
+            color: var(--m3-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: background-color 0.25s, color 0.25s;
+        }
+
+        .upload-status-icon-wrap.complete {
+            background-color: var(--m3-success-container);
+            color: var(--m3-success);
+        }
+
+        .upload-status-icon {
+            font-size: 24px;
+            user-select: none;
+        }
+
+        .upload-status-text {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            overflow: hidden;
+            min-width: 0;
+        }
+
+        .upload-filename {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--g-text-main);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            letter-spacing: 0.1px;
+        }
+
+        .upload-subtext {
+            font-size: 12px;
+            color: var(--g-text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .upload-percentage {
+            font-size: 13px;
+            font-weight: 500;
+            font-family: 'Roboto Mono', monospace;
+            color: var(--m3-primary);
+            flex-shrink: 0;
         }
 
         /* Hidden Controls Required for folder.js compatibility */
@@ -973,93 +1308,126 @@
             display: none;
         }
 
-        /* Dialogs */
+        /* Material You (M3) Dialogs */
         dialog#newFolderModal,
         dialog#pwModal {
-            background-color: var(--g-dialog-bg);
+            background-color: var(--m3-surface-container);
             color: var(--g-text-main);
-            border: 1px solid var(--g-border);
+            border: 1px solid var(--g-border-subtle);
             border-radius: 28px;
-            padding: 24px 28px;
-            max-width: 420px;
+            padding: 28px;
+            max-width: 440px;
             width: 90%;
             margin: auto;
             outline: none;
-            box-shadow: 0 8px 24px var(--g-dialog-shadow);
+            box-shadow: var(--m3-elevation-dialog);
+            animation: m3DialogPop 0.25s cubic-bezier(0.2, 0, 0, 1);
+        }
+
+        @keyframes m3DialogPop {
+            from {
+                transform: scale(0.92);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
         }
 
         dialog::backdrop {
-            background: rgba(0, 0, 0, 0.5);
+            background: rgba(0, 0, 0, 0.45);
+            backdrop-filter: blur(6px);
+        }
+
+        .dialog-m3-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background-color: var(--m3-primary-container);
+            color: var(--m3-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+        }
+
+        .dialog-m3-icon .material-symbols-outlined {
+            font-size: 26px;
         }
 
         .dialog-title {
-            font-size: 20px;
-            font-weight: 500;
-            margin-bottom: 16px;
+            font-size: 24px;
+            font-weight: 400;
+            letter-spacing: -0.2px;
+            margin-bottom: 20px;
+            color: var(--g-text-main);
         }
 
         .dialog-input {
             width: 100%;
-            height: 48px;
-            padding: 0 14px;
-            border: 1px solid var(--g-border);
-            border-radius: 8px;
+            height: 52px;
+            padding: 0 16px;
+            border: 1.5px solid var(--g-border);
+            border-radius: 14px;
             font-family: inherit;
-            font-size: 14px;
+            font-size: 15px;
             margin-bottom: 20px;
             outline: none;
-            background-color: transparent;
+            background-color: var(--g-hover-bg);
             color: var(--g-text-main);
+            transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s;
         }
 
         .dialog-input:focus {
-            border-color: var(--g-primary-blue);
-            box-shadow: 0 0 0 1px var(--g-primary-blue);
+            border-color: var(--m3-primary);
+            background-color: var(--g-surface);
+            box-shadow: 0 0 0 2px rgba(11, 87, 208, 0.15);
         }
 
         .dialog-btn-group {
             display: flex;
             justify-content: flex-end;
-            gap: 8px;
+            gap: 10px;
+            margin-top: 8px;
         }
 
         .btn-dialog-cancel {
-            height: 36px;
-            padding: 0 16px;
+            height: 40px;
+            padding: 0 20px;
             border: none;
             background: transparent;
-            color: var(--g-primary-blue);
+            color: var(--m3-primary);
             font-family: inherit;
             font-size: 14px;
             font-weight: 500;
-            border-radius: 18px;
+            border-radius: 20px;
             cursor: pointer;
+            transition: background-color 0.15s;
         }
 
         .btn-dialog-cancel:hover {
-            background-color: var(--g-hover-bg);
+            background-color: var(--m3-surface-container-highest);
         }
 
         .btn-dialog-confirm {
-            height: 36px;
-            padding: 0 20px;
+            height: 40px;
+            padding: 0 24px;
             border: none;
-            background-color: var(--g-primary-blue);
-            color: #ffffff;
+            background-color: var(--m3-primary);
+            color: var(--m3-on-primary);
             font-family: inherit;
             font-size: 14px;
             font-weight: 500;
-            border-radius: 18px;
+            border-radius: 20px;
             cursor: pointer;
-        }
-
-        [data-theme="dark"] .btn-dialog-confirm,
-        :root:not([data-theme="light"]) .btn-dialog-confirm {
-            color: #062e6f;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+            transition: background-color 0.15s, box-shadow 0.15s;
         }
 
         .btn-dialog-confirm:hover {
-            background-color: var(--g-primary-hover);
+            background-color: var(--m3-primary-hover);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
         }
 
         /* 9. Full Window Drag & Drop Overlay (Google Drive style) */
@@ -1319,6 +1687,15 @@
                 <!-- Grid / List items container -->
                 <div id="mediaGrid" class="media-grid"></div>
 
+                <!-- Infinite Scroll Loader (Material You Circular Progress Indicator) -->
+                <div id="infiniteScrollLoader" class="infinite-scroll-loader">
+                    <svg class="m3-circular-spinner" viewBox="0 0 48 48">
+                        <circle class="m3-circular-track" cx="24" cy="24" r="18" fill="none" stroke-width="4"></circle>
+                        <circle class="m3-circular-indicator" cx="24" cy="24" r="18" fill="none" stroke-width="4" stroke-linecap="round"></circle>
+                    </svg>
+                    <span>Loading files...</span>
+                </div>
+
                 <!-- Empty State (Shown when folder is empty) -->
                 <div class="empty-state-view" id="emptyStateContainer">
                     <span class="material-symbols-outlined empty-cloud-icon">cloud_upload</span>
@@ -1330,8 +1707,8 @@
                     </button>
                 </div>
 
-                <!-- Pagination -->
-                <div class="pagination-container" id="paginationBar">
+                <!-- Pagination (Hidden in favor of smooth infinite scroll, preserved for folder.js compatibility) -->
+                <div class="pagination-container" id="paginationBar" style="display: none !important;">
                     <span id="pageIndicator">1 / 1</span>
                     <button id="btnPrevPage" class="page-icon-btn" title="Previous page">
                         <span class="material-symbols-outlined" style="font-size: 20px;">chevron_left</span>
@@ -1359,24 +1736,30 @@
         <span id="lblUserHash" style="display: none;"></span>
     </div>
 
-    <!-- New Folder Dialog (Triggered by '+ New folder') -->
+    <!-- New Folder Dialog (Material You M3 Dialog) -->
     <dialog id="newFolderModal">
+        <div class="dialog-m3-icon">
+            <span class="material-symbols-outlined">create_new_folder</span>
+        </div>
         <div class="dialog-title">New folder</div>
         <input type="text" id="modalFolderNameInput" class="dialog-input" placeholder="Untitled folder">
         <div class="dialog-btn-group">
-            <button class="btn-dialog-cancel" id="btnCancelNewFolder">Cancel</button>
-            <button class="btn-dialog-confirm" id="btnConfirmNewFolder">Create</button>
+            <button class="btn-dialog-cancel" id="btnCancelNewFolder" type="button">Cancel</button>
+            <button class="btn-dialog-confirm" id="btnConfirmNewFolder" type="button">Create</button>
         </div>
     </dialog>
 
-    <!-- Change Password Dialog -->
+    <!-- Change Password Dialog (Material You M3 Dialog) -->
     <dialog id="pwModal">
+        <div class="dialog-m3-icon">
+            <span class="material-symbols-outlined">lock_reset</span>
+        </div>
         <div class="dialog-title">Change Password</div>
         <input type="password" id="newPassword" class="dialog-input" placeholder="New Password">
         <input type="password" id="newPasswordConfirm" class="dialog-input" placeholder="Confirm Password">
         <div class="dialog-btn-group">
-            <button id="btnCancelPw" class="btn-dialog-cancel">Cancel</button>
-            <button id="btnConfirmPw" class="btn-dialog-confirm">Save</button>
+            <button id="btnCancelPw" class="btn-dialog-cancel" type="button">Cancel</button>
+            <button id="btnConfirmPw" class="btn-dialog-confirm" type="button">Save</button>
         </div>
     </dialog>
 
@@ -1386,6 +1769,46 @@
             <span class="material-symbols-outlined drag-drop-icon">cloud_upload</span>
             <div class="drag-drop-title">Drop files to upload</div>
             <div class="drag-drop-subtitle" id="dragDropSubtitle">Upload to current folder</div>
+        </div>
+    </div>
+
+    <!-- Material You (M3) Floating Upload Progress Widget (Bottom Right) -->
+    <div id="uploadProgressWidget" class="upload-progress-widget hidden">
+        <div class="upload-widget-header" id="uploadWidgetHeader">
+            <div class="upload-widget-title-group">
+                <span class="m3-status-badge" id="uploadStatusBadge">
+                    <span class="material-symbols-outlined" id="uploadBadgeIcon" style="font-size: 16px;">upload</span>
+                    <span id="uploadBadgeText">Uploading</span>
+                </span>
+                <span class="upload-widget-title" id="uploadWidgetTitle">1 item</span>
+            </div>
+            <div class="upload-widget-actions">
+                <button class="widget-action-btn" id="btnMinimizeUploadWidget" type="button" title="Minimize / Expand">
+                    <span class="material-symbols-outlined" id="uploadWidgetChevron">expand_more</span>
+                </button>
+                <button class="widget-action-btn" id="btnCloseUploadWidget" type="button" title="Close">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+        </div>
+        <div class="upload-widget-body" id="uploadWidgetBody">
+            <div class="upload-file-status">
+                <div class="upload-status-icon-wrap" id="uploadStatusIconWrap">
+                    <span class="material-symbols-outlined upload-status-icon" id="uploadStatusIcon">upload_file</span>
+                </div>
+                <div class="upload-status-text">
+                    <span class="upload-filename" id="uploadCurrentFilename">Preparing files...</span>
+                    <span class="upload-subtext" id="uploadSubtext">Encrypting & uploading...</span>
+                </div>
+                <span class="upload-percentage" id="uploadPercentage">0%</span>
+            </div>
+            <!-- Material You (M3) Linear Progress Indicator -->
+            <div class="m3-linear-progress" id="uploadProgressContainer" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                <div class="m3-linear-track">
+                    <div class="m3-linear-indicator" id="uploadProgressBarFill"></div>
+                    <div class="m3-linear-stop" id="uploadProgressStop"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1511,6 +1934,65 @@
         const viewModeText = document.getElementById("viewModeText");
         const mediaGrid = document.getElementById("mediaGrid");
         const mediaContainer = document.getElementById("mediaContainer");
+        const infiniteScrollLoader = document.getElementById("infiniteScrollLoader");
+
+        // Infinite Scroll Mechanism:
+        // Intercept innerHTML setter on mediaGrid so that when folder.js calls grid.innerHTML = "" during
+        // an infinite scroll load (btnNextPage.click()), existing items remain intact and next page items are appended.
+        let isInfiniteScrollLoading = false;
+        const origGridInnerHTMLDesc = Object.getOwnPropertyDescriptor(Element.prototype, "innerHTML");
+        Object.defineProperty(mediaGrid, "innerHTML", {
+            set(value) {
+                if (isInfiniteScrollLoading && value === "") {
+                    // Suppress clearing during infinite scroll append
+                    return;
+                }
+                origGridInnerHTMLDesc.set.call(this, value);
+            },
+            get() {
+                return origGridInnerHTMLDesc.get.call(this);
+            },
+            configurable: true
+        });
+
+        // Trigger next page when scrolling within 300px of bottom
+        function handleInfiniteScroll() {
+            if (isInfiniteScrollLoading) return;
+            if (!folderSelect || !folderSelect.value || mediaContainer.style.display === "none") return;
+
+            const remaining = mediaContainer.scrollHeight - mediaContainer.scrollTop - mediaContainer.clientHeight;
+            if (remaining <= 320) {
+                const indicator = document.getElementById("pageIndicator");
+                const parts = (indicator ? indicator.textContent || "" : "").split("/");
+                if (parts.length === 2) {
+                    const cur = parseInt(parts[0].trim(), 10);
+                    const total = parseInt(parts[1].trim(), 10);
+                    if (!isNaN(cur) && !isNaN(total) && cur < total) {
+                        const btnNext = document.getElementById("btnNextPage");
+                        if (btnNext) {
+                            isInfiniteScrollLoading = true;
+                            if (infiniteScrollLoader) infiniteScrollLoader.style.display = "flex";
+
+                            const prevCount = mediaGrid.children.length;
+                            btnNext.click();
+
+                            // Poll until new cards are appended by folder.js showFls()
+                            let elapsed = 0;
+                            const pollInterval = setInterval(() => {
+                                elapsed += 40;
+                                if (mediaGrid.children.length > prevCount || elapsed >= 2500) {
+                                    clearInterval(pollInterval);
+                                    isInfiniteScrollLoading = false;
+                                    if (infiniteScrollLoader) infiniteScrollLoader.style.display = "none";
+                                }
+                            }, 40);
+                        }
+                    }
+                }
+            }
+        }
+
+        mediaContainer.addEventListener("scroll", handleInfiniteScroll);
 
         function applyViewMode(mode) {
             localStorage.setItem("driveViewMode", mode);
@@ -1755,6 +2237,8 @@
 
         folderSelect.addEventListener("change", () => {
             fileSizeCache = {};
+            isInfiniteScrollLoading = false;
+            if (mediaContainer) mediaContainer.scrollTop = 0;
             updateFolderDisplay();
         });
 
@@ -1762,10 +2246,10 @@
         const observer = new MutationObserver(() => {
             if (mediaGrid.children.length === 0) {
                 emptyState.style.display = "flex";
-                paginationBar.style.display = "none";
+                if (paginationBar) paginationBar.style.display = "none";
             } else {
                 emptyState.style.display = "none";
-                paginationBar.style.display = "flex";
+                if (paginationBar) paginationBar.style.display = "none";
                 if (folderSelect.value && rootFolderView.style.display !== "none") {
                     updateFolderDisplay();
                 }
@@ -1865,9 +2349,271 @@
             btnEmptyUpload.addEventListener("click", triggerUploadFlow);
         }
 
+        // 7. Material You (M3) Floating Upload Progress Widget (Bottom Right)
+        const uploadProgressWidget = document.getElementById("uploadProgressWidget");
+        const uploadWidgetHeader = document.getElementById("uploadWidgetHeader");
+        const uploadWidgetTitle = document.getElementById("uploadWidgetTitle");
+        const uploadStatusBadge = document.getElementById("uploadStatusBadge");
+        const uploadBadgeIcon = document.getElementById("uploadBadgeIcon");
+        const uploadBadgeText = document.getElementById("uploadBadgeText");
+        const btnMinimizeUploadWidget = document.getElementById("btnMinimizeUploadWidget");
+        const btnCloseUploadWidget = document.getElementById("btnCloseUploadWidget");
+        const uploadWidgetChevron = document.getElementById("uploadWidgetChevron");
+        const uploadWidgetBody = document.getElementById("uploadWidgetBody");
+        const uploadStatusIconWrap = document.getElementById("uploadStatusIconWrap");
+        const uploadStatusIcon = document.getElementById("uploadStatusIcon");
+        const uploadCurrentFilename = document.getElementById("uploadCurrentFilename");
+        const uploadSubtext = document.getElementById("uploadSubtext");
+        const uploadPercentage = document.getElementById("uploadPercentage");
+        const uploadProgressContainer = document.getElementById("uploadProgressContainer");
+        const uploadProgressBarFill = document.getElementById("uploadProgressBarFill");
+        const uploadProgressStop = document.getElementById("uploadProgressStop");
+
+        let activeUploadFiles = [];
+        let uploadDismissTimer = null;
+        let isUploadOngoing = false;
+
+        function setUploadWidgetCollapsed(collapsed) {
+            if (!uploadWidgetBody) return;
+            if (collapsed) {
+                uploadWidgetBody.classList.add("collapsed");
+                if (uploadWidgetChevron) uploadWidgetChevron.textContent = "expand_less";
+            } else {
+                uploadWidgetBody.classList.remove("collapsed");
+                if (uploadWidgetChevron) uploadWidgetChevron.textContent = "expand_more";
+            }
+        }
+
+        if (uploadWidgetHeader) {
+            uploadWidgetHeader.addEventListener("click", (e) => {
+                if (e.target.closest("#btnCloseUploadWidget")) return;
+                const isCurrentlyCollapsed = uploadWidgetBody.classList.contains("collapsed");
+                setUploadWidgetCollapsed(!isCurrentlyCollapsed);
+            });
+        }
+
+        if (btnMinimizeUploadWidget) {
+            btnMinimizeUploadWidget.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const isCurrentlyCollapsed = uploadWidgetBody.classList.contains("collapsed");
+                setUploadWidgetCollapsed(!isCurrentlyCollapsed);
+            });
+        }
+
+        if (btnCloseUploadWidget) {
+            btnCloseUploadWidget.addEventListener("click", (e) => {
+                e.stopPropagation();
+                if (uploadProgressWidget) {
+                    uploadProgressWidget.classList.add("hidden");
+                }
+                clearTimeout(uploadDismissTimer);
+            });
+        }
+
+        function showUploadProgressWidget(files) {
+            clearTimeout(uploadDismissTimer);
+            activeUploadFiles = files && files.length ? files : [];
+            const count = activeUploadFiles.length || 1;
+
+            if (uploadProgressWidget) {
+                uploadProgressWidget.classList.remove("hidden");
+                uploadProgressWidget.style.opacity = "1";
+                uploadProgressWidget.style.transform = "translateY(0) scale(1)";
+            }
+            setUploadWidgetCollapsed(false);
+
+            if (uploadProgressContainer) {
+                uploadProgressContainer.classList.remove("indeterminate");
+            }
+            if (uploadProgressBarFill) {
+                uploadProgressBarFill.classList.remove("complete");
+                uploadProgressBarFill.style.width = "4%";
+            }
+            if (uploadProgressStop) {
+                uploadProgressStop.classList.remove("hidden");
+            }
+
+            if (uploadStatusBadge) {
+                uploadStatusBadge.classList.remove("complete");
+            }
+            if (uploadBadgeIcon) {
+                uploadBadgeIcon.textContent = "upload";
+            }
+            if (uploadBadgeText) {
+                uploadBadgeText.textContent = "Uploading";
+            }
+
+            if (uploadStatusIconWrap) {
+                uploadStatusIconWrap.classList.remove("complete");
+            }
+            if (uploadStatusIcon) {
+                uploadStatusIcon.textContent = "upload_file";
+            }
+
+            if (uploadWidgetTitle) {
+                uploadWidgetTitle.textContent = `${count} ${count === 1 ? 'file' : 'files'}`;
+            }
+            if (uploadCurrentFilename) {
+                uploadCurrentFilename.textContent = activeUploadFiles[0]?.name || "Selected files";
+            }
+            if (uploadSubtext) {
+                uploadSubtext.textContent = `Encrypting & uploading (1 of ${count})...`;
+            }
+            if (uploadPercentage) {
+                uploadPercentage.textContent = "4%";
+            }
+        }
+
+        function updateUploadProgressStep(currentIdx, totalCount) {
+            if (!totalCount || totalCount <= 0) return;
+            const cur = Math.max(1, Math.min(currentIdx, totalCount));
+            const percent = Math.min(92, Math.round(((cur - 0.4) / totalCount) * 100));
+
+            if (uploadProgressContainer) {
+                uploadProgressContainer.classList.remove("indeterminate");
+            }
+            if (uploadProgressBarFill) {
+                uploadProgressBarFill.style.width = `${percent}%`;
+            }
+            if (uploadProgressStop) {
+                uploadProgressStop.classList.remove("hidden");
+            }
+            if (uploadPercentage) {
+                uploadPercentage.textContent = `${percent}%`;
+            }
+
+            if (uploadBadgeText) {
+                uploadBadgeText.textContent = `${cur}/${totalCount}`;
+            }
+            if (uploadWidgetTitle) {
+                uploadWidgetTitle.textContent = `${totalCount} ${totalCount === 1 ? 'file' : 'files'}`;
+            }
+
+            const currentFile = activeUploadFiles[cur - 1];
+            if (currentFile && uploadCurrentFilename) {
+                uploadCurrentFilename.textContent = currentFile.name;
+            }
+            if (uploadSubtext) {
+                uploadSubtext.textContent = `Encrypting & uploading (${cur} of ${totalCount})...`;
+            }
+        }
+
+        function setUploadSyncingState() {
+            if (uploadProgressContainer) {
+                uploadProgressContainer.classList.add("indeterminate");
+            }
+            if (uploadProgressStop) {
+                uploadProgressStop.classList.add("hidden");
+            }
+            if (uploadBadgeIcon) {
+                uploadBadgeIcon.textContent = "sync";
+            }
+            if (uploadBadgeText) {
+                uploadBadgeText.textContent = "Syncing";
+            }
+            if (uploadPercentage) {
+                uploadPercentage.textContent = "96%";
+            }
+            if (uploadSubtext) {
+                uploadSubtext.textContent = "Syncing encrypted metadata with server...";
+            }
+        }
+
+        function markUploadComplete() {
+            if (uploadProgressContainer) {
+                uploadProgressContainer.classList.remove("indeterminate");
+            }
+            if (uploadProgressBarFill) {
+                uploadProgressBarFill.style.width = "100%";
+                uploadProgressBarFill.classList.add("complete");
+            }
+            if (uploadProgressStop) {
+                uploadProgressStop.classList.add("hidden");
+            }
+            if (uploadPercentage) {
+                uploadPercentage.textContent = "100%";
+            }
+
+            if (uploadStatusBadge) {
+                uploadStatusBadge.classList.add("complete");
+            }
+            if (uploadBadgeIcon) {
+                uploadBadgeIcon.textContent = "check_circle";
+            }
+            if (uploadBadgeText) {
+                uploadBadgeText.textContent = "Complete";
+            }
+
+            if (uploadStatusIconWrap) {
+                uploadStatusIconWrap.classList.add("complete");
+            }
+            if (uploadStatusIcon) {
+                uploadStatusIcon.textContent = "task_alt";
+            }
+
+            const totalCount = activeUploadFiles.length || 1;
+            if (uploadWidgetTitle) {
+                uploadWidgetTitle.textContent = `${totalCount} ${totalCount === 1 ? 'upload' : 'uploads'} finished`;
+            }
+            if (uploadSubtext) {
+                uploadSubtext.textContent = "All files successfully encrypted and stored";
+            }
+
+            clearTimeout(uploadDismissTimer);
+            uploadDismissTimer = setTimeout(() => {
+                if (uploadProgressWidget) {
+                    uploadProgressWidget.style.opacity = "0";
+                    uploadProgressWidget.style.transform = "translateY(32px) scale(0.96)";
+                    setTimeout(() => {
+                        uploadProgressWidget.classList.add("hidden");
+                    }, 300);
+                }
+            }, 6000);
+        }
+
+        // MutationObserver to watch folder.js updating btnUpload
+        const uploadBtnObserver = new MutationObserver(() => {
+            const txt = (btnUpload.textContent || "").trim();
+            const isDisabled = btnUpload.disabled;
+
+            if (isDisabled || txt.startsWith("🚀") || txt.includes("Syncing")) {
+                if (!isUploadOngoing) {
+                    isUploadOngoing = true;
+                    if (fileInput.files && fileInput.files.length > 0 && activeUploadFiles.length === 0) {
+                        activeUploadFiles = Array.from(fileInput.files);
+                    }
+                    showUploadProgressWidget(activeUploadFiles);
+                }
+
+                // Check text for 🚀 X/Y
+                const match = txt.match(/🚀\s*(\d+)\s*\/\s*(\d+)/);
+                if (match) {
+                    const cur = parseInt(match[1], 10);
+                    const total = parseInt(match[2], 10);
+                    updateUploadProgressStep(cur, total);
+                } else if (txt.includes("Syncing")) {
+                    setUploadSyncingState();
+                }
+            } else if (isUploadOngoing && !isDisabled && !txt.startsWith("🚀") && !txt.includes("Syncing")) {
+                isUploadOngoing = false;
+                markUploadComplete();
+                activeUploadFiles = [];
+            }
+        });
+
+        uploadBtnObserver.observe(btnUpload, {
+            characterData: true,
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ["disabled"]
+        });
+
         fileInput.addEventListener("change", () => {
             if (fileInput.files.length > 0) {
                 fileSizeCache = {};
+                activeUploadFiles = Array.from(fileInput.files);
+                showUploadProgressWidget(activeUploadFiles);
                 btnUpload.click();
             }
         });

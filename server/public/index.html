@@ -272,38 +272,56 @@
             transform: scale(0.98);
         }
 
-        /* Google Dialogs */
+        /* Material You (M3) Dialogs */
         dialog {
             background-color: var(--g-surface);
             color: var(--g-text-main);
             border: 1px solid var(--g-border-card);
             border-radius: 28px;
-            padding: 24px 28px;
-            max-width: 420px;
+            padding: 28px;
+            max-width: 440px;
             width: 90%;
             margin: auto;
             outline: none;
-            box-shadow: 0 8px 24px rgba(60, 64, 67, 0.2);
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28);
+            animation: m3DialogPop 0.25s cubic-bezier(0.2, 0, 0, 1);
+        }
+
+        @keyframes m3DialogPop {
+            from {
+                transform: scale(0.92);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
         }
 
         dialog::backdrop {
-            background: rgba(0, 0, 0, 0.38);
+            background: rgba(0, 0, 0, 0.45);
+            backdrop-filter: blur(6px);
         }
 
         .dialog-title {
-            font-size: 18px;
-            font-weight: 500;
+            font-size: 22px;
+            font-weight: 400;
+            letter-spacing: -0.2px;
             color: var(--g-text-main);
-            margin-bottom: 12px;
+            margin-bottom: 16px;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 12px;
+        }
+
+        .dialog-title .material-symbols-outlined {
+            font-size: 26px;
         }
 
         .dialog-body {
-            font-size: 14px;
+            font-size: 14.5px;
             color: var(--g-text-sub);
-            line-height: 1.5;
+            line-height: 1.55;
             margin-bottom: 24px;
             white-space: pre-wrap;
         }
@@ -311,7 +329,8 @@
         .dialog-actions {
             display: flex;
             justify-content: flex-end;
-            gap: 8px;
+            gap: 10px;
+            margin-top: 8px;
         }
 
         .btn-dialog-text {
@@ -321,10 +340,11 @@
             font-family: inherit;
             font-size: 14px;
             font-weight: 500;
-            padding: 0 16px;
-            height: 38px;
-            border-radius: 19px;
+            padding: 0 20px;
+            height: 40px;
+            border-radius: 20px;
             cursor: pointer;
+            transition: background-color 0.15s;
         }
 
         .btn-dialog-text:hover {
@@ -338,10 +358,12 @@
             font-family: inherit;
             font-size: 14px;
             font-weight: 500;
-            padding: 0 20px;
-            height: 38px;
-            border-radius: 19px;
+            padding: 0 24px;
+            height: 40px;
+            border-radius: 20px;
             cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+            transition: background-color 0.15s, box-shadow 0.15s;
         }
 
         [data-theme="dark"] .btn-dialog-primary,
@@ -351,6 +373,7 @@
 
         .btn-dialog-primary:hover {
             background-color: var(--g-primary-hover);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
         }
 
         @media (max-width: 480px) {
