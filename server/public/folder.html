@@ -731,6 +731,93 @@
             color: var(--g-primary-blue);
         }
 
+        /* Sort Dropdown Menu */
+        .sort-action-wrapper {
+            position: relative;
+            display: inline-flex;
+        }
+
+        .sort-dropdown-menu {
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0;
+            min-width: 210px;
+            background-color: var(--m3-surface-container);
+            border-radius: 16px;
+            box-shadow: var(--m3-elevation-widget);
+            border: 1px solid var(--g-border-subtle);
+            padding: 6px;
+            display: none;
+            z-index: 1000;
+            animation: menuFadeIn 0.15s cubic-bezier(0.2, 0, 0, 1);
+        }
+
+        .sort-dropdown-menu.open {
+            display: block;
+        }
+
+        .sort-menu-header {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--g-text-muted);
+            padding: 6px 12px 4px 12px;
+        }
+
+        .sort-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            height: 38px;
+            padding: 0 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            user-select: none;
+            font-size: 13.5px;
+            font-weight: 500;
+            color: var(--g-text-main);
+            transition: background-color 0.15s, color 0.15s;
+        }
+
+        .sort-menu-item:hover {
+            background-color: var(--g-hover-bg);
+            color: var(--m3-primary);
+        }
+
+        .sort-menu-item.active {
+            background-color: var(--m3-primary-container, #d3e3fd);
+            color: var(--m3-primary, #0b57d0);
+            font-weight: 600;
+        }
+
+        [data-theme="dark"] .sort-menu-item.active,
+        :root:not([data-theme="light"]) .sort-menu-item.active {
+            background-color: #004a77;
+            color: #d3e3fd;
+        }
+
+        .sort-menu-item .menu-icon {
+            font-size: 18px;
+            color: inherit;
+        }
+
+        .sort-menu-item .menu-label {
+            flex: 1;
+            font-weight: inherit;
+        }
+
+        .sort-menu-item .check-icon {
+            font-size: 18px;
+            color: inherit;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+
+        .sort-menu-item.active .check-icon {
+            opacity: 1;
+        }
+
         /* 4. Root Folder View (Shown when landing / no folder selected) */
         .root-folder-view {
             flex: 1;
@@ -1730,6 +1817,37 @@
                         <span class="material-symbols-outlined" id="viewModeIcon">view_list</span>
                         <span id="viewModeText">List view</span>
                     </button>
+                    <!-- Sort As Dropdown Menu -->
+                    <div class="sort-action-wrapper" id="sortActionWrapper">
+                        <button class="top-action-btn" id="btnSortMenu" type="button" aria-haspopup="true" aria-expanded="false" title="Sort files">
+                            <span class="material-symbols-outlined" id="sortModeIcon">swap_vert</span>
+                            <span id="sortModeText">Sort as</span>
+                        </button>
+                        <div class="sort-dropdown-menu" id="sortDropdownMenu">
+                            <div class="sort-menu-header">Sort files by</div>
+                            <div class="sort-menu-item active" data-sort="name-asc" id="sortOptNameAsc">
+                                <span class="material-symbols-outlined menu-icon">arrow_upward</span>
+                                <span class="menu-label">Name (A to Z)</span>
+                                <span class="material-symbols-outlined check-icon">check</span>
+                            </div>
+                            <div class="sort-menu-item" data-sort="name-desc" id="sortOptNameDesc">
+                                <span class="material-symbols-outlined menu-icon">arrow_downward</span>
+                                <span class="menu-label">Name (Z to A)</span>
+                                <span class="material-symbols-outlined check-icon">check</span>
+                            </div>
+                            <div class="drive-menu-divider"></div>
+                            <div class="sort-menu-item" data-sort="size-asc" id="sortOptSizeAsc">
+                                <span class="material-symbols-outlined menu-icon">straighten</span>
+                                <span class="menu-label">Size (Small to Large)</span>
+                                <span class="material-symbols-outlined check-icon">check</span>
+                            </div>
+                            <div class="sort-menu-item" data-sort="size-desc" id="sortOptSizeDesc">
+                                <span class="material-symbols-outlined menu-icon">inventory_2</span>
+                                <span class="menu-label">Size (Large to Small)</span>
+                                <span class="material-symbols-outlined check-icon">check</span>
+                            </div>
+                        </div>
+                    </div>
                     <button class="top-action-btn" id="btnImport" title="Import share token">
                         <span class="material-symbols-outlined">file_download</span>
                         <span>Import</span>
@@ -2187,6 +2305,78 @@
         });
         applyViewMode(localStorage.getItem("driveViewMode") || "grid");
 
+        // Sort Dropdown Binding
+        const sortActionWrapper = document.getElementById("sortActionWrapper");
+        const btnSortMenu = document.getElementById("btnSortMenu");
+        const sortDropdownMenu = document.getElementById("sortDropdownMenu");
+        const sortModeText = document.getElementById("sortModeText");
+        const sortModeIcon = document.getElementById("sortModeIcon");
+
+        function updateSortMenuUI(sortMode) {
+            const items = document.querySelectorAll(".sort-menu-item");
+            items.forEach(item => {
+                if (item.getAttribute("data-sort") === sortMode) {
+                    item.classList.add("active");
+                } else {
+                    item.classList.remove("active");
+                }
+            });
+            if (sortModeText) {
+                if (sortMode === "name-asc") {
+                    sortModeText.textContent = "Sort: Name (A-Z)";
+                    if (sortModeIcon) sortModeIcon.textContent = "arrow_upward";
+                } else if (sortMode === "name-desc") {
+                    sortModeText.textContent = "Sort: Name (Z-A)";
+                    if (sortModeIcon) sortModeIcon.textContent = "arrow_downward";
+                } else if (sortMode === "size-asc") {
+                    sortModeText.textContent = "Sort: Size (Small)";
+                    if (sortModeIcon) sortModeIcon.textContent = "straighten";
+                } else if (sortMode === "size-desc") {
+                    sortModeText.textContent = "Sort: Size (Large)";
+                    if (sortModeIcon) sortModeIcon.textContent = "inventory_2";
+                } else {
+                    sortModeText.textContent = "Sort as";
+                    if (sortModeIcon) sortModeIcon.textContent = "swap_vert";
+                }
+            }
+        }
+
+        if (btnSortMenu && sortDropdownMenu) {
+            btnSortMenu.addEventListener("click", (e) => {
+                e.stopPropagation();
+                if (typeof newDriveMenu !== "undefined" && newDriveMenu) newDriveMenu.classList.remove("open");
+                const accountMenu = document.getElementById("accountDropdownMenu");
+                if (accountMenu) accountMenu.classList.remove("open");
+                const isOpen = sortDropdownMenu.classList.toggle("open");
+                btnSortMenu.setAttribute("aria-expanded", isOpen ? "true" : "false");
+            });
+
+            document.addEventListener("click", (e) => {
+                if (sortActionWrapper && !sortActionWrapper.contains(e.target)) {
+                    sortDropdownMenu.classList.remove("open");
+                    btnSortMenu.setAttribute("aria-expanded", "false");
+                }
+            });
+        }
+
+        document.querySelectorAll(".sort-menu-item").forEach(item => {
+            item.addEventListener("click", async () => {
+                const mode = item.getAttribute("data-sort");
+                updateSortMenuUI(mode);
+                if (sortDropdownMenu) sortDropdownMenu.classList.remove("open");
+                if (btnSortMenu) btnSortMenu.setAttribute("aria-expanded", "false");
+
+                if (window.setFileSort) {
+                    await window.setFileSort(mode);
+                } else {
+                    localStorage.setItem("mediahub_sort", mode);
+                }
+                if (mediaContainer) mediaContainer.scrollTop = 0;
+            });
+        });
+
+        updateSortMenuUI(localStorage.getItem("mediahub_sort") || "name-asc");
+
         // 3. Folder Navigation & Root Folder List Display
         const folderSelect = document.getElementById("folderSelect");
         const sidebarFolderList = document.getElementById("sidebarFolderList");
@@ -2249,6 +2439,7 @@
                 btnDeleteFolder.style.display = "";
                 btnExport.style.display = "";
                 btnChangeView.style.display = "";
+                if (sortActionWrapper) sortActionWrapper.style.display = "";
 
                 // Highlight active in sidebar
                 document.querySelectorAll(".nav-folder-item").forEach(item => {
@@ -2272,6 +2463,7 @@
                 btnDeleteFolder.style.display = "none";
                 btnExport.style.display = "none";
                 btnChangeView.style.display = "none";
+                if (sortActionWrapper) sortActionWrapper.style.display = "none";
 
                 document.querySelectorAll(".nav-folder-item").forEach(item => {
                     item.classList.remove("active");
@@ -2439,6 +2631,9 @@
         if (btnNewDropdown && newDriveMenu) {
             btnNewDropdown.addEventListener("click", (e) => {
                 e.stopPropagation();
+                if (sortDropdownMenu) sortDropdownMenu.classList.remove("open");
+                const accountMenu = document.getElementById("accountDropdownMenu");
+                if (accountMenu) accountMenu.classList.remove("open");
                 const isOpen = newDriveMenu.classList.toggle("open");
                 btnNewDropdown.setAttribute("aria-expanded", isOpen ? "true" : "false");
             });
@@ -2874,6 +3069,7 @@
             btnAccountMenu.addEventListener("click", (e) => {
                 e.stopPropagation();
                 if (newDriveMenu) newDriveMenu.classList.remove("open");
+                if (sortDropdownMenu) sortDropdownMenu.classList.remove("open");
                 const isOpen = accountDropdownMenu.classList.toggle("open");
                 btnAccountMenu.setAttribute("aria-expanded", isOpen ? "true" : "false");
             });

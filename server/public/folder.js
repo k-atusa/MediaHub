@@ -1,6 +1,6 @@
 // MediaHub Folder Module
 import { SHA3256, SymMaster, Random, Masker, HashMaster } from './Bencrypt.js';
-import { EncodeCfg, DecodeCfg, EncodeInt, PadLen } from './Opsec.js';
+import { EncodeCfg, DecodeCfg, EncodeInt, DecodeInt, PadLen } from './Opsec.js';
 import { NormPW } from './Bencode.js';
 import { makeImg, makeVid } from './media.js';
 import { makeToken, loadToken } from './storage.js';
@@ -27,7 +27,7 @@ let usrKey = null;
     const raw = sessionStorage.getItem("userKey") ? fromHex(sessionStorage.getItem("userKey")) : null;
     if (raw) { usrKey = mask.XOR(raw); raw.fill(0); }
 }
-let state = { fldMap: {}, name: "", key: null, id: "", flsMap: {}, page: 1, limit: 30 };
+let state = { fldMap: {}, name: "", key: null, id: "", flsMap: {}, page: 1, limit: 30, sort: localStorage.getItem("mediahub_sort") || "name-asc" };
 if (!usrHsh || !usrKey) window.location.href = "./index.html";
 
 // Read file chunks.
@@ -334,10 +334,43 @@ async function loadFld() {
     await showFls();
 }
 
+// Helper to extract file size from masked flInfo
+function getEntrySize(flKeyMasked) {
+    if (!flKeyMasked) return 0;
+    const raw = mask.XOR(flKeyMasked);
+    let sz = 0;
+    if (raw.length >= 52) {
+        sz = DecodeInt(raw.slice(44, 52));
+    }
+    raw.fill(0);
+    return sz;
+}
+
 // Render files grid.
 async function showFls() {
     const grid = document.getElementById("mediaGrid"); grid.innerHTML = "";
-    const entries = Object.entries(state.flsMap).sort((a, b) => a[0].localeCompare(b[0]));
+    let entries = Object.entries(state.flsMap);
+    const sortMode = state.sort || localStorage.getItem("mediahub_sort") || "name-asc";
+
+    if (sortMode === "name-desc") {
+        entries.sort((a, b) => b[0].localeCompare(a[0], undefined, { numeric: true, sensitivity: 'base' }));
+    } else if (sortMode === "size-asc") {
+        entries.sort((a, b) => {
+            const szA = getEntrySize(a[1]);
+            const szB = getEntrySize(b[1]);
+            return (szA - szB) || a[0].localeCompare(b[0], undefined, { numeric: true, sensitivity: 'base' });
+        });
+    } else if (sortMode === "size-desc") {
+        entries.sort((a, b) => {
+            const szA = getEntrySize(a[1]);
+            const szB = getEntrySize(b[1]);
+            return (szB - szA) || a[0].localeCompare(b[0], undefined, { numeric: true, sensitivity: 'base' });
+        });
+    } else {
+        // Default: name-asc
+        entries.sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true, sensitivity: 'base' }));
+    }
+
     const total = Math.ceil(entries.length / state.limit) || 1;
     document.getElementById("pageIndicator").textContent = `${state.page} / ${total}`;
 
@@ -370,6 +403,14 @@ async function showFls() {
         grid.appendChild(card);
     }
 }
+
+window.setFileSort = async (mode) => {
+    state.sort = mode;
+    localStorage.setItem("mediahub_sort", mode);
+    state.page = 1;
+    await showFls();
+};
+window.getFileSort = () => state.sort;
 
 // Fetch thumb file.
 async function loadThm(filePid, ext, imgEl, fileKeyRaw) {
