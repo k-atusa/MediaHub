@@ -389,7 +389,14 @@ document.getElementById("btnUpload").addEventListener("click", async () => {
     const fileIn = document.getElementById("fileInput");
     const btnUp = document.getElementById("btnUpload");
     const files = fileIn.files;
-    if (files.length === 0) return alert("⚠️ Select files");
+    if (files.length === 0) {
+        if (window.showNotice) {
+            window.showNotice("Please select files to upload.", "Upload", "info");
+        } else {
+            alert("⚠️ Select files");
+        }
+        return;
+    }
 
     fileIn.disabled = true;
     btnUp.disabled = true;
@@ -399,7 +406,8 @@ document.getElementById("btnUpload").addEventListener("click", async () => {
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
             if (state.flsMap[file.name]) {
-                if (!confirm(`⚠️ File "${file.name}" already exists. Overwrite?`)) {
+                const shouldOverwrite = await showConfirmModal(`File "${file.name}" already exists. Overwrite?`, "File Exists", "warning", "Overwrite", true);
+                if (!shouldOverwrite) {
                     continue;
                 }
                 const oldRaw = mask.XOR(state.flsMap[file.name]);
