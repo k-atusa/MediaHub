@@ -453,7 +453,38 @@
             gap: 16px;
             flex-shrink: 0;
             border-right: 1px solid var(--g-border-subtle);
-            transition: background-color 0.2s ease, border-color 0.2s ease;
+            transition: width 0.22s cubic-bezier(0.2, 0, 0, 1), padding 0.22s cubic-bezier(0.2, 0, 0, 1), opacity 0.2s ease, transform 0.25s cubic-bezier(0.2, 0, 0, 1);
+            overflow: hidden;
+        }
+
+        .sidebar-collapsed .drive-sidebar {
+            width: 0;
+            padding-left: 0;
+            padding-right: 0;
+            border-right: none;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Mobile Sidebar Backdrop */
+        .sidebar-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.4);
+            z-index: 1040;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            backdrop-filter: blur(2px);
+            -webkit-backdrop-filter: blur(2px);
+        }
+
+        .sidebar-backdrop.active {
+            display: block;
+            opacity: 1;
         }
 
         /* Google Drive "+ New" Pill Button & Dropdown Menu */
@@ -1675,7 +1706,33 @@
         /* Responsive */
         @media (max-width: 768px) {
             .drive-sidebar {
-                display: none;
+                position: fixed;
+                top: 64px;
+                left: 0;
+                bottom: 0;
+                width: 270px;
+                background-color: var(--g-surface);
+                box-shadow: var(--m3-elevation-widget);
+                z-index: 1050;
+                transform: translateX(-100%);
+                display: flex;
+                opacity: 1;
+                pointer-events: auto;
+            }
+
+            .drive-sidebar.mobile-open {
+                transform: translateX(0);
+            }
+
+            .sidebar-collapsed .drive-sidebar {
+                width: 270px;
+                transform: translateX(-100%);
+                opacity: 1;
+                pointer-events: auto;
+            }
+
+            .sidebar-collapsed .drive-sidebar.mobile-open {
+                transform: translateX(0);
             }
 
             .header-search-box {
@@ -1683,7 +1740,68 @@
             }
 
             .drive-workspace {
-                padding: 16px;
+                padding: 12px 14px 20px 14px;
+            }
+
+            .workspace-top-bar {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+                margin-bottom: 10px;
+            }
+
+            .workspace-folder-title {
+                font-size: 20px;
+            }
+
+            /* Single row toolbar for action buttons on mobile */
+            .workspace-action-group {
+                display: flex;
+                align-items: center;
+                justify-content: flex-start;
+                gap: 6px;
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                padding: 4px 0;
+                width: 100%;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;
+            }
+
+            .workspace-action-group::-webkit-scrollbar {
+                display: none;
+            }
+
+            .top-action-btn {
+                padding: 8px 10px;
+                border-radius: 10px;
+                background-color: var(--g-hover-bg);
+                flex-shrink: 0;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                min-width: 40px;
+                height: 40px;
+            }
+
+            .top-action-btn:hover {
+                background-color: var(--m3-surface-container-highest, #e0e6f0);
+            }
+
+            /* Icon-only mode for mobile toolbar buttons */
+            .top-action-btn span:not(.material-symbols-outlined) {
+                display: none !important;
+            }
+
+            .top-action-btn .material-symbols-outlined {
+                font-size: 20px;
+                margin: 0;
+            }
+
+            .sort-dropdown-menu {
+                left: 0;
+                right: auto;
+                max-width: 85vw;
             }
 
             .list-view-header {
@@ -1700,10 +1818,13 @@
 </head>
 
 <body>
+    <!-- Mobile Sidebar Backdrop Overlay -->
+    <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
+
     <!-- 1. Google Drive Top Navigation Bar -->
     <header class="drive-header">
         <div class="header-left">
-            <button class="menu-btn" title="Main menu">
+            <button class="menu-btn" id="btnToggleSidebar" title="Main menu">
                 <span class="material-symbols-outlined">menu</span>
             </button>
             <div class="logo-wrap" onclick="navToRoot()">
@@ -2305,6 +2426,57 @@
         });
         applyViewMode(localStorage.getItem("driveViewMode") || "grid");
 
+        // Sidebar Toggle (Desktop Collapse & Mobile Drawer)
+        const btnToggleSidebar = document.getElementById("btnToggleSidebar");
+        const driveSidebar = document.querySelector(".drive-sidebar");
+        const sidebarBackdrop = document.getElementById("sidebarBackdrop");
+
+        function isMobileView() {
+            return window.innerWidth <= 768;
+        }
+
+        function toggleSidebar() {
+            if (isMobileView()) {
+                if (driveSidebar) {
+                    const isOpen = driveSidebar.classList.toggle("mobile-open");
+                    if (sidebarBackdrop) {
+                        if (isOpen) {
+                            sidebarBackdrop.classList.add("active");
+                        } else {
+                            sidebarBackdrop.classList.remove("active");
+                        }
+                    }
+                }
+            } else {
+                const isCollapsed = document.body.classList.toggle("sidebar-collapsed");
+                localStorage.setItem("mediahub_sidebar_collapsed", isCollapsed ? "true" : "false");
+            }
+        }
+
+        function closeMobileSidebar() {
+            if (driveSidebar) driveSidebar.classList.remove("mobile-open");
+            if (sidebarBackdrop) sidebarBackdrop.classList.remove("active");
+        }
+
+        if (btnToggleSidebar) {
+            btnToggleSidebar.addEventListener("click", toggleSidebar);
+        }
+
+        if (sidebarBackdrop) {
+            sidebarBackdrop.addEventListener("click", closeMobileSidebar);
+        }
+
+        // Initialize desktop sidebar collapse state
+        if (!isMobileView() && localStorage.getItem("mediahub_sidebar_collapsed") === "true") {
+            document.body.classList.add("sidebar-collapsed");
+        }
+
+        window.addEventListener("resize", () => {
+            if (!isMobileView()) {
+                closeMobileSidebar();
+            }
+        });
+
         // Sort Dropdown Binding
         const sortActionWrapper = document.getElementById("sortActionWrapper");
         const btnSortMenu = document.getElementById("btnSortMenu");
@@ -2394,6 +2566,7 @@
         const btnExport = document.getElementById("btnExport");
 
         function navToRoot() {
+            if (isMobileView()) closeMobileSidebar();
             folderSelect.value = "";
             sessionStorage.removeItem("oldFold");
             updateFolderDisplay();
@@ -2526,6 +2699,7 @@
                     <span class="folder-name-label">${opt.textContent}</span>
                 `;
                 item.addEventListener("click", () => {
+                    if (isMobileView()) closeMobileSidebar();
                     if (folderSelect.value !== opt.value) {
                         folderSelect.value = opt.value;
                         folderSelect.dispatchEvent(new Event("change"));
