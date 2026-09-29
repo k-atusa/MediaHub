@@ -782,13 +782,15 @@
             color: var(--g-primary-blue);
         }
 
-        /* Sort Dropdown Menu */
-        .sort-action-wrapper {
+        /* Dropdown Menus (View & Sort) */
+        .sort-action-wrapper,
+        .view-action-wrapper {
             position: relative;
             display: inline-flex;
         }
 
-        .sort-dropdown-menu {
+        .sort-dropdown-menu,
+        .view-dropdown-menu {
             position: absolute;
             top: calc(100% + 6px);
             left: 0;
@@ -803,11 +805,13 @@
             animation: menuFadeIn 0.15s cubic-bezier(0.2, 0, 0, 1);
         }
 
-        .sort-dropdown-menu.open {
+        .sort-dropdown-menu.open,
+        .view-dropdown-menu.open {
             display: block;
         }
 
-        .sort-menu-header {
+        .sort-menu-header,
+        .view-menu-header {
             font-size: 11px;
             font-weight: 600;
             text-transform: uppercase;
@@ -816,7 +820,8 @@
             padding: 6px 12px 4px 12px;
         }
 
-        .sort-menu-item {
+        .sort-menu-item,
+        .view-menu-item {
             display: flex;
             align-items: center;
             gap: 12px;
@@ -831,41 +836,49 @@
             transition: background-color 0.15s, color 0.15s;
         }
 
-        .sort-menu-item:hover {
+        .sort-menu-item:hover,
+        .view-menu-item:hover {
             background-color: var(--g-hover-bg);
             color: var(--m3-primary);
         }
 
-        .sort-menu-item.active {
+        .sort-menu-item.active,
+        .view-menu-item.active {
             background-color: var(--m3-primary-container, #d3e3fd);
             color: var(--m3-primary, #0b57d0);
             font-weight: 600;
         }
 
         [data-theme="dark"] .sort-menu-item.active,
-        :root:not([data-theme="light"]) .sort-menu-item.active {
+        [data-theme="dark"] .view-menu-item.active,
+        :root:not([data-theme="light"]) .sort-menu-item.active,
+        :root:not([data-theme="light"]) .view-menu-item.active {
             background-color: #004a77;
             color: #d3e3fd;
         }
 
-        .sort-menu-item .menu-icon {
+        .sort-menu-item .menu-icon,
+        .view-menu-item .menu-icon {
             font-size: 18px;
             color: inherit;
         }
 
-        .sort-menu-item .menu-label {
+        .sort-menu-item .menu-label,
+        .view-menu-item .menu-label {
             flex: 1;
             font-weight: inherit;
         }
 
-        .sort-menu-item .check-icon {
+        .sort-menu-item .check-icon,
+        .view-menu-item .check-icon {
             font-size: 18px;
             color: inherit;
             opacity: 0;
             transition: opacity 0.15s;
         }
 
-        .sort-menu-item.active .check-icon {
+        .sort-menu-item.active .check-icon,
+        .view-menu-item.active .check-icon {
             opacity: 1;
         }
 
@@ -986,8 +999,8 @@
         /* 6. Media Grid (Grid View default) */
         .media-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-            gap: 16px;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 14px;
             width: 100%;
             padding: 10px 0;
         }
@@ -1001,25 +1014,25 @@
             display: flex;
             flex-direction: column;
             cursor: pointer;
-            transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
+            transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.15s;
         }
 
         .media-card:hover {
             background-color: var(--g-hover-bg);
             border-color: var(--g-primary-blue);
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
         }
 
         .thumb-img {
             width: 100%;
-            height: 140px;
+            height: 135px;
             object-fit: cover;
             background-color: var(--g-hover-bg);
             display: block;
         }
 
         .file-title {
-            padding: 12px 14px;
+            padding: 10px 12px;
             font-size: 13px;
             font-weight: 500;
             color: var(--g-text-main);
@@ -1030,7 +1043,85 @@
             background-color: var(--g-surface);
         }
 
-        /* --- 7. Google Drive List View Specific Styles --- */
+        /* 1) Extra Large Icons View */
+        .media-grid.view-extra-large {
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px;
+        }
+
+        .media-grid.view-extra-large .media-card {
+            border-radius: 16px;
+        }
+
+        .media-grid.view-extra-large .thumb-img {
+            height: 250px;
+        }
+
+        .media-grid.view-extra-large .file-title {
+            padding: 14px 16px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* 2) Large Icons View */
+        .media-grid.view-large,
+        .media-grid.large-grid {
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 16px;
+        }
+
+        .media-grid.view-large .media-card,
+        .media-grid.large-grid .media-card {
+            border-radius: 14px;
+        }
+
+        .media-grid.view-large .thumb-img,
+        .media-grid.large-grid .thumb-img {
+            height: 180px;
+        }
+
+        .media-grid.view-large .file-title,
+        .media-grid.large-grid .file-title {
+            padding: 12px 14px;
+            font-size: 13.5px;
+            font-weight: 500;
+        }
+
+        /* 3) Medium Icons View (Default) */
+        .media-grid.view-medium {
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 14px;
+        }
+
+        .media-grid.view-medium .thumb-img {
+            height: 135px;
+        }
+
+        .media-grid.view-medium .file-title {
+            padding: 10px 12px;
+            font-size: 13px;
+        }
+
+        /* 4) Small Icons View */
+        .media-grid.view-small {
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 10px;
+        }
+
+        .media-grid.view-small .media-card {
+            border-radius: 10px;
+        }
+
+        .media-grid.view-small .thumb-img {
+            height: 85px;
+        }
+
+        .media-grid.view-small .file-title {
+            padding: 6px 8px;
+            font-size: 11.5px;
+        }
+
+        /* --- 5. Details (List View) Specific Styles --- */
         .list-view-header {
             display: none;
             grid-template-columns: minmax(200px, 1fr) 140px 48px;
@@ -1044,7 +1135,8 @@
             gap: 16px;
         }
 
-        /* Show list-view header only when list-view is active */
+        /* Show list-view header only when Details / list-view is active */
+        .media-grid.view-details,
         .media-grid.list-view {
             display: flex;
             flex-direction: column;
@@ -1058,6 +1150,7 @@
         }
 
         /* List View Row */
+        .media-grid.view-details .media-card,
         .media-grid.list-view .media-card {
             display: grid;
             grid-template-columns: minmax(200px, 1fr) 140px 48px;
@@ -1072,12 +1165,14 @@
             gap: 16px;
         }
 
+        .media-grid.view-details .media-card:hover,
         .media-grid.list-view .media-card:hover {
             background-color: var(--g-hover-bg);
             box-shadow: none;
         }
 
         /* Columns inside media-card in list-view */
+        .media-grid.view-details .list-col-name,
         .media-grid.list-view .list-col-name {
             display: flex;
             align-items: center;
@@ -1086,6 +1181,7 @@
             padding-right: 12px;
         }
 
+        .media-grid.view-details .thumb-img,
         .media-grid.list-view .thumb-img {
             width: 22px;
             height: 22px;
@@ -1095,6 +1191,7 @@
             background-color: transparent;
         }
 
+        .media-grid.view-details .file-title,
         .media-grid.list-view .file-title {
             border-top: none;
             background-color: transparent;
@@ -1107,6 +1204,7 @@
             text-overflow: ellipsis;
         }
 
+        .media-grid.view-details .list-col-size,
         .media-grid.list-view .list-col-size {
             display: flex;
             align-items: center;
@@ -1125,6 +1223,7 @@
             color: var(--g-text-muted);
         }
 
+        .media-grid.view-details .list-col-more,
         .media-grid.list-view .list-col-more {
             display: flex;
             align-items: center;
@@ -1132,17 +1231,18 @@
             color: var(--g-text-muted);
         }
 
+        .media-grid.view-details .list-col-more:hover,
         .media-grid.list-view .list-col-more:hover {
             color: var(--g-text-main);
         }
 
         /* In Grid View, hide the extra list columns */
-        .media-grid:not(.list-view) .list-col-size,
-        .media-grid:not(.list-view) .list-col-more {
+        .media-grid:not(.view-details):not(.list-view) .list-col-size,
+        .media-grid:not(.view-details):not(.list-view) .list-col-more {
             display: none !important;
         }
 
-        .media-grid:not(.list-view) .list-col-name {
+        .media-grid:not(.view-details):not(.list-view) .list-col-name {
             display: contents;
         }
 
@@ -1818,7 +1918,8 @@
                 margin: 0;
             }
 
-            .sort-dropdown-menu {
+            .sort-dropdown-menu,
+            .view-dropdown-menu {
                 left: 0;
                 right: auto;
                 max-width: 85vw;
@@ -1829,6 +1930,7 @@
                 gap: 8px;
             }
 
+            .media-grid.view-details .media-card,
             .media-grid.list-view .media-card {
                 grid-template-columns: 1fr 80px 36px;
                 gap: 8px;
@@ -1960,11 +2062,42 @@
                 </div>
 
                 <div class="workspace-action-group">
-                    <!-- Change View (Grid / List) Button placed to the left of Import -->
-                    <button class="top-action-btn" id="btnChangeView" title="Change view (Grid / List)">
-                        <span class="material-symbols-outlined" id="viewModeIcon">view_list</span>
-                        <span id="viewModeText">List view</span>
-                    </button>
+                    <!-- View Options Dropdown Menu (Windows File Explorer Style) -->
+                    <div class="view-action-wrapper" id="viewActionWrapper">
+                        <button class="top-action-btn" id="btnViewMenu" type="button" aria-haspopup="true" aria-expanded="false" title="View options">
+                            <span class="material-symbols-outlined" id="viewModeIcon">grid_view</span>
+                            <span>View</span>
+                        </button>
+                        <div class="view-dropdown-menu" id="viewDropdownMenu">
+                            <div class="view-menu-header">View</div>
+                            <div class="view-menu-item" data-view="extra-large" id="viewOptExtraLarge">
+                                <span class="material-symbols-outlined menu-icon">photo_size_select_actual</span>
+                                <span class="menu-label">Extra large icons</span>
+                                <span class="material-symbols-outlined check-icon">check</span>
+                            </div>
+                            <div class="view-menu-item" data-view="large" id="viewOptLarge">
+                                <span class="material-symbols-outlined menu-icon">view_module</span>
+                                <span class="menu-label">Large icons</span>
+                                <span class="material-symbols-outlined check-icon">check</span>
+                            </div>
+                            <div class="view-menu-item active" data-view="medium" id="viewOptMedium">
+                                <span class="material-symbols-outlined menu-icon">grid_view</span>
+                                <span class="menu-label">Medium icons</span>
+                                <span class="material-symbols-outlined check-icon">check</span>
+                            </div>
+                            <div class="view-menu-item" data-view="small" id="viewOptSmall">
+                                <span class="material-symbols-outlined menu-icon">view_compact</span>
+                                <span class="menu-label">Small icons</span>
+                                <span class="material-symbols-outlined check-icon">check</span>
+                            </div>
+                            <div class="drive-menu-divider"></div>
+                            <div class="view-menu-item" data-view="details" id="viewOptDetails">
+                                <span class="material-symbols-outlined menu-icon">view_list</span>
+                                <span class="menu-label">Details</span>
+                                <span class="material-symbols-outlined check-icon">check</span>
+                            </div>
+                        </div>
+                    </div>
                     <!-- Sort As Dropdown Menu -->
                     <div class="sort-action-wrapper" id="sortActionWrapper">
                         <button class="top-action-btn" id="btnSortMenu" type="button" aria-haspopup="true" aria-expanded="false" title="Sort files">
@@ -2364,9 +2497,11 @@
         updateThemeUI();
 
         // 2. Grid View vs List View Toggle
-        const btnChangeView = document.getElementById("btnChangeView");
+        // 2. View Options Dropdown (Windows File Explorer Style)
+        const viewActionWrapper = document.getElementById("viewActionWrapper");
+        const btnViewMenu = document.getElementById("btnViewMenu");
+        const viewDropdownMenu = document.getElementById("viewDropdownMenu");
         const viewModeIcon = document.getElementById("viewModeIcon");
-        const viewModeText = document.getElementById("viewModeText");
         const mediaGrid = document.getElementById("mediaGrid");
         const mediaContainer = document.getElementById("mediaContainer");
         const infiniteScrollLoader = document.getElementById("infiniteScrollLoader");
@@ -2430,27 +2565,72 @@
         mediaContainer.addEventListener("scroll", handleInfiniteScroll);
 
         function applyViewMode(mode) {
+            // Backward compatibility mapping
+            if (mode === "grid") mode = "medium";
+            else if (mode === "list") mode = "details";
+            else if (mode === "large-grid") mode = "large";
+
             localStorage.setItem("driveViewMode", mode);
-            if (mode === "list") {
-                mediaGrid.classList.add("list-view");
+            mediaGrid.classList.remove("view-extra-large", "view-large", "view-medium", "view-small", "view-details", "list-view", "large-grid");
+            mediaContainer.classList.remove("is-list-mode");
+
+            if (mode === "details") {
+                mediaGrid.classList.add("view-details", "list-view");
                 mediaContainer.classList.add("is-list-mode");
-                viewModeIcon.textContent = "grid_view";
-                viewModeText.textContent = "Grid view";
-                btnChangeView.title = "Switch to Grid view";
+                if (viewModeIcon) viewModeIcon.textContent = "view_list";
+            } else if (mode === "extra-large") {
+                mediaGrid.classList.add("view-extra-large");
+                if (viewModeIcon) viewModeIcon.textContent = "photo_size_select_actual";
+            } else if (mode === "large") {
+                mediaGrid.classList.add("view-large");
+                if (viewModeIcon) viewModeIcon.textContent = "view_module";
+            } else if (mode === "small") {
+                mediaGrid.classList.add("view-small");
+                if (viewModeIcon) viewModeIcon.textContent = "view_compact";
             } else {
-                mediaGrid.classList.remove("list-view");
-                mediaContainer.classList.remove("is-list-mode");
-                viewModeIcon.textContent = "view_list";
-                viewModeText.textContent = "List view";
-                btnChangeView.title = "Switch to List view";
+                mode = "medium";
+                mediaGrid.classList.add("view-medium");
+                if (viewModeIcon) viewModeIcon.textContent = "grid_view";
             }
+
+            document.querySelectorAll(".view-menu-item").forEach(item => {
+                if (item.getAttribute("data-view") === mode) {
+                    item.classList.add("active");
+                } else {
+                    item.classList.remove("active");
+                }
+            });
         }
 
-        btnChangeView.addEventListener("click", () => {
-            const currentMode = localStorage.getItem("driveViewMode") || "grid";
-            applyViewMode(currentMode === "grid" ? "list" : "grid");
+        if (btnViewMenu && viewDropdownMenu) {
+            btnViewMenu.addEventListener("click", (e) => {
+                e.stopPropagation();
+                if (sortDropdownMenu) sortDropdownMenu.classList.remove("open");
+                if (typeof newDriveMenu !== "undefined" && newDriveMenu) newDriveMenu.classList.remove("open");
+                const accountMenu = document.getElementById("accountDropdownMenu");
+                if (accountMenu) accountMenu.classList.remove("open");
+                const isOpen = viewDropdownMenu.classList.toggle("open");
+                btnViewMenu.setAttribute("aria-expanded", isOpen ? "true" : "false");
+            });
+
+            document.addEventListener("click", (e) => {
+                if (viewActionWrapper && !viewActionWrapper.contains(e.target)) {
+                    viewDropdownMenu.classList.remove("open");
+                    btnViewMenu.setAttribute("aria-expanded", "false");
+                }
+            });
+        }
+
+        document.querySelectorAll(".view-menu-item").forEach(item => {
+            item.addEventListener("click", () => {
+                const mode = item.getAttribute("data-view");
+                applyViewMode(mode);
+                if (viewDropdownMenu) viewDropdownMenu.classList.remove("open");
+                if (btnViewMenu) btnViewMenu.setAttribute("aria-expanded", "false");
+            });
         });
-        applyViewMode(localStorage.getItem("driveViewMode") || "grid");
+
+        applyViewMode(localStorage.getItem("driveViewMode") || "medium");
 
         // Sidebar Toggle (Desktop Collapse & Mobile Drawer)
         const btnToggleSidebar = document.getElementById("btnToggleSidebar");
@@ -2542,6 +2722,7 @@
         if (btnSortMenu && sortDropdownMenu) {
             btnSortMenu.addEventListener("click", (e) => {
                 e.stopPropagation();
+                if (viewDropdownMenu) viewDropdownMenu.classList.remove("open");
                 if (typeof newDriveMenu !== "undefined" && newDriveMenu) newDriveMenu.classList.remove("open");
                 const accountMenu = document.getElementById("accountDropdownMenu");
                 if (accountMenu) accountMenu.classList.remove("open");
@@ -2637,7 +2818,7 @@
 
                 btnDeleteFolder.style.display = "";
                 btnExport.style.display = "";
-                btnChangeView.style.display = "";
+                if (viewActionWrapper) viewActionWrapper.style.display = "";
                 if (sortActionWrapper) sortActionWrapper.style.display = "";
 
                 // Highlight active in sidebar
@@ -2661,7 +2842,7 @@
 
                 btnDeleteFolder.style.display = "none";
                 btnExport.style.display = "none";
-                btnChangeView.style.display = "none";
+                if (viewActionWrapper) viewActionWrapper.style.display = "none";
                 if (sortActionWrapper) sortActionWrapper.style.display = "none";
 
                 document.querySelectorAll(".nav-folder-item").forEach(item => {
@@ -2866,6 +3047,7 @@
         if (btnNewDropdown && newDriveMenu) {
             btnNewDropdown.addEventListener("click", (e) => {
                 e.stopPropagation();
+                if (viewDropdownMenu) viewDropdownMenu.classList.remove("open");
                 if (sortDropdownMenu) sortDropdownMenu.classList.remove("open");
                 const accountMenu = document.getElementById("accountDropdownMenu");
                 if (accountMenu) accountMenu.classList.remove("open");
@@ -3304,6 +3486,7 @@
             btnAccountMenu.addEventListener("click", (e) => {
                 e.stopPropagation();
                 if (newDriveMenu) newDriveMenu.classList.remove("open");
+                if (viewDropdownMenu) viewDropdownMenu.classList.remove("open");
                 if (sortDropdownMenu) sortDropdownMenu.classList.remove("open");
                 const isOpen = accountDropdownMenu.classList.toggle("open");
                 btnAccountMenu.setAttribute("aria-expanded", isOpen ? "true" : "false");
