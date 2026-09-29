@@ -350,6 +350,14 @@ function getEntrySize(flKeyMasked) {
 async function showFls() {
     const grid = document.getElementById("mediaGrid"); grid.innerHTML = "";
     let entries = Object.entries(state.flsMap);
+
+    // Search query filtering (case-insensitive)
+    const searchInput = document.getElementById("topSearchInput");
+    const query = (searchInput ? searchInput.value || "" : "").trim().toLowerCase();
+    if (query) {
+        entries = entries.filter(([name]) => name.toLowerCase().includes(query));
+    }
+
     const sortMode = state.sort || localStorage.getItem("mediahub_sort") || "name-asc";
 
     if (sortMode === "name-desc") {
@@ -411,6 +419,27 @@ window.setFileSort = async (mode) => {
     await showFls();
 };
 window.getFileSort = () => state.sort;
+window.refreshFilesView = async () => {
+    state.page = 1;
+    await showFls();
+};
+
+// Hook live search on topSearchInput
+const searchInputEl = document.getElementById("topSearchInput");
+if (searchInputEl) {
+    let searchDebounce = null;
+    searchInputEl.addEventListener("input", () => {
+        clearTimeout(searchDebounce);
+        searchDebounce = setTimeout(async () => {
+            if (state.id) {
+                state.page = 1;
+                await showFls();
+                const mediaContainer = document.getElementById("mediaContainer");
+                if (mediaContainer) mediaContainer.scrollTop = 0;
+            }
+        }, 120);
+    });
+}
 
 // Fetch thumb file.
 async function loadThm(filePid, ext, imgEl, fileKeyRaw) {

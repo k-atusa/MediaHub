@@ -305,6 +305,26 @@
             color: var(--g-text-muted);
             font-size: 22px;
             cursor: pointer;
+            transition: color 0.15s;
+        }
+
+        .search-clear-btn {
+            background: transparent;
+            border: none;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--g-text-muted);
+            cursor: pointer;
+            transition: background-color 0.15s, color 0.15s;
+        }
+
+        .search-clear-btn:hover {
+            background-color: var(--g-hover-bg);
+            color: var(--g-text-main);
         }
 
         /* Header Right Actions */
@@ -1833,12 +1853,19 @@
             </div>
         </div>
 
-        <div class="header-search-box">
-            <input type="text" class="search-input" placeholder="Search in MediaHub" id="topSearchInput">
-            <span class="material-symbols-outlined search-icon">search</span>
+        <div class="header-search-box" id="headerSearchBox">
+            <span class="material-symbols-outlined search-icon" id="searchBoxLeadingIcon">search</span>
+            <input type="text" class="search-input" placeholder="Search in MediaHub" id="topSearchInput" autocomplete="off" spellcheck="false">
+            <button class="search-clear-btn" id="btnSearchClear" type="button" title="Clear search" style="display: none;">
+                <span class="material-symbols-outlined" style="font-size: 18px;">close</span>
+            </button>
         </div>
 
         <div class="header-right">
+            <!-- Mobile Search Toggle Button -->
+            <button class="header-icon-btn mobile-search-toggle" id="btnMobileSearchToggle" type="button" title="Search">
+                <span class="material-symbols-outlined">search</span>
+            </button>
             <!-- Account Menu Dropdown (Triggered by Avatar) -->
             <div class="account-menu-wrapper" id="accountMenuWrapper">
                 <button class="profile-avatar-btn" id="btnAccountMenu" type="button" aria-haspopup="true"
@@ -2017,12 +2044,11 @@
                     <span>Loading files...</span>
                 </div>
 
-                <!-- Empty State (Shown when folder is empty) -->
+                <!-- Empty State (Shown when folder is empty or no search results) -->
                 <div class="empty-state-view" id="emptyStateContainer">
-                    <span class="material-symbols-outlined empty-cloud-icon">cloud_upload</span>
-                    <div class="empty-title">This folder is empty</div>
-                    <div class="empty-subtitle">Drag and drop files anywhere on the page, or use the upload button.
-                    </div>
+                    <span class="material-symbols-outlined empty-cloud-icon" id="emptyStateIcon">cloud_upload</span>
+                    <div class="empty-title" id="emptyStateTitle">This folder is empty</div>
+                    <div class="empty-subtitle" id="emptyStateSubtitle">Drag and drop files anywhere on the page, or use the upload button.</div>
                     <button class="btn-empty-upload" id="btnEmptyUploadAction">
                         <span class="material-symbols-outlined">add</span>
                         <span>Upload</span>
@@ -2649,16 +2675,32 @@
         function syncRootFolderGrid() {
             if (!rootFolderGrid) return;
             rootFolderGrid.innerHTML = "";
-            const options = Array.from(folderSelect.options).filter(opt => opt.value !== "");
+            let options = Array.from(folderSelect.options).filter(opt => opt.value !== "");
+            const searchInput = document.getElementById("topSearchInput");
+            const query = (searchInput ? searchInput.value || "" : "").trim().toLowerCase();
+
+            if (query) {
+                options = options.filter(opt => opt.textContent.toLowerCase().includes(query));
+            }
 
             if (options.length === 0) {
-                rootFolderGrid.innerHTML = `
-                    <div style="grid-column: 1 / -1; padding: 40px; text-align: center; color: var(--g-text-muted);">
-                        <span class="material-symbols-outlined" style="font-size: 48px; margin-bottom: 8px;">folder_off</span>
-                        <div style="font-size: 16px; font-weight: 500; color: var(--g-text-main); margin-bottom: 4px;">No folders created</div>
-                        <div style="font-size: 13px;">Click "+ New folder" to create your first folder.</div>
-                    </div>
-                `;
+                if (query) {
+                    rootFolderGrid.innerHTML = `
+                        <div style="grid-column: 1 / -1; padding: 40px; text-align: center; color: var(--g-text-muted);">
+                            <span class="material-symbols-outlined" style="font-size: 48px; margin-bottom: 8px;">search_off</span>
+                            <div style="font-size: 16px; font-weight: 500; color: var(--g-text-main); margin-bottom: 4px;">No folders found</div>
+                            <div style="font-size: 13px;">No folders matching "${query}".</div>
+                        </div>
+                    `;
+                } else {
+                    rootFolderGrid.innerHTML = `
+                        <div style="grid-column: 1 / -1; padding: 40px; text-align: center; color: var(--g-text-muted);">
+                            <span class="material-symbols-outlined" style="font-size: 48px; margin-bottom: 8px;">folder_off</span>
+                            <div style="font-size: 16px; font-weight: 500; color: var(--g-text-main); margin-bottom: 4px;">No folders created</div>
+                            <div style="font-size: 13px;">Click "+ New folder" to create your first folder.</div>
+                        </div>
+                    `;
+                }
                 return;
             }
 
@@ -2781,6 +2823,25 @@
         // Observe mediaGrid children to toggle Empty State & enhance list view
         const observer = new MutationObserver(() => {
             if (mediaGrid.children.length === 0) {
+                const searchInput = document.getElementById("topSearchInput");
+                const query = (searchInput ? searchInput.value || "" : "").trim();
+                const emptyIcon = document.getElementById("emptyStateIcon");
+                const emptyTitle = document.getElementById("emptyStateTitle");
+                const emptySubtitle = document.getElementById("emptyStateSubtitle");
+                const emptyBtn = document.getElementById("btnEmptyUploadAction");
+
+                if (query) {
+                    if (emptyIcon) emptyIcon.textContent = "search_off";
+                    if (emptyTitle) emptyTitle.textContent = "No matching files found";
+                    if (emptySubtitle) emptySubtitle.textContent = `No files matching "${query}".`;
+                    if (emptyBtn) emptyBtn.style.display = "none";
+                } else {
+                    if (emptyIcon) emptyIcon.textContent = "cloud_upload";
+                    if (emptyTitle) emptyTitle.textContent = "This folder is empty";
+                    if (emptySubtitle) emptySubtitle.textContent = "Drag and drop files anywhere on the page, or use the upload button.";
+                    if (emptyBtn) emptyBtn.style.display = "inline-flex";
+                }
+
                 emptyState.style.display = "flex";
                 if (paginationBar) paginationBar.style.display = "none";
             } else {
@@ -3296,6 +3357,64 @@
                     menuUserHashShort.textContent = "E2EE Account";
                 }
             }
+        }
+
+        // 6.5. Search Bar Controls & Shortcuts
+        const topSearchInput = document.getElementById("topSearchInput");
+        const btnSearchClear = document.getElementById("btnSearchClear");
+        const btnMobileSearchToggle = document.getElementById("btnMobileSearchToggle");
+        const searchBoxLeadingIcon = document.getElementById("searchBoxLeadingIcon");
+        const driveHeader = document.querySelector(".drive-header");
+
+        if (topSearchInput) {
+            topSearchInput.addEventListener("input", () => {
+                const val = (topSearchInput.value || "").trim();
+                if (btnSearchClear) {
+                    btnSearchClear.style.display = val.length > 0 ? "inline-flex" : "none";
+                }
+                // If currently on Root View ("My Drive"), filter folder cards in real-time
+                if (rootFolderView && rootFolderView.style.display !== "none") {
+                    syncRootFolderGrid();
+                }
+            });
+
+            topSearchInput.addEventListener("keydown", (e) => {
+                if (e.key === "Escape") {
+                    topSearchInput.value = "";
+                    topSearchInput.dispatchEvent(new Event("input"));
+                    topSearchInput.blur();
+                    if (driveHeader) driveHeader.classList.remove("mobile-search-active");
+                }
+            });
+        }
+
+        if (btnSearchClear) {
+            btnSearchClear.addEventListener("click", () => {
+                if (topSearchInput) {
+                    topSearchInput.value = "";
+                    topSearchInput.dispatchEvent(new Event("input"));
+                    topSearchInput.focus();
+                }
+            });
+        }
+
+        if (btnMobileSearchToggle) {
+            btnMobileSearchToggle.addEventListener("click", () => {
+                if (driveHeader) {
+                    const isActive = driveHeader.classList.toggle("mobile-search-active");
+                    if (isActive && topSearchInput) {
+                        topSearchInput.focus();
+                    }
+                }
+            });
+        }
+
+        if (searchBoxLeadingIcon) {
+            searchBoxLeadingIcon.addEventListener("click", () => {
+                if (driveHeader && driveHeader.classList.contains("mobile-search-active")) {
+                    driveHeader.classList.remove("mobile-search-active");
+                }
+            });
         }
 
         // 7. Full Window Drag & Drop File Upload (Google Drive style)
