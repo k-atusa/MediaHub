@@ -1309,9 +1309,8 @@
         }
 
         /* Material You (M3) Dialogs */
-        dialog#newFolderModal,
-        dialog#pwModal {
-            background-color: var(--m3-surface-container);
+        dialog {
+            background-color: var(--g-surface, var(--m3-surface-container));
             color: var(--g-text-main);
             border: 1px solid var(--g-border-subtle);
             border-radius: 28px;
@@ -1322,6 +1321,11 @@
             outline: none;
             box-shadow: var(--m3-elevation-dialog);
             animation: m3DialogPop 0.25s cubic-bezier(0.2, 0, 0, 1);
+            box-sizing: border-box;
+        }
+
+        dialog:not([open]) {
+            display: none;
         }
 
         @keyframes m3DialogPop {
@@ -1357,11 +1361,28 @@
         }
 
         .dialog-title {
-            font-size: 24px;
+            font-size: 22px;
             font-weight: 400;
             letter-spacing: -0.2px;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
             color: var(--g-text-main);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .dialog-title .material-symbols-outlined {
+            font-size: 26px;
+        }
+
+        .dialog-body {
+            font-size: 14.5px;
+            color: var(--g-text-muted);
+            line-height: 1.55;
+            margin-bottom: 24px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-wrap: break-word;
         }
 
         .dialog-input {
@@ -1377,6 +1398,7 @@
             background-color: var(--g-hover-bg);
             color: var(--g-text-main);
             transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s;
+            box-sizing: border-box;
         }
 
         .dialog-input:focus {
@@ -1385,6 +1407,7 @@
             box-shadow: 0 0 0 2px rgba(11, 87, 208, 0.15);
         }
 
+        .dialog-actions,
         .dialog-btn-group {
             display: flex;
             justify-content: flex-end;
@@ -1392,7 +1415,8 @@
             margin-top: 8px;
         }
 
-        .btn-dialog-cancel {
+        .btn-dialog-cancel,
+        .btn-dialog-text {
             height: 40px;
             padding: 0 20px;
             border: none;
@@ -1406,11 +1430,13 @@
             transition: background-color 0.15s;
         }
 
-        .btn-dialog-cancel:hover {
+        .btn-dialog-cancel:hover,
+        .btn-dialog-text:hover {
             background-color: var(--m3-surface-container-highest);
         }
 
-        .btn-dialog-confirm {
+        .btn-dialog-confirm,
+        .btn-dialog-primary {
             height: 40px;
             padding: 0 24px;
             border: none;
@@ -1425,9 +1451,41 @@
             transition: background-color 0.15s, box-shadow 0.15s;
         }
 
-        .btn-dialog-confirm:hover {
+        .btn-dialog-confirm:hover,
+        .btn-dialog-primary:hover {
             background-color: var(--m3-primary-hover);
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-dialog-danger {
+            height: 40px;
+            padding: 0 24px;
+            border: none;
+            background-color: var(--g-danger, #b3261e);
+            color: #ffffff;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 20px;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+            transition: background-color 0.15s, box-shadow 0.15s;
+        }
+
+        [data-theme="dark"] .btn-dialog-danger,
+        :root:not([data-theme="light"]) .btn-dialog-danger {
+            background-color: #f2b8b5;
+            color: #601410;
+        }
+
+        .btn-dialog-danger:hover {
+            background-color: #8c1d18;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        [data-theme="dark"] .btn-dialog-danger:hover,
+        :root:not([data-theme="light"]) .btn-dialog-danger:hover {
+            background-color: #f9dedc;
         }
 
         /* 9. Full Window Drag & Drop Overlay (Google Drive style) */
@@ -1760,6 +1818,80 @@
         <div class="dialog-btn-group">
             <button id="btnCancelPw" class="btn-dialog-cancel" type="button">Cancel</button>
             <button id="btnConfirmPw" class="btn-dialog-confirm" type="button">Save</button>
+        </div>
+    </dialog>
+
+    <!-- Share Folder Dialog (Material You Dialog) -->
+    <dialog id="shareModal">
+        <div class="dialog-title">
+            <span class="material-symbols-outlined" style="color: var(--g-primary-blue);">share</span>
+            <span>Share Folder</span>
+        </div>
+        <div class="dialog-body">
+            <div id="shareModalDesc" style="margin-bottom: 16px;">Set a password to encrypt this folder's share token. Anyone with the token file and password can access the folder.</div>
+            <input type="password" id="sharePasswordInput" class="dialog-input" placeholder="Set share password" autocomplete="new-password">
+            <div id="shareErrorText" style="color: var(--g-danger); font-size: 13px; margin-top: -12px; margin-bottom: 8px; display: none;"></div>
+        </div>
+        <div class="dialog-actions">
+            <button id="btnCancelShare" class="btn-dialog-text" type="button">Cancel</button>
+            <button id="btnConfirmShare" class="btn-dialog-primary" type="button">Share</button>
+        </div>
+    </dialog>
+
+    <!-- Delete Folder Dialog (Material You Dialog) -->
+    <dialog id="deleteFolderModal">
+        <div class="dialog-title">
+            <span class="material-symbols-outlined" style="color: var(--g-danger, #b3261e);">delete</span>
+            <span>Delete folder?</span>
+        </div>
+        <div class="dialog-body" id="deleteFolderText">
+            Are you sure you want to delete this folder? All files and encrypted metadata inside it will be permanently deleted.
+        </div>
+        <div class="dialog-actions">
+            <button id="btnCancelDeleteFolder" class="btn-dialog-text" type="button">Cancel</button>
+            <button id="btnConfirmDeleteFolder" class="btn-dialog-danger" type="button">Delete</button>
+        </div>
+    </dialog>
+
+    <!-- Import Share Password Dialog (Material You Dialog) -->
+    <dialog id="importShareModal">
+        <div class="dialog-title">
+            <span class="material-symbols-outlined" style="color: var(--g-primary-blue);">key</span>
+            <span>Unlock Share Token</span>
+        </div>
+        <div class="dialog-body">
+            <div style="margin-bottom: 16px;">Enter the password to decrypt and import this folder share token.</div>
+            <input type="password" id="importPasswordInput" class="dialog-input" placeholder="Enter share password" autocomplete="current-password">
+            <div id="importErrorText" style="color: var(--g-danger); font-size: 13px; margin-top: -12px; margin-bottom: 8px; display: none;"></div>
+        </div>
+        <div class="dialog-actions">
+            <button id="btnCancelImportShare" class="btn-dialog-text" type="button">Cancel</button>
+            <button id="btnConfirmImportShare" class="btn-dialog-primary" type="button">Unlock</button>
+        </div>
+    </dialog>
+
+    <!-- Generic Confirm Dialog (Material You Dialog) -->
+    <dialog id="confirmModal">
+        <div class="dialog-title">
+            <span class="material-symbols-outlined" id="confirmModalIcon" style="color: var(--g-primary-blue);">help</span>
+            <span id="confirmModalTitle">Confirm</span>
+        </div>
+        <div class="dialog-body" id="confirmModalText"></div>
+        <div class="dialog-actions">
+            <button id="btnCancelConfirmModal" class="btn-dialog-text" type="button">Cancel</button>
+            <button id="btnActionConfirmModal" class="btn-dialog-primary" type="button">Confirm</button>
+        </div>
+    </dialog>
+
+    <!-- Notice Dialog (Material You Dialog) -->
+    <dialog id="noticeModal">
+        <div class="dialog-title">
+            <span class="material-symbols-outlined" id="noticeIcon" style="color: var(--g-primary-blue);">campaign</span>
+            <span id="noticeTitle">Notice</span>
+        </div>
+        <div id="noticeText" class="dialog-body"></div>
+        <div class="dialog-actions">
+            <button id="btnConfirmNotice" class="btn-dialog-primary" type="button">OK</button>
         </div>
     </dialog>
 
@@ -2747,6 +2879,59 @@
             }
             fileInput.files = dt.files;
             fileInput.dispatchEvent(new Event("change"));
+        });
+
+        // Material You Dialog Helpers
+        window.showNotice = function(msg, title = "Notice", icon = "campaign") {
+            const modal = document.getElementById("noticeModal");
+            if (!modal) {
+                alert(msg);
+                return Promise.resolve();
+            }
+            const textEl = document.getElementById("noticeText");
+            const titleEl = document.getElementById("noticeTitle");
+            const iconEl = document.getElementById("noticeIcon");
+            const btn = document.getElementById("btnConfirmNotice");
+
+            if (textEl) textEl.textContent = msg;
+            if (titleEl) titleEl.textContent = title;
+            if (iconEl) {
+                iconEl.textContent = icon;
+                if (icon === "error" || icon === "delete") {
+                    iconEl.style.color = "var(--g-danger, #b3261e)";
+                } else if (icon === "warning") {
+                    iconEl.style.color = "#ea8600";
+                } else if (icon === "check_circle" || icon === "check") {
+                    iconEl.style.color = "#137333";
+                } else {
+                    iconEl.style.color = "var(--g-primary-blue, #0b57d0)";
+                }
+            }
+
+            modal.showModal();
+            return new Promise(resolve => {
+                const handler = () => {
+                    btn.removeEventListener("click", handler);
+                    modal.close();
+                    resolve();
+                };
+                btn.addEventListener("click", handler);
+                modal.addEventListener("close", () => {
+                    btn.removeEventListener("click", handler);
+                    resolve();
+                }, { once: true });
+            });
+        };
+        window.alert = (msg) => window.showNotice(msg);
+
+        // Backdrop click close for all dialogs
+        document.querySelectorAll("dialog").forEach(dialog => {
+            dialog.addEventListener("click", (e) => {
+                const rect = dialog.getBoundingClientRect();
+                const isInDialog = (rect.top <= e.clientY && e.clientY <= rect.top + rect.height
+                    && rect.left <= e.clientX && e.clientX <= rect.left + rect.width);
+                if (!isInDialog) dialog.close();
+            });
         });
 
         // Initial setup

@@ -318,6 +318,153 @@
                 max-height: 80vh;
             }
         }
+
+        /* Material You (M3) Dialogs */
+        dialog {
+            background-color: var(--preview-surface);
+            color: var(--preview-text);
+            border: 1px solid var(--preview-outline);
+            border-radius: 28px;
+            padding: 28px;
+            max-width: 440px;
+            width: 90%;
+            margin: auto;
+            outline: none;
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28);
+            animation: m3DialogPop 0.25s cubic-bezier(0.2, 0, 0, 1);
+            box-sizing: border-box;
+        }
+
+        dialog:not([open]) {
+            display: none;
+        }
+
+        @keyframes m3DialogPop {
+            from {
+                transform: scale(0.92);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        dialog::backdrop {
+            background: rgba(0, 0, 0, 0.45);
+            backdrop-filter: blur(6px);
+        }
+
+        .dialog-title {
+            font-size: 22px;
+            font-weight: 400;
+            letter-spacing: -0.2px;
+            color: var(--preview-text);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .dialog-title .material-symbols-outlined {
+            font-size: 26px;
+        }
+
+        .dialog-body {
+            font-size: 14.5px;
+            color: var(--preview-subtext);
+            line-height: 1.55;
+            margin-bottom: 24px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-wrap: break-word;
+        }
+
+        .dialog-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .btn-dialog-text {
+            background: transparent;
+            color: var(--preview-primary);
+            border: none;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 500;
+            padding: 0 20px;
+            height: 40px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: background-color 0.15s;
+        }
+
+        .btn-dialog-text:hover {
+            background-color: rgba(11, 87, 208, 0.08);
+        }
+
+        [data-theme="dark"] .btn-dialog-text:hover,
+        :root:not([data-theme="light"]) .btn-dialog-text:hover {
+            background-color: rgba(168, 199, 250, 0.12);
+        }
+
+        .btn-dialog-primary {
+            background-color: var(--preview-primary);
+            color: #ffffff;
+            border: none;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 500;
+            padding: 0 24px;
+            height: 40px;
+            border-radius: 20px;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+            transition: background-color 0.15s, box-shadow 0.15s;
+        }
+
+        [data-theme="dark"] .btn-dialog-primary,
+        :root:not([data-theme="light"]) .btn-dialog-primary {
+            color: #062e6f;
+        }
+
+        .btn-dialog-primary:hover {
+            opacity: 0.92;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-dialog-danger {
+            background-color: #b3261e;
+            color: #ffffff;
+            border: none;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 500;
+            padding: 0 24px;
+            height: 40px;
+            border-radius: 20px;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+            transition: background-color 0.15s, box-shadow 0.15s;
+        }
+
+        [data-theme="dark"] .btn-dialog-danger,
+        :root:not([data-theme="light"]) .btn-dialog-danger {
+            background-color: #f2b8b5;
+            color: #601410;
+        }
+
+        .btn-dialog-danger:hover {
+            background-color: #8c1d18;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        [data-theme="dark"] .btn-dialog-danger:hover,
+        :root:not([data-theme="light"]) .btn-dialog-danger:hover {
+            background-color: #f9dedc;
+        }
     </style>
 </head>
 
@@ -362,6 +509,33 @@
     <button id="btnNextFile" class="btn-floating-nav hidden" title="Next file">
         <span class="material-symbols-outlined" style="font-size: 28px;">chevron_right</span>
     </button>
+
+    <!-- Delete File Dialog (Material You Dialog) -->
+    <dialog id="deleteFileModal">
+        <div class="dialog-title">
+            <span class="material-symbols-outlined" style="color: var(--preview-danger, #b3261e);">delete</span>
+            <span>Delete file?</span>
+        </div>
+        <div class="dialog-body" id="deleteFileText">
+            Are you sure you want to delete this file? This action cannot be undone.
+        </div>
+        <div class="dialog-actions">
+            <button id="btnCancelDeleteFile" class="btn-dialog-text" type="button">Cancel</button>
+            <button id="btnConfirmDeleteFile" class="btn-dialog-danger" type="button">Delete</button>
+        </div>
+    </dialog>
+
+    <!-- Notice Dialog (Material You Dialog) -->
+    <dialog id="noticeModal">
+        <div class="dialog-title">
+            <span class="material-symbols-outlined" id="noticeIcon" style="color: var(--preview-primary, #0b57d0);">campaign</span>
+            <span id="noticeTitle">Notice</span>
+        </div>
+        <div id="noticeText" class="dialog-body"></div>
+        <div class="dialog-actions">
+            <button id="btnConfirmNotice" class="btn-dialog-primary" type="button">OK</button>
+        </div>
+    </dialog>
 
     <!-- Theme Manager Script -->
     <script>
@@ -410,6 +584,59 @@
             }
         });
         updateThemeUI();
+
+        // Material You Dialog Helpers
+        window.showNotice = function(msg, title = "Notice", icon = "campaign") {
+            const modal = document.getElementById("noticeModal");
+            if (!modal) {
+                alert(msg);
+                return Promise.resolve();
+            }
+            const textEl = document.getElementById("noticeText");
+            const titleEl = document.getElementById("noticeTitle");
+            const iconEl = document.getElementById("noticeIcon");
+            const btn = document.getElementById("btnConfirmNotice");
+
+            if (textEl) textEl.textContent = msg;
+            if (titleEl) titleEl.textContent = title;
+            if (iconEl) {
+                iconEl.textContent = icon;
+                if (icon === "error" || icon === "delete") {
+                    iconEl.style.color = "var(--preview-danger, #b3261e)";
+                } else if (icon === "warning") {
+                    iconEl.style.color = "#ea8600";
+                } else if (icon === "check_circle" || icon === "check") {
+                    iconEl.style.color = "#137333";
+                } else {
+                    iconEl.style.color = "var(--preview-primary, #0b57d0)";
+                }
+            }
+
+            modal.showModal();
+            return new Promise(resolve => {
+                const handler = () => {
+                    btn.removeEventListener("click", handler);
+                    modal.close();
+                    resolve();
+                };
+                btn.addEventListener("click", handler);
+                modal.addEventListener("close", () => {
+                    btn.removeEventListener("click", handler);
+                    resolve();
+                }, { once: true });
+            });
+        };
+        window.alert = (msg) => window.showNotice(msg);
+
+        // Backdrop click close for all dialogs
+        document.querySelectorAll("dialog").forEach(dialog => {
+            dialog.addEventListener("click", (e) => {
+                const rect = dialog.getBoundingClientRect();
+                const isInDialog = (rect.top <= e.clientY && e.clientY <= rect.top + rect.height
+                    && rect.left <= e.clientX && e.clientX <= rect.left + rect.width);
+                if (!isInDialog) dialog.close();
+            });
+        });
     </script>
 
     <script type="module" src="./viewer.js"></script>

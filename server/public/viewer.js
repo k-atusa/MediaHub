@@ -265,8 +265,44 @@ async function downFl() {
 }
 
 // Delete file and metadata.
-async function delFl() {
-    if (!confirm("Delete this file?")) return;
+function delFl() {
+    const modal = document.getElementById("deleteFileModal");
+    if (!modal) {
+        if (!confirm("Delete this file?")) return;
+        return executeDelete();
+    }
+    const textEl = document.getElementById("deleteFileText");
+    const btnCancel = document.getElementById("btnCancelDeleteFile");
+    const btnConfirm = document.getElementById("btnConfirmDeleteFile");
+
+    if (textEl) {
+        textEl.innerHTML = `Are you sure you want to delete "<strong>${flName.replace(/</g, "&lt;")}</strong>"? This action cannot be undone.`;
+    }
+
+    modal.showModal();
+
+    const cleanup = () => {
+        btnConfirm.removeEventListener("click", onConfirm);
+        btnCancel.removeEventListener("click", onCancel);
+    };
+
+    const onCancel = () => {
+        cleanup();
+        modal.close();
+    };
+
+    const onConfirm = async () => {
+        cleanup();
+        modal.close();
+        await executeDelete();
+    };
+
+    modal.addEventListener("close", cleanup, { once: true });
+    btnConfirm.addEventListener("click", onConfirm);
+    btnCancel.addEventListener("click", onCancel);
+}
+
+async function executeDelete() {
     try {
         const rawFK = mask.XOR(flKey);
         const flPid = getObjPid(rawFK);
@@ -287,7 +323,10 @@ async function delFl() {
         await fetch(`${SERVER}/api/storage/${fldId}/names`, { method: "POST", body: await sm.EnBin(encoded) });
         encoded.fill(0);
         window.location.href = "./folder.html";
-    } catch (e) { alert("❌ Delete failed"); }
+    } catch (e) {
+        if (window.showNotice) window.showNotice("❌ Delete failed", "Error", "error");
+        else alert("❌ Delete failed");
+    }
 }
 
 // Render decrypted content.

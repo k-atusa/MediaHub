@@ -85,17 +85,184 @@ document.getElementById("btnCreateFolder").addEventListener("click", async () =>
     document.getElementById("newFolderName").value = "";
 });
 
+function promptSharePassword() {
+    return new Promise((resolve) => {
+        const modal = document.getElementById("importShareModal");
+        if (!modal) {
+            const pw = prompt("Enter share password:");
+            return resolve(pw);
+        }
+        const pwInput = document.getElementById("importPasswordInput");
+        const btnConfirm = document.getElementById("btnConfirmImportShare");
+        const btnCancel = document.getElementById("btnCancelImportShare");
+        const errText = document.getElementById("importErrorText");
+
+        pwInput.value = "";
+        if (errText) {
+            errText.style.display = "none";
+            errText.textContent = "";
+        }
+
+        modal.showModal();
+        pwInput.focus();
+
+        const cleanup = () => {
+            btnConfirm.removeEventListener("click", onConfirm);
+            btnCancel.removeEventListener("click", onCancel);
+            pwInput.removeEventListener("keydown", onKeyDown);
+        };
+
+        const onCancel = () => {
+            cleanup();
+            modal.close();
+            resolve(null);
+        };
+
+        const onConfirm = () => {
+            const val = pwInput.value;
+            if (!val) {
+                if (errText) {
+                    errText.textContent = "Please enter the password.";
+                    errText.style.display = "block";
+                }
+                pwInput.focus();
+                return;
+            }
+            cleanup();
+            modal.close();
+            resolve(val);
+        };
+
+        const onKeyDown = (e) => {
+            if (e.key === "Enter") onConfirm();
+        };
+
+        modal.addEventListener("close", () => { cleanup(); resolve(null); }, { once: true });
+        btnConfirm.addEventListener("click", onConfirm);
+        btnCancel.addEventListener("click", onCancel);
+        pwInput.addEventListener("keydown", onKeyDown);
+    });
+}
+
+function showConfirmModal(msg, title = "Confirm", icon = "help", confirmText = "Confirm", isDanger = false) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById("confirmModal");
+        if (!modal) {
+            return resolve(confirm(msg));
+        }
+        const textEl = document.getElementById("confirmModalText");
+        const titleEl = document.getElementById("confirmModalTitle");
+        const iconEl = document.getElementById("confirmModalIcon");
+        const btnCancel = document.getElementById("btnCancelConfirmModal");
+        const btnConfirm = document.getElementById("btnActionConfirmModal");
+
+        if (textEl) textEl.textContent = msg;
+        if (titleEl) titleEl.textContent = title;
+        if (iconEl) {
+            iconEl.textContent = icon;
+            iconEl.style.color = isDanger ? "var(--g-danger, #b3261e)" : "var(--g-primary-blue, #0b57d0)";
+        }
+        if (btnConfirm) {
+            btnConfirm.textContent = confirmText;
+            btnConfirm.className = isDanger ? "btn-dialog-danger" : "btn-dialog-primary";
+        }
+
+        modal.showModal();
+
+        const cleanup = () => {
+            btnConfirm.removeEventListener("click", onConfirm);
+            btnCancel.removeEventListener("click", onCancel);
+        };
+
+        const onCancel = () => {
+            cleanup();
+            modal.close();
+            resolve(false);
+        };
+
+        const onConfirm = () => {
+            cleanup();
+            modal.close();
+            resolve(true);
+        };
+
+        modal.addEventListener("close", () => { cleanup(); resolve(false); }, { once: true });
+        btnConfirm.addEventListener("click", onConfirm);
+        btnCancel.addEventListener("click", onCancel);
+    });
+}
+
 // Export share token.
-document.getElementById("btnExport").addEventListener("click", async () => {
-    if (!state.name) return alert("⚠️ Select a folder");
-    const token = await makeToken(state.name, state.key);
-    if (!token) return;
-    const blob = new Blob([token], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url;
-    const safeName = state.name.replace(/[\\/:*?"<>|]/g, "_");
-    a.download = `${safeName}_share.txt`; a.click();
-    URL.revokeObjectURL(url);
+document.getElementById("btnExport").addEventListener("click", () => {
+    if (!state.name) {
+        if (window.showNotice) window.showNotice("⚠️ Please select a folder first to share.", "Notice", "warning");
+        else alert("⚠️ Select a folder");
+        return;
+    }
+    const modal = document.getElementById("shareModal");
+    if (!modal) return;
+    const descEl = document.getElementById("shareModalDesc");
+    const pwInput = document.getElementById("sharePasswordInput");
+    const errText = document.getElementById("shareErrorText");
+    const btnConfirm = document.getElementById("btnConfirmShare");
+    const btnCancel = document.getElementById("btnCancelShare");
+
+    if (descEl) {
+        descEl.innerHTML = `Set a password to encrypt this folder's share token for "<strong>${state.name.replace(/</g, "&lt;")}</strong>". Anyone with the token file and password can access the folder.`;
+    }
+    pwInput.value = "";
+    if (errText) {
+        errText.style.display = "none";
+        errText.textContent = "";
+    }
+
+    modal.showModal();
+    pwInput.focus();
+
+    const cleanup = () => {
+        btnConfirm.removeEventListener("click", onConfirm);
+        btnCancel.removeEventListener("click", onCancel);
+        pwInput.removeEventListener("keydown", onKeyDown);
+    };
+
+    const onCancel = () => {
+        cleanup();
+        modal.close();
+    };
+
+    const onConfirm = async () => {
+        const pw = pwInput.value;
+        if (!pw) {
+            if (errText) {
+                errText.textContent = "Please enter a password.";
+                errText.style.display = "block";
+            }
+            pwInput.focus();
+            return;
+        }
+        cleanup();
+        modal.close();
+
+        const token = await makeToken(state.name, state.key, pw);
+        if (!token) return;
+        const blob = new Blob([token], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        const safeName = state.name.replace(/[\\/:*?"<>|]/g, "_");
+        a.download = `${safeName}_share.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const onKeyDown = (e) => {
+        if (e.key === "Enter") onConfirm();
+    };
+
+    modal.addEventListener("close", cleanup, { once: true });
+    btnConfirm.addEventListener("click", onConfirm);
+    btnCancel.addEventListener("click", onCancel);
+    pwInput.addEventListener("keydown", onKeyDown);
 });
 
 // Import share token.
@@ -103,10 +270,26 @@ document.getElementById("btnImport").addEventListener("click", () => {
     const input = document.createElement("input"); input.type = "file"; input.accept = ".txt";
     input.onchange = async () => {
         if (!input.files[0]) return;
-        const info = await loadToken((await input.files[0].text()).trim());
-        if (!info) return alert("❌ Invalid token");
+        const fileText = (await input.files[0].text()).trim();
+
+        const pw = await promptSharePassword();
+        if (!pw) return;
+
+        const info = await loadToken(fileText, pw);
+        if (!info) {
+            if (window.showNotice) window.showNotice("❌ Invalid token or wrong password.", "Error", "error");
+            else alert("❌ Invalid token");
+            return;
+        }
         if (state.fldMap[info.name]) {
-            if (!confirm("Overwrite existing?")) return;
+            const shouldOverwrite = await showConfirmModal(
+                `A folder named "${info.name}" already exists. Overwrite?`,
+                "Overwrite Folder?",
+                "warning",
+                "Overwrite",
+                true
+            );
+            if (!shouldOverwrite) return;
             const oldRaw = mask.XOR(state.fldMap[info.name]);
             const oldFldId = getObjPid(oldRaw);
             oldRaw.fill(0);
@@ -118,6 +301,7 @@ document.getElementById("btnImport").addEventListener("click", () => {
         }
         state.fldMap[info.name] = info.key;
         await saveUsr(); loadUsr();
+        if (window.showNotice) window.showNotice(`✅ Folder "${info.name}" imported successfully.`, "Success", "check_circle");
     };
     input.click();
 });
@@ -300,19 +484,76 @@ document.getElementById("btnUpload").addEventListener("click", async () => {
 });
 
 // Delete folder.
-document.getElementById("btnDeleteFolder").addEventListener("click", async () => {
-    if (!confirm("Delete this folder?")) return;
-    await fetch(`${SERVER}/api/storage/${state.id}/names`, { method: "DELETE", headers: { "X-User-Hash": usrHsh } });
-    delete state.fldMap[state.name]; await saveUsr(); loadUsr();
-    document.getElementById("uploadContainer").classList.add("hidden"); document.getElementById("mediaContainer").classList.add("hidden");
+document.getElementById("btnDeleteFolder").addEventListener("click", () => {
+    if (!state.name || !state.id) return;
+    const modal = document.getElementById("deleteFolderModal");
+    if (!modal) {
+        if (!confirm("Delete this folder?")) return;
+        return executeDeleteFolder();
+    }
+    const textEl = document.getElementById("deleteFolderText");
+    const btnCancel = document.getElementById("btnCancelDeleteFolder");
+    const btnConfirm = document.getElementById("btnConfirmDeleteFolder");
+
+    if (textEl) {
+        textEl.innerHTML = `Are you sure you want to delete folder "<strong>${state.name.replace(/</g, "&lt;")}</strong>"? All files and metadata inside it will be permanently deleted.`;
+    }
+
+    modal.showModal();
+
+    const cleanup = () => {
+        btnConfirm.removeEventListener("click", onConfirm);
+        btnCancel.removeEventListener("click", onCancel);
+    };
+
+    const onCancel = () => {
+        cleanup();
+        modal.close();
+    };
+
+    const onConfirm = async () => {
+        cleanup();
+        modal.close();
+        await executeDeleteFolder();
+    };
+
+    modal.addEventListener("close", cleanup, { once: true });
+    btnConfirm.addEventListener("click", onConfirm);
+    btnCancel.addEventListener("click", onCancel);
 });
+
+async function executeDeleteFolder() {
+    try {
+        await fetch(`${SERVER}/api/storage/${state.id}/names`, { method: "DELETE", headers: { "X-User-Hash": usrHsh } });
+        delete state.fldMap[state.name];
+        state.name = "";
+        state.id = "";
+        state.key = null;
+        await saveUsr();
+        await loadUsr();
+        if (window.navToRoot) {
+            window.navToRoot();
+        } else {
+            document.getElementById("uploadContainer").classList.add("hidden");
+            document.getElementById("mediaContainer").classList.add("hidden");
+        }
+    } catch (e) {
+        console.error("Failed to delete folder:", e);
+        if (window.showNotice) window.showNotice("❌ Failed to delete folder: " + e.message, "Error", "error");
+    }
+}
 
 // Handle pagination.
 document.getElementById("btnPrevPage").addEventListener("click", async () => { if (state.page > 1) { state.page--; await showFls(); } });
 document.getElementById("btnNextPage").addEventListener("click", async () => { if (state.page < Math.ceil(Object.keys(state.flsMap).length / state.limit)) { state.page++; await showFls(); } });
 document.getElementById("btnTrim").addEventListener("click", async () => {
-    if (!state.name || !state.id) return alert("⚠️ Select a folder first");
-    if (!confirm("⚠️ Trim will delete orphan files on the server. Continue?")) return;
+    if (!state.name || !state.id) {
+        if (window.showNotice) window.showNotice("⚠️ Select a folder first", "Notice", "warning");
+        else alert("⚠️ Select a folder first");
+        return;
+    }
+    const ok = await showConfirmModal("⚠️ Trim will delete orphan files on the server. Continue?", "Trim Orphan Files", "warning", "Trim", true);
+    if (!ok) return;
 
     // Collect all file PIDs from the current folder's file map.
     const pids = [];
