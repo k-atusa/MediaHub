@@ -1868,6 +1868,8 @@
                 align-items: stretch;
                 gap: 8px;
                 margin-bottom: 10px;
+                position: relative;
+                z-index: 50;
             }
 
             .workspace-folder-title {
@@ -1881,15 +1883,11 @@
                 justify-content: flex-start;
                 gap: 6px;
                 flex-wrap: nowrap;
-                overflow-x: auto;
+                overflow: visible;
                 padding: 4px 0;
                 width: 100%;
-                -webkit-overflow-scrolling: touch;
-                scrollbar-width: none;
-            }
-
-            .workspace-action-group::-webkit-scrollbar {
-                display: none;
+                position: relative;
+                z-index: 50;
             }
 
             .top-action-btn {
@@ -1920,9 +1918,14 @@
 
             .sort-dropdown-menu,
             .view-dropdown-menu {
+                position: absolute;
+                top: calc(100% + 6px);
                 left: 0;
                 right: auto;
+                min-width: 200px;
                 max-width: 85vw;
+                z-index: 1000;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
             }
 
             .list-view-header {
