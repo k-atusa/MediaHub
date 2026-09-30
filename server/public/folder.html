@@ -509,6 +509,10 @@
             pointer-events: none;
         }
 
+        .mobile-drawer-header {
+            display: none;
+        }
+
         /* Mobile Sidebar Backdrop */
         .sidebar-backdrop {
             position: fixed;
@@ -1917,17 +1921,27 @@
         @media (max-width: 768px) {
             .drive-sidebar {
                 position: fixed;
-                top: 64px;
+                top: 0;
                 left: 0;
                 bottom: 0;
-                width: 270px;
+                width: 280px;
+                max-width: 85vw;
+                height: 100%;
+                height: 100dvh;
                 background-color: var(--g-surface);
-                box-shadow: var(--m3-elevation-widget);
+                box-shadow: 0 4px 32px rgba(0, 0, 0, 0.45);
+                border-radius: 0 24px 24px 0;
                 z-index: 1050;
                 transform: translateX(-100%);
                 display: flex;
+                flex-direction: column;
                 opacity: 1;
                 pointer-events: auto;
+                padding: 0 16px 20px 16px;
+                gap: 12px;
+                box-sizing: border-box;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
             }
 
             .drive-sidebar.mobile-open {
@@ -1935,7 +1949,8 @@
             }
 
             .sidebar-collapsed .drive-sidebar {
-                width: 270px;
+                width: 280px;
+                max-width: 85vw;
                 transform: translateX(-100%);
                 opacity: 1;
                 pointer-events: auto;
@@ -1943,6 +1958,58 @@
 
             .sidebar-collapsed .drive-sidebar.mobile-open {
                 transform: translateX(0);
+            }
+
+            .mobile-drawer-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                height: 64px;
+                min-height: 64px;
+                padding: 0 4px;
+                border-bottom: 1px solid var(--g-border-subtle);
+                margin-bottom: 4px;
+                user-select: none;
+            }
+
+            .mobile-drawer-header .logo-wrap {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                cursor: pointer;
+                text-decoration: none;
+            }
+
+            .mobile-drawer-header .logo-wrap .cloud-logo-icon {
+                font-size: 26px;
+                color: var(--g-primary);
+            }
+
+            .mobile-drawer-header .logo-wrap .app-title {
+                font-size: 19px;
+                font-weight: 500;
+                color: var(--g-text);
+                letter-spacing: -0.2px;
+            }
+
+            .drawer-close-btn {
+                width: 40px;
+                height: 40px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 50%;
+                border: none;
+                background: transparent;
+                color: var(--g-text-muted);
+                cursor: pointer;
+                transition: background-color var(--g-transition-fast), color var(--g-transition-fast);
+            }
+
+            .drawer-close-btn:hover,
+            .drawer-close-btn:active {
+                background-color: var(--g-hover);
+                color: var(--g-text);
             }
 
             .mobile-search-toggle {
@@ -2446,6 +2513,17 @@
     <div class="drive-body">
         <!-- Sidebar Navigation Drawer -->
         <aside class="drive-sidebar">
+            <!-- Mobile Drawer Top Header -->
+            <div class="mobile-drawer-header" id="mobileDrawerHeader">
+                <div class="logo-wrap" onclick="navToRoot(); closeMobileSidebar();">
+                    <span class="material-symbols-outlined cloud-logo-icon">cloud</span>
+                    <span class="app-title">MediaHub</span>
+                </div>
+                <button class="drawer-close-btn" id="btnCloseSidebarDrawer" type="button" title="Close menu">
+                    <span class="material-symbols-outlined">menu_open</span>
+                </button>
+            </div>
+
             <!-- Google Drive "+ New" Button & Dropdown Menu -->
             <div class="new-action-wrapper" id="newActionWrapper">
                 <button class="btn-new-drive" id="btnNewDropdown" type="button" aria-haspopup="true"
@@ -3204,6 +3282,8 @@
             }
         }
 
+        const btnCloseSidebarDrawer = document.getElementById("btnCloseSidebarDrawer");
+
         function closeMobileSidebar() {
             if (driveSidebar) driveSidebar.classList.remove("mobile-open");
             if (sidebarBackdrop) sidebarBackdrop.classList.remove("active");
@@ -3211,6 +3291,10 @@
 
         if (btnToggleSidebar) {
             btnToggleSidebar.addEventListener("click", toggleSidebar);
+        }
+
+        if (btnCloseSidebarDrawer) {
+            btnCloseSidebarDrawer.addEventListener("click", closeMobileSidebar);
         }
 
         if (sidebarBackdrop) {
