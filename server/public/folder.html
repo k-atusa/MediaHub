@@ -1444,6 +1444,55 @@
             animation: m3SpinnerArc 1.4s ease-in-out infinite;
         }
 
+        .m3-circular-progress {
+            display: inline-block;
+            border-radius: 50%;
+            border-style: solid;
+            border-color: var(--g-border-subtle, rgba(255, 255, 255, 0.2));
+            border-top-color: var(--m3-primary, var(--g-primary-blue));
+            animation: m3SpinnerRotate 0.8s linear infinite;
+            box-sizing: border-box;
+        }
+
+        .m3-linear-progress {
+            height: 4px;
+            border-radius: 2px;
+            overflow: hidden;
+            background-color: var(--g-border-subtle, rgba(255, 255, 255, 0.12));
+            position: relative;
+            width: 100%;
+        }
+
+        .m3-linear-bar {
+            height: 100%;
+            background-color: var(--m3-primary, var(--g-primary-blue));
+            border-radius: 2px;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 0%;
+            transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .m3-linear-bar.indeterminate {
+            animation: m3LinearIndeterminate 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        }
+
+        @keyframes m3LinearIndeterminate {
+            0% {
+                left: -35%;
+                width: 35%;
+            }
+            60% {
+                left: 100%;
+                width: 70%;
+            }
+            100% {
+                left: 100%;
+                width: 70%;
+            }
+        }
+
         @keyframes m3SpinnerRotate {
             100% {
                 transform: rotate(360deg);
@@ -1792,13 +1841,17 @@
         .dialog-actions,
         .dialog-btn-group {
             display: flex;
+            align-items: center;
             justify-content: flex-end;
             gap: 10px;
-            margin-top: 8px;
+            margin-top: 12px;
         }
 
         .btn-dialog-cancel,
         .btn-dialog-text {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             height: 40px;
             padding: 0 20px;
             border: none;
@@ -1810,6 +1863,9 @@
             border-radius: 20px;
             cursor: pointer;
             transition: background-color 0.15s;
+            line-height: 1;
+            box-sizing: border-box;
+            vertical-align: middle;
         }
 
         .btn-dialog-cancel:hover,
@@ -1819,6 +1875,9 @@
 
         .btn-dialog-confirm,
         .btn-dialog-primary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             height: 40px;
             padding: 0 24px;
             border: none;
@@ -1831,6 +1890,9 @@
             cursor: pointer;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
             transition: background-color 0.15s, box-shadow 0.15s;
+            line-height: 1;
+            box-sizing: border-box;
+            vertical-align: middle;
         }
 
         .btn-dialog-confirm:hover,
@@ -1840,6 +1902,9 @@
         }
 
         .btn-dialog-danger {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             height: 40px;
             padding: 0 24px;
             border: none;
@@ -1852,6 +1917,9 @@
             cursor: pointer;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
             transition: background-color 0.15s, box-shadow 0.15s;
+            line-height: 1;
+            box-sizing: border-box;
+            vertical-align: middle;
         }
 
         [data-theme="dark"] .btn-dialog-danger,
@@ -1868,6 +1936,28 @@
         [data-theme="dark"] .btn-dialog-danger:hover,
         :root:not([data-theme="light"]) .btn-dialog-danger:hover {
             background-color: #f9dedc;
+        }
+
+        /* Clear Cache Dialog Custom UI */
+        #clearCacheModal {
+            max-width: 420px;
+            padding: 24px 24px 20px 24px;
+        }
+
+        #clearCacheModal .dialog-body {
+            white-space: normal;
+            font-size: 14px;
+            color: var(--g-text-sub);
+            line-height: 1.5;
+            margin-bottom: 16px;
+        }
+
+        #clearCacheModal .dialog-title {
+            margin-bottom: 12px;
+        }
+
+        #clearCacheModal .dialog-m3-icon {
+            margin-bottom: 12px;
         }
 
         /* 9. Full Window Drag & Drop Overlay (Google Drive style) */
@@ -2561,6 +2651,11 @@
                         <span class="material-symbols-outlined menu-icon">lock_reset</span>
                         <span class="menu-label">Change password</span>
                     </div>
+                    <!-- Clear Cache Option -->
+                    <div class="drive-menu-item" id="accountMenuItemTrim">
+                        <span class="material-symbols-outlined menu-icon">cleaning_services</span>
+                        <span class="menu-label">Clear cache</span>
+                    </div>
                     <div class="drive-menu-divider"></div>
                     <!-- Logout Option -->
                     <div class="drive-menu-item" id="accountMenuItemLogout">
@@ -2863,6 +2958,30 @@
         <div class="dialog-btn-group">
             <button id="btnCancelPw" class="btn-dialog-cancel" type="button">Cancel</button>
             <button id="btnConfirmPw" class="btn-dialog-confirm" type="button">Save</button>
+        </div>
+    </dialog>
+
+    <!-- Clear Cache / Trim Dialog (Material You M3 Dialog) -->
+    <dialog id="clearCacheModal">
+        <div class="dialog-m3-icon">
+            <span class="material-symbols-outlined" style="color: var(--g-primary-blue);">cleaning_services</span>
+        </div>
+        <div class="dialog-title">Clear Server Cache</div>
+        <div class="dialog-body" id="clearCacheModalBody">
+            This will scan all your encrypted folders on the server and safely remove unreferenced orphan files to free up storage space.
+        </div>
+        <div id="clearCacheStatusArea" style="display: none; margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px;">
+                <div id="clearCacheStatusText" style="font-size: 14px; color: var(--g-text-main); line-height: 1.5; word-break: break-all; text-align: left;">Scanning encrypted folders...</div>
+                <div id="clearCacheProgressPercent" style="font-size: 13px; font-weight: 500; color: var(--g-primary-blue); flex-shrink: 0; display: none;">0%</div>
+            </div>
+            <div class="m3-linear-progress">
+                <div id="clearCacheProgressBar" class="m3-linear-bar indeterminate"></div>
+            </div>
+        </div>
+        <div class="dialog-btn-group" id="clearCacheBtnGroup">
+            <button class="btn-dialog-cancel" id="btnCancelClearCache" type="button">Cancel</button>
+            <button class="btn-dialog-confirm" id="btnConfirmClearCache" type="button">Clear cache</button>
         </div>
     </dialog>
 
@@ -4465,6 +4584,217 @@
             });
         }
 
+        const accountMenuItemTrim = document.getElementById("accountMenuItemTrim");
+        const clearCacheModal = document.getElementById("clearCacheModal");
+        const btnCancelClearCache = document.getElementById("btnCancelClearCache");
+        const btnConfirmClearCache = document.getElementById("btnConfirmClearCache");
+        const clearCacheModalBody = document.getElementById("clearCacheModalBody");
+        const clearCacheStatusArea = document.getElementById("clearCacheStatusArea");
+        const clearCacheStatusText = document.getElementById("clearCacheStatusText");
+        const clearCacheProgressBar = document.getElementById("clearCacheProgressBar");
+        const clearCacheProgressPercent = document.getElementById("clearCacheProgressPercent");
+        const clearCacheBtnGroup = document.getElementById("clearCacheBtnGroup");
+
+        if (accountMenuItemTrim) {
+            accountMenuItemTrim.addEventListener("click", () => {
+                if (accountDropdownMenu) accountDropdownMenu.classList.remove("open");
+                if (clearCacheModal) {
+                    clearCacheModal.dataset.preventBackdropClose = "false";
+                    clearCacheModalBody.style.display = "block";
+                    clearCacheModalBody.innerHTML = "This will scan all your encrypted folders on the server and safely remove unreferenced orphan files to free up storage space.";
+                    clearCacheStatusArea.style.display = "none";
+                    clearCacheBtnGroup.style.display = "flex";
+                    btnCancelClearCache.style.display = "inline-flex";
+                    btnCancelClearCache.disabled = false;
+                    btnConfirmClearCache.style.display = "inline-flex";
+                    btnConfirmClearCache.disabled = false;
+                    btnConfirmClearCache.textContent = "Clear cache";
+                    clearCacheModal.showModal();
+                }
+            });
+        }
+
+        if (btnCancelClearCache) {
+            btnCancelClearCache.addEventListener("click", () => {
+                if (clearCacheModal) clearCacheModal.close();
+            });
+        }
+
+        if (btnConfirmClearCache) {
+            btnConfirmClearCache.addEventListener("click", async () => {
+                if (btnConfirmClearCache.textContent === "Done" || btnConfirmClearCache.textContent === "OK") {
+                    if (clearCacheModal) clearCacheModal.close();
+                    return;
+                }
+
+                const usrHsh = sessionStorage.getItem("userHash");
+                const usrKeyHex = sessionStorage.getItem("userKey");
+                if (!usrHsh || !usrKeyHex) {
+                    alert("Session expired. Please sign in again.");
+                    return;
+                }
+
+                // Prevent closing during trim
+                clearCacheModal.dataset.preventBackdropClose = "true";
+
+                // Show in-progress UI with indeterminate progress while scanning user data
+                clearCacheModalBody.style.display = "none";
+                clearCacheStatusArea.style.display = "block";
+                clearCacheStatusText.textContent = "Scanning encrypted folders...";
+                if (clearCacheProgressBar) {
+                    clearCacheProgressBar.classList.add("indeterminate");
+                    clearCacheProgressBar.style.width = "0%";
+                }
+                if (clearCacheProgressPercent) {
+                    clearCacheProgressPercent.style.display = "none";
+                    clearCacheProgressPercent.textContent = "0%";
+                }
+                clearCacheBtnGroup.style.display = "none";
+
+                try {
+                    const rawUK = fromHex(usrKeyHex);
+                    const sm = new SymMaster("gcm1", rawUK);
+                    rawUK.fill(0);
+
+                    const usrRes = await fetch(`${window.location.origin}/api/userdata/${usrHsh}`);
+                    if (!usrRes.ok) {
+                        throw new Error(usrRes.status === 404 ? "User data not found" : "Failed to load user data");
+                    }
+                    const usrDec = await sm.DeBin(new Uint8Array(await usrRes.arrayBuffer()));
+                    const fldMap = DecodeCfg(usrDec);
+                    usrDec.fill(0);
+
+                    const folderEntries = Object.entries(fldMap);
+                    if (folderEntries.length === 0) {
+                        clearCacheModal.dataset.preventBackdropClose = "false";
+                        clearCacheStatusArea.style.display = "none";
+                        clearCacheModalBody.style.display = "block";
+                        clearCacheModalBody.innerHTML = "<span style='color: var(--g-text-main); font-weight: 500;'>No folders found to clear cache.</span>";
+                        clearCacheBtnGroup.style.display = "flex";
+                        btnCancelClearCache.style.display = "none";
+                        btnConfirmClearCache.style.display = "inline-flex";
+                        btnConfirmClearCache.disabled = false;
+                        btnConfirmClearCache.textContent = "OK";
+                        return;
+                    }
+
+                    // Switch to determinate progress bar
+                    if (clearCacheProgressBar) {
+                        clearCacheProgressBar.classList.remove("indeterminate");
+                        clearCacheProgressBar.style.width = "0%";
+                    }
+                    if (clearCacheProgressPercent) {
+                        clearCacheProgressPercent.style.display = "inline-block";
+                        clearCacheProgressPercent.textContent = "0%";
+                    }
+
+                    let totalCleanedFolders = 0;
+                    let totalOrphanFiles = 0;
+                    let totalOrphanPids = 0;
+                    let totalKeptPids = 0;
+                    let reportLines = [];
+
+                    for (let i = 0; i < folderEntries.length; i++) {
+                        const [fName, fldKey] = folderEntries[i];
+                        const currentPercent = Math.round((i / folderEntries.length) * 100);
+                        if (clearCacheProgressBar) clearCacheProgressBar.style.width = `${currentPercent}%`;
+                        if (clearCacheProgressPercent) clearCacheProgressPercent.textContent = `${currentPercent}%`;
+                        clearCacheStatusText.textContent = `Cleaning folder (${i + 1}/${folderEntries.length}): ${fName}...`;
+
+                        try {
+                            const fldId = getObjPid(fldKey);
+                            const fldSm = new SymMaster("gcm1", fldKey.slice(0, 32));
+                            const flsRes = await fetch(`${window.location.origin}/api/storage/${fldId}/names`);
+
+                            let validPids = [];
+                            if (flsRes.ok) {
+                                const flsDec = await fldSm.DeBin(new Uint8Array(await flsRes.arrayBuffer()));
+                                const flsMap = DecodeCfg(flsDec);
+                                flsDec.fill(0);
+
+                                for (const [, flKey] of Object.entries(flsMap)) {
+                                    if (flKey && flKey.length >= 44) {
+                                        const pid = getObjPid(flKey);
+                                        if (pid) validPids.push(pid);
+                                    }
+                                }
+                            }
+
+                            // Call /api/trim/{fldId}
+                            const trimRes = await fetch(`${window.location.origin}/api/trim/${fldId}`, {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type": "application/json",
+                                    "X-User-Hash": usrHsh
+                                },
+                                body: JSON.stringify({ pids: validPids })
+                            });
+
+                            if (trimRes.ok) {
+                                const msg = await trimRes.text();
+                                totalCleanedFolders++;
+                                const match = msg.match(/Trimmed (\d+) files \((\d+) orphan PIDs removed, (\d+) PIDs kept\)/);
+                                if (match) {
+                                    const delFiles = parseInt(match[1], 10);
+                                    const delPids = parseInt(match[2], 10);
+                                    const keptPids = parseInt(match[3], 10);
+                                    totalOrphanFiles += delFiles;
+                                    totalOrphanPids += delPids;
+                                    totalKeptPids += keptPids;
+                                    if (delFiles > 0) {
+                                        reportLines.push(`📁 ${fName}: Removed ${delFiles} orphan file(s)`);
+                                    }
+                                }
+                            } else {
+                                const errData = await trimRes.json().catch(() => ({ error: trimRes.statusText }));
+                                console.warn(`Trim warning for ${fName}:`, errData.error);
+                            }
+                        } catch (fErr) {
+                            console.warn(`Trim failed for folder ${fName}:`, fErr);
+                        }
+
+                        const donePercent = Math.round(((i + 1) / folderEntries.length) * 100);
+                        if (clearCacheProgressBar) clearCacheProgressBar.style.width = `${donePercent}%`;
+                        if (clearCacheProgressPercent) clearCacheProgressPercent.textContent = `${donePercent}%`;
+                    }
+
+                    // Invalidate all-folders cache
+                    if (typeof fetchAllFoldersAndFiles === "function") {
+                        await fetchAllFoldersAndFiles(true);
+                    }
+
+                    // Display final completion result
+                    clearCacheModal.dataset.preventBackdropClose = "false";
+                    clearCacheStatusArea.style.display = "none";
+                    clearCacheModalBody.style.display = "block";
+                    let resultHtml = `<div style="font-weight: 500; font-size: 15px; color: var(--g-text-main); margin-bottom: 6px;">${totalOrphanFiles > 0 ? "✅ Cache cleared successfully!" : "✨ Cache is already clean!"}</div><div style="font-size: 13.5px; color: var(--g-text-sub); line-height: 1.5; margin-bottom: ${reportLines.length > 0 ? "10px" : "0"};">Scanned <b>${totalCleanedFolders}</b> folder(s).<br>${totalOrphanFiles > 0 ? `Removed <b>${totalOrphanFiles}</b> orphan file(s) (${totalOrphanPids} items).` : "No orphan files found."}</div>`;
+                    if (reportLines.length > 0) {
+                        resultHtml += `<div style="max-height: 120px; overflow-y: auto; font-size: 12.5px; color: var(--g-text-muted); line-height: 1.5;">${reportLines.map(line => `<div style="padding: 2px 0;">${line}</div>`).join("")}</div>`;
+                    }
+                    clearCacheModalBody.innerHTML = resultHtml;
+
+                    // Show button group with only Done button (cancel button hidden)
+                    clearCacheBtnGroup.style.display = "flex";
+                    btnCancelClearCache.style.display = "none";
+                    btnConfirmClearCache.style.display = "inline-flex";
+                    btnConfirmClearCache.disabled = false;
+                    btnConfirmClearCache.textContent = "Done";
+
+                } catch (err) {
+                    console.error("Clear cache failed:", err);
+                    clearCacheModal.dataset.preventBackdropClose = "false";
+                    clearCacheStatusArea.style.display = "none";
+                    clearCacheModalBody.style.display = "block";
+                    clearCacheModalBody.innerHTML = `<span style="color: var(--g-danger);">Failed to clear cache: ${err.message || err}</span>`;
+                    clearCacheBtnGroup.style.display = "flex";
+                    btnCancelClearCache.style.display = "none";
+                    btnConfirmClearCache.style.display = "inline-flex";
+                    btnConfirmClearCache.disabled = false;
+                    btnConfirmClearCache.textContent = "OK";
+                }
+            });
+        }
+
         if (accountMenuItemLogout) {
             accountMenuItemLogout.addEventListener("click", () => {
                 sessionStorage.clear();
@@ -4955,10 +5285,16 @@
         // Backdrop click close for all dialogs
         document.querySelectorAll("dialog").forEach(dialog => {
             dialog.addEventListener("click", (e) => {
+                if (dialog.dataset.preventBackdropClose === "true") return;
                 const rect = dialog.getBoundingClientRect();
                 const isInDialog = (rect.top <= e.clientY && e.clientY <= rect.top + rect.height
                     && rect.left <= e.clientX && e.clientX <= rect.left + rect.width);
                 if (!isInDialog) dialog.close();
+            });
+            dialog.addEventListener("cancel", (e) => {
+                if (dialog.dataset.preventBackdropClose === "true") {
+                    e.preventDefault();
+                }
             });
         });
 
