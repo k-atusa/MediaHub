@@ -1122,7 +1122,7 @@
         }
 
         .file-title {
-            padding: 10px 12px;
+            padding: 10px 12px 4px 12px;
             font-size: 13px;
             font-weight: 500;
             color: var(--g-text-main);
@@ -1131,6 +1131,25 @@
             text-overflow: ellipsis;
             border-top: 1px solid var(--g-border);
             background-color: var(--g-surface);
+        }
+
+        .file-folder-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11.5px;
+            color: var(--g-text-muted);
+            padding: 0 12px 10px 12px;
+            background-color: var(--g-surface);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .file-folder-chip .material-symbols-outlined {
+            font-size: 14px;
+            color: var(--g-primary-blue);
+            flex-shrink: 0;
         }
 
         /* 1) Extra Large Icons View */
@@ -2863,6 +2882,88 @@
             }
         }
 
+        let allFoldersFilesCache = null;
+        let allFoldersFilesCacheTime = 0;
+
+        async function fetchAllFoldersAndFiles(forceRefresh = false) {
+            const now = Date.now();
+            if (!forceRefresh && allFoldersFilesCache && (now - allFoldersFilesCacheTime < 30000)) {
+                return allFoldersFilesCache;
+            }
+
+            try {
+                const usrHsh = sessionStorage.getItem("userHash");
+                const usrKeyHex = sessionStorage.getItem("userKey");
+                if (!usrHsh || !usrKeyHex) return [];
+
+                const rawUK = fromHex(usrKeyHex);
+                const sm = new SymMaster("gcm1", rawUK);
+                rawUK.fill(0);
+
+                const usrRes = await fetch(`${window.location.origin}/api/userdata/${usrHsh}`);
+                if (!usrRes.ok) return [];
+                const usrDec = await sm.DeBin(new Uint8Array(await usrRes.arrayBuffer()));
+                const fldMap = DecodeCfg(usrDec);
+                usrDec.fill(0);
+
+                const folderEntries = Object.entries(fldMap);
+                const allFiles = [];
+
+                await Promise.all(folderEntries.map(async ([fName, fldKey]) => {
+                    try {
+                        const fldId = getObjPid(fldKey);
+                        const fldSm = new SymMaster("gcm1", fldKey.slice(0, 32));
+                        const flsRes = await fetch(`${window.location.origin}/api/storage/${fldId}/names`);
+                        if (!flsRes.ok) return;
+                        const flsDec = await fldSm.DeBin(new Uint8Array(await flsRes.arrayBuffer()));
+                        const flsMap = DecodeCfg(flsDec);
+                        flsDec.fill(0);
+
+                        for (const [flName, flKey] of Object.entries(flsMap)) {
+                            let size = 0;
+                            if (flKey && flKey.length >= 52) {
+                                size = DecodeInt(flKey.slice(44, 52));
+                            }
+                            allFiles.push({
+                                folderName: fName,
+                                folderKey: fldKey,
+                                folderId: fldId,
+                                fileName: flName,
+                                fileKey: flKey,
+                                size: size
+                            });
+                        }
+                    } catch (e) {
+                        console.warn(`Error fetching files for folder ${fName}:`, e);
+                    }
+                }));
+
+                allFoldersFilesCache = allFiles;
+                allFoldersFilesCacheTime = Date.now();
+                return allFiles;
+            } catch (err) {
+                console.warn("Could not fetch all folders files:", err);
+                return [];
+            }
+        }
+
+        async function loadThumbnailForGlobalSearch(folderId, filePid, ext, imgEl, fileKeyRaw) {
+            try {
+                const res = await fetch(`${window.location.origin}/api/media/${folderId}/${filePid}/thumb`);
+                if (res.status === 404 || !res.ok) {
+                    imgEl.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='%23333'><rect width='24' height='24' rx='2'/><text x='50%' y='60%' font-family='sans-serif' font-size='5' font-weight='bold' fill='%23aaa' text-anchor='middle'>" + ext + "</text></svg>";
+                    fileKeyRaw.fill(0);
+                    return;
+                }
+                const sm = new SymMaster("gcm1", fileKeyRaw.slice(0, 32));
+                fileKeyRaw.fill(0);
+                imgEl.src = URL.createObjectURL(new Blob([await sm.DeBin(new Uint8Array(await res.arrayBuffer()))]));
+            } catch (e) {
+                fileKeyRaw.fill(0);
+                imgEl.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='%23333'><rect width='24' height='24' rx='2'/><text x='50%' y='60%' font-family='sans-serif' font-size='5' font-weight='bold' fill='%23aaa' text-anchor='middle'>" + ext + "</text></svg>";
+            }
+        }
+
         // 1. Theme Manager (System default as base, supports Light / Dark / System toggle)
         const accountMenuItemTheme = document.getElementById("accountMenuItemTheme");
         const accountMenuThemeLabel = document.getElementById("accountMenuThemeLabel");
@@ -3276,27 +3377,17 @@
             }
         }
 
-        function syncRootFolderGrid() {
+        let rootSearchCounter = 0;
+
+        async function syncRootFolderGrid() {
             if (!rootFolderGrid) return;
-            rootFolderGrid.innerHTML = "";
-            let options = Array.from(folderSelect.options).filter(opt => opt.value !== "");
             const searchInput = document.getElementById("topSearchInput");
             const query = (searchInput ? searchInput.value || "" : "").normalize('NFC').trim().toLowerCase();
 
-            if (query) {
-                options = options.filter(opt => (opt.textContent || "").normalize('NFC').toLowerCase().includes(query));
-            }
-
-            if (options.length === 0) {
-                if (query) {
-                    rootFolderGrid.innerHTML = `
-                        <div style="grid-column: 1 / -1; padding: 40px; text-align: center; color: var(--g-text-muted);">
-                            <span class="material-symbols-outlined" style="font-size: 48px; margin-bottom: 8px;">search_off</span>
-                            <div style="font-size: 16px; font-weight: 500; color: var(--g-text-main); margin-bottom: 4px;">No folders found</div>
-                            <div style="font-size: 13px;">No folders matching "${query}".</div>
-                        </div>
-                    `;
-                } else {
+            if (!query) {
+                rootFolderGrid.innerHTML = "";
+                const options = Array.from(folderSelect.options).filter(opt => opt.value !== "");
+                if (options.length === 0) {
                     rootFolderGrid.innerHTML = `
                         <div style="grid-column: 1 / -1; padding: 40px; text-align: center; color: var(--g-text-muted);">
                             <span class="material-symbols-outlined" style="font-size: 48px; margin-bottom: 8px;">folder_off</span>
@@ -3304,24 +3395,139 @@
                             <div style="font-size: 13px;">Click "+ New folder" to create your first folder.</div>
                         </div>
                     `;
+                    return;
                 }
+
+                options.forEach(opt => {
+                    const card = document.createElement("div");
+                    card.className = "root-folder-card";
+                    card.innerHTML = `
+                        <span class="material-symbols-outlined">folder</span>
+                        <span class="root-folder-card-name">${opt.textContent}</span>
+                    `;
+                    card.addEventListener("click", () => {
+                        folderSelect.value = opt.value;
+                        folderSelect.dispatchEvent(new Event("change"));
+                        updateFolderDisplay();
+                    });
+                    rootFolderGrid.appendChild(card);
+                });
                 return;
             }
 
-            options.forEach(opt => {
-                const card = document.createElement("div");
-                card.className = "root-folder-card";
-                card.innerHTML = `
-                    <span class="material-symbols-outlined">folder</span>
-                    <span class="root-folder-card-name">${opt.textContent}</span>
+            // --- QUERY IS ACTIVE ON ROOT VIEW: Search Folders AND All Files Across All Folders ---
+            const thisReq = ++rootSearchCounter;
+            rootFolderGrid.innerHTML = `
+                <div style="grid-column: 1 / -1; padding: 36px 20px; text-align: center; color: var(--g-text-muted);">
+                    <div class="m3-circular-progress" style="width: 28px; height: 28px; margin: 0 auto 12px auto; border-width: 3px;"></div>
+                    <div style="font-size: 14px; color: var(--g-text-main);">Searching across all folders...</div>
+                </div>
+            `;
+
+            const allFiles = await fetchAllFoldersAndFiles();
+            if (thisReq !== rootSearchCounter) return;
+
+            const options = Array.from(folderSelect.options).filter(opt => opt.value !== "");
+            const matchingFolders = options.filter(opt => (opt.textContent || "").normalize('NFC').toLowerCase().includes(query));
+            const matchingFiles = allFiles.filter(f => (f.fileName || "").normalize('NFC').toLowerCase().includes(query));
+
+            if (matchingFolders.length === 0 && matchingFiles.length === 0) {
+                rootFolderGrid.innerHTML = `
+                    <div style="grid-column: 1 / -1; padding: 48px 20px; text-align: center; color: var(--g-text-muted);">
+                        <span class="material-symbols-outlined" style="font-size: 48px; margin-bottom: 8px; opacity: 0.6;">search_off</span>
+                        <div style="font-size: 16px; font-weight: 500; color: var(--g-text-main); margin-bottom: 4px;">No matching results</div>
+                        <div style="font-size: 13px;">No folders or files matching "${query}" across your drive.</div>
+                    </div>
                 `;
-                card.addEventListener("click", () => {
-                    folderSelect.value = opt.value;
-                    folderSelect.dispatchEvent(new Event("change"));
-                    updateFolderDisplay();
+                return;
+            }
+
+            rootFolderGrid.innerHTML = "";
+
+            // 1) Render Matching Folders (if any)
+            if (matchingFolders.length > 0) {
+                const fldHeader = document.createElement("div");
+                fldHeader.className = "root-folder-header";
+                fldHeader.style.gridColumn = "1 / -1";
+                fldHeader.style.margin = "0 0 4px 0";
+                fldHeader.textContent = `Folders (${matchingFolders.length})`;
+                rootFolderGrid.appendChild(fldHeader);
+
+                matchingFolders.forEach(opt => {
+                    const card = document.createElement("div");
+                    card.className = "root-folder-card";
+                    card.innerHTML = `
+                        <span class="material-symbols-outlined">folder</span>
+                        <span class="root-folder-card-name">${opt.textContent}</span>
+                    `;
+                    card.addEventListener("click", () => {
+                        folderSelect.value = opt.value;
+                        folderSelect.dispatchEvent(new Event("change"));
+                        updateFolderDisplay();
+                    });
+                    rootFolderGrid.appendChild(card);
                 });
-                rootFolderGrid.appendChild(card);
-            });
+            }
+
+            // 2) Render Matching Files (if any)
+            if (matchingFiles.length > 0) {
+                const filesHeader = document.createElement("div");
+                filesHeader.className = "root-folder-header";
+                filesHeader.style.gridColumn = "1 / -1";
+                filesHeader.style.margin = (matchingFolders.length > 0) ? "24px 0 4px 0" : "0 0 4px 0";
+                filesHeader.textContent = `Files (${matchingFiles.length})`;
+                rootFolderGrid.appendChild(filesHeader);
+
+                const filesGridContainer = document.createElement("div");
+                filesGridContainer.className = "media-grid";
+                filesGridContainer.style.gridColumn = "1 / -1";
+                filesGridContainer.style.width = "100%";
+
+                matchingFiles.forEach(file => {
+                    const card = document.createElement("div");
+                    card.className = "media-card";
+
+                    const img = document.createElement("img");
+                    img.className = "thumb-img";
+                    img.alt = "Loading...";
+
+                    const rawFK = file.fileKey.slice();
+                    const fkSlice = rawFK.slice(0, 44);
+                    const ext = file.fileName.split('.').pop().toUpperCase();
+                    loadThumbnailForGlobalSearch(file.folderId, getObjPid(fkSlice), ext, img, fkSlice);
+
+                    const title = document.createElement("div");
+                    title.className = "file-title";
+                    title.textContent = file.fileName;
+
+                    const folderChip = document.createElement("div");
+                    folderChip.className = "file-folder-chip";
+                    folderChip.innerHTML = `
+                        <span class="material-symbols-outlined">folder</span>
+                        <span>${file.folderName}</span>
+                    `;
+
+                    card.appendChild(img);
+                    card.appendChild(title);
+                    card.appendChild(folderChip);
+
+                    card.addEventListener("click", () => {
+                        const rFK = file.fileKey.slice();
+                        const rSK = file.folderKey.slice();
+                        sessionStorage.setItem("currentFileKey", toHex(rFK));
+                        sessionStorage.setItem("currentFileName", file.fileName);
+                        sessionStorage.setItem("currentFolderId", file.folderId);
+                        sessionStorage.setItem("currentFolderKey", toHex(rSK));
+                        sessionStorage.setItem("oldFold", file.folderName);
+                        rFK.fill(0); rSK.fill(0);
+                        window.location.href = "./viewer.html";
+                    });
+
+                    filesGridContainer.appendChild(card);
+                });
+
+                rootFolderGrid.appendChild(filesGridContainer);
+            }
         }
 
         const folderActionMenu = document.getElementById("folderActionMenu");
