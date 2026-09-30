@@ -539,6 +539,7 @@
             position: relative;
             display: block;
             width: 100%;
+            flex-shrink: 0;
         }
 
         .btn-new-drive {
@@ -649,6 +650,7 @@
             flex-direction: column;
             gap: 4px;
             flex: 1;
+            min-height: 0;
             overflow: hidden;
         }
 
@@ -657,6 +659,8 @@
             align-items: center;
             gap: 12px;
             height: 40px;
+            min-height: 40px;
+            flex-shrink: 0;
             padding: 0 14px;
             color: var(--g-text-main);
             font-size: 14px;
@@ -665,6 +669,7 @@
             cursor: pointer;
             border-radius: 20px;
             transition: background-color 0.15s;
+            box-sizing: border-box;
         }
 
         .sidebar-section-header:hover {
@@ -683,7 +688,28 @@
             gap: 2px;
             padding-left: 12px;
             overflow-y: auto;
+            overflow-x: hidden;
             flex: 1;
+            min-height: 0;
+            scrollbar-width: thin;
+            scrollbar-color: var(--g-border-subtle) transparent;
+        }
+
+        .sidebar-folder-list::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .sidebar-folder-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .sidebar-folder-list::-webkit-scrollbar-thumb {
+            background-color: var(--g-border-subtle);
+            border-radius: 4px;
+        }
+
+        .sidebar-folder-list::-webkit-scrollbar-thumb:hover {
+            background-color: var(--g-text-muted);
         }
 
         /* Individual Folder Item */
@@ -692,6 +718,8 @@
             align-items: center;
             gap: 10px;
             height: 38px;
+            min-height: 38px;
+            flex-shrink: 0;
             padding: 0 6px 0 14px;
             border-radius: 19px;
             color: var(--g-text-main);
@@ -701,6 +729,7 @@
             user-select: none;
             transition: background-color 0.15s, color 0.15s;
             position: relative;
+            box-sizing: border-box;
         }
 
         .nav-folder-item:hover {
@@ -1971,6 +2000,7 @@
                 justify-content: space-between;
                 height: 64px;
                 min-height: 64px;
+                flex-shrink: 0;
                 padding: 0 4px;
                 border-bottom: 1px solid var(--g-border-subtle);
                 margin-bottom: 4px;
