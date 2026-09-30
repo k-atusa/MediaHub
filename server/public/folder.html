@@ -354,6 +354,29 @@
             color: var(--g-text-main);
         }
 
+        .mobile-search-toggle {
+            display: none;
+        }
+
+        .mobile-search-back-btn {
+            display: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            color: var(--g-text-main);
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: background-color 0.15s;
+        }
+
+        .mobile-search-back-btn:hover {
+            background-color: var(--g-hover-bg);
+        }
+
         /* Account Menu Wrapper & Dropdown */
         .account-menu-wrapper {
             position: relative;
@@ -1891,8 +1914,55 @@
                 transform: translateX(0);
             }
 
+            .mobile-search-toggle {
+                display: flex;
+            }
+
             .header-search-box {
                 display: none;
+            }
+
+            /* When mobile search is active, the entire navigation bar becomes the search bar */
+            .drive-header.mobile-search-active {
+                padding: 0 8px;
+            }
+
+            .drive-header.mobile-search-active .header-left,
+            .drive-header.mobile-search-active .header-right {
+                display: none !important;
+            }
+
+            .drive-header.mobile-search-active .header-search-box {
+                display: flex !important;
+                flex: 1;
+                width: 100%;
+                max-width: 100%;
+                height: 48px;
+                background-color: var(--g-search-bg);
+                border-radius: 24px;
+                padding: 0 10px 0 6px;
+                gap: 8px;
+                margin: 0;
+                animation: mobileSearchSlideIn 0.2s cubic-bezier(0.2, 0, 0, 1);
+            }
+
+            .drive-header.mobile-search-active .mobile-search-back-btn {
+                display: flex;
+            }
+
+            .drive-header.mobile-search-active .search-input {
+                font-size: 16px;
+            }
+
+            @keyframes mobileSearchSlideIn {
+                from {
+                    opacity: 0;
+                    transform: scale(0.97);
+                }
+                to {
+                    opacity: 1;
+                    transform: scale(1);
+                }
             }
 
             .drive-workspace {
@@ -2276,6 +2346,9 @@
         </div>
 
         <div class="header-search-box" id="headerSearchBox">
+            <button class="mobile-search-back-btn" id="btnMobileSearchClose" type="button" title="Back">
+                <span class="material-symbols-outlined">arrow_back</span>
+            </button>
             <input type="text" class="search-input" placeholder="Search in MediaHub" id="topSearchInput" autocomplete="off" spellcheck="false">
             <button class="search-clear-btn" id="btnSearchClear" type="button" title="Clear search" style="display: none;">
                 <span class="material-symbols-outlined" style="font-size: 18px;">close</span>
@@ -4047,6 +4120,7 @@
         const topSearchInput = document.getElementById("topSearchInput");
         const btnSearchClear = document.getElementById("btnSearchClear");
         const btnMobileSearchToggle = document.getElementById("btnMobileSearchToggle");
+        const btnMobileSearchClose = document.getElementById("btnMobileSearchClose");
         const driveHeader = document.querySelector(".drive-header");
 
         if (topSearchInput) {
@@ -4085,12 +4159,27 @@
         }
 
         if (btnMobileSearchToggle) {
-            btnMobileSearchToggle.addEventListener("click", () => {
+            btnMobileSearchToggle.addEventListener("click", (e) => {
+                e.stopPropagation();
                 if (driveHeader) {
-                    const isActive = driveHeader.classList.toggle("mobile-search-active");
-                    if (isActive && topSearchInput) {
+                    driveHeader.classList.add("mobile-search-active");
+                    if (topSearchInput) {
                         topSearchInput.focus();
                     }
+                }
+            });
+        }
+
+        if (btnMobileSearchClose) {
+            btnMobileSearchClose.addEventListener("click", (e) => {
+                e.stopPropagation();
+                if (driveHeader) {
+                    driveHeader.classList.remove("mobile-search-active");
+                }
+                if (topSearchInput) {
+                    topSearchInput.value = "";
+                    topSearchInput.dispatchEvent(new Event("input"));
+                    topSearchInput.blur();
                 }
             });
         }
