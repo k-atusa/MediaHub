@@ -267,6 +267,8 @@ document.getElementById("btnExport").addEventListener("click", () => {
 
 // Import share token.
 document.getElementById("btnImport").addEventListener("click", () => {
+    const newDriveMenu = document.getElementById("newDriveMenu");
+    if (newDriveMenu) newDriveMenu.classList.remove("open");
     const input = document.createElement("input"); input.type = "file"; input.accept = ".txt";
     input.onchange = async () => {
         if (!input.files[0]) return;
