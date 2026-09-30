@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo "==> Building MediaHub Server..."
 
 cd "${ROOT_DIR}/server"
-VERSION="1.4.1"
+VERSION="1.5.0"
 OS="$(go env GOOS)"
 ARCH="$(go env GOARCH)"
 EXT=""
