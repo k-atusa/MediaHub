@@ -2480,14 +2480,6 @@
                             </div>
                         </div>
                     </div>
-                    <button class="top-action-btn" id="btnExport" title="Share folder token">
-                        <span class="material-symbols-outlined">share</span>
-                        <span>Share</span>
-                    </button>
-                    <button class="top-action-btn" id="btnDeleteFolder" title="Delete folder">
-                        <span class="material-symbols-outlined">delete_outline</span>
-                        <span>Delete folder</span>
-                    </button>
                 </div>
             </div>
 
@@ -2571,6 +2563,8 @@
         <button id="btnTrim">Trim</button>
         <input type="text" id="newFolderName">
         <button id="btnCreateFolder">Create</button>
+        <button id="btnExport" style="display: none;"></button>
+        <button id="btnDeleteFolder" style="display: none;"></button>
         <button id="btnChangePassword" style="display: none;"></button>
         <span id="lblUserHash" style="display: none;"></span>
     </div>
@@ -2581,7 +2575,6 @@
             <span class="material-symbols-outlined menu-icon">share</span>
             <span class="menu-label">Share folder</span>
         </div>
-        <div class="drive-menu-divider"></div>
         <div class="drive-menu-item" id="folderMenuDelete">
             <span class="material-symbols-outlined menu-icon">delete_outline</span>
             <span class="menu-label">Delete folder</span>
@@ -3174,8 +3167,6 @@
                 mediaContainer.style.display = "flex";
                 sidebarMyDriveHeader.classList.remove("active");
 
-                btnDeleteFolder.style.display = "";
-                btnExport.style.display = "";
                 if (filterActionWrapper) filterActionWrapper.style.display = "";
                 if (viewActionWrapper) viewActionWrapper.style.display = "";
                 if (sortActionWrapper) sortActionWrapper.style.display = "";
@@ -3199,8 +3190,6 @@
                 mediaContainer.style.display = "none";
                 sidebarMyDriveHeader.classList.add("active");
 
-                btnDeleteFolder.style.display = "none";
-                btnExport.style.display = "none";
                 if (filterActionWrapper) filterActionWrapper.style.display = "none";
                 if (activeFilterChipsBar) activeFilterChipsBar.style.display = "none";
                 if (viewActionWrapper) viewActionWrapper.style.display = "none";
