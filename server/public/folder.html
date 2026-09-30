@@ -534,30 +534,33 @@
             opacity: 1;
         }
 
-        /* Google Drive "+ New" Pill Button & Dropdown Menu */
+        /* Google Drive "+ New" Full-Width Button & Dropdown Menu */
         .new-action-wrapper {
             position: relative;
-            display: inline-block;
-            width: fit-content;
+            display: block;
+            width: 100%;
         }
 
         .btn-new-drive {
+            width: 100%;
             height: 48px;
             border-radius: 16px;
             background-color: var(--g-surface);
             color: var(--g-text-main);
             border: 1px solid var(--g-border-subtle);
             font-family: inherit;
-            font-size: 14px;
+            font-size: 14.5px;
             font-weight: 500;
-            display: inline-flex;
+            display: flex;
             align-items: center;
+            justify-content: center;
             gap: 12px;
-            padding: 0 20px 0 16px;
+            padding: 0 16px;
             cursor: pointer;
             box-shadow: 0 1px 3px rgba(60, 64, 67, 0.25), 0 1px 2px rgba(60, 64, 67, 0.15);
             transition: background-color 0.15s, box-shadow 0.15s, border-color 0.15s;
             user-select: none;
+            box-sizing: border-box;
         }
 
         .btn-new-drive:hover {
@@ -575,7 +578,8 @@
             position: absolute;
             top: calc(100% + 6px);
             left: 0;
-            min-width: 220px;
+            right: 0;
+            width: 100%;
             background-color: var(--m3-surface-container);
             border-radius: 20px;
             box-shadow: var(--m3-elevation-widget);
@@ -584,6 +588,7 @@
             display: none;
             z-index: 1000;
             animation: menuFadeIn 0.15s cubic-bezier(0.2, 0, 0, 1);
+            box-sizing: border-box;
         }
 
         .new-drive-menu.open {
