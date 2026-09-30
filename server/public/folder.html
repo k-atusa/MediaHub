@@ -658,9 +658,9 @@
         .nav-folder-item {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
             height: 38px;
-            padding: 0 14px;
+            padding: 0 6px 0 14px;
             border-radius: 19px;
             color: var(--g-text-main);
             font-size: 13.5px;
@@ -668,6 +668,7 @@
             cursor: pointer;
             user-select: none;
             transition: background-color 0.15s, color 0.15s;
+            position: relative;
         }
 
         .nav-folder-item:hover {
@@ -680,15 +681,73 @@
             font-weight: 600;
         }
 
-        .nav-folder-item .material-symbols-outlined {
+        .nav-folder-item .material-symbols-outlined.nav-folder-icon {
             font-size: 19px;
             color: inherit;
+            flex-shrink: 0;
         }
 
         .folder-name-label {
+            flex: 1;
+            min-width: 0;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+        }
+
+        .folder-more-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            min-width: 28px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            color: inherit;
+            cursor: pointer;
+            opacity: 0;
+            margin-left: auto;
+            flex-shrink: 0;
+            transition: opacity 0.15s, background-color 0.15s;
+        }
+
+        .folder-more-btn .material-symbols-outlined {
+            font-size: 18px !important;
+            color: inherit;
+        }
+
+        .nav-folder-item:hover .folder-more-btn,
+        .nav-folder-item.active .folder-more-btn,
+        .folder-more-btn.open {
+            opacity: 1;
+        }
+
+        .folder-more-btn:hover,
+        .folder-more-btn.open {
+            background-color: rgba(0, 0, 0, 0.08);
+        }
+
+        [data-theme="dark"] .folder-more-btn:hover,
+        [data-theme="dark"] .folder-more-btn.open,
+        :root:not([data-theme="light"]) .folder-more-btn:hover,
+        :root:not([data-theme="light"]) .folder-more-btn.open {
+            background-color: rgba(255, 255, 255, 0.12);
+        }
+
+        @media (hover: none) {
+            .folder-more-btn {
+                opacity: 1;
+            }
+        }
+
+        .folder-action-menu {
+            position: fixed;
+            min-width: 190px;
+            z-index: 3000;
+            top: 0;
+            left: 0;
         }
 
 
@@ -2516,6 +2575,19 @@
         <span id="lblUserHash" style="display: none;"></span>
     </div>
 
+    <!-- Folder Item Context Menu (Same UI styling as New Button Dropdown) -->
+    <div class="new-drive-menu folder-action-menu" id="folderActionMenu">
+        <div class="drive-menu-item" id="folderMenuShare">
+            <span class="material-symbols-outlined menu-icon">share</span>
+            <span class="menu-label">Share folder</span>
+        </div>
+        <div class="drive-menu-divider"></div>
+        <div class="drive-menu-item" id="folderMenuDelete">
+            <span class="material-symbols-outlined menu-icon">delete_outline</span>
+            <span class="menu-label">Delete folder</span>
+        </div>
+    </div>
+
     <!-- New Folder Dialog (Material You M3 Dialog) -->
     <dialog id="newFolderModal">
         <div class="dialog-m3-icon">
@@ -3190,8 +3262,118 @@
             });
         }
 
+        const folderActionMenu = document.getElementById("folderActionMenu");
+        const folderMenuShare = document.getElementById("folderMenuShare");
+        const folderMenuDelete = document.getElementById("folderMenuDelete");
+        let activeFolderMoreBtn = null;
+
+        function closeFolderContextMenu() {
+            if (!folderActionMenu) return;
+            folderActionMenu.classList.remove("open");
+            folderActionMenu.style.display = "none";
+            if (activeFolderMoreBtn) {
+                activeFolderMoreBtn.classList.remove("open");
+                activeFolderMoreBtn = null;
+            }
+        }
+
+        function openFolderContextMenu(e, folderName, btn) {
+            if (!folderActionMenu) return;
+            if (folderActionMenu.classList.contains("open") && activeFolderMoreBtn === btn) {
+                closeFolderContextMenu();
+                return;
+            }
+
+            if (typeof newDriveMenu !== "undefined" && newDriveMenu) newDriveMenu.classList.remove("open");
+            const accountMenu = document.getElementById("accountDropdownMenu");
+            if (accountMenu) accountMenu.classList.remove("open");
+            if (typeof sortDropdownMenu !== "undefined" && sortDropdownMenu) sortDropdownMenu.classList.remove("open");
+            if (typeof viewDropdownMenu !== "undefined" && viewDropdownMenu) viewDropdownMenu.classList.remove("open");
+
+            if (activeFolderMoreBtn) {
+                activeFolderMoreBtn.classList.remove("open");
+            }
+            activeFolderMoreBtn = btn;
+            btn.classList.add("open");
+
+            folderActionMenu.dataset.targetFolder = folderName;
+
+            folderActionMenu.style.visibility = "hidden";
+            folderActionMenu.style.display = "block";
+
+            const btnRect = btn.getBoundingClientRect();
+            const menuWidth = folderActionMenu.offsetWidth || 190;
+            const menuHeight = folderActionMenu.offsetHeight || 96;
+
+            let left = btnRect.right + 6;
+            let top = btnRect.top - 4;
+
+            if (left + menuWidth > window.innerWidth - 10) {
+                left = btnRect.left - menuWidth - 6;
+                if (left < 10) left = window.innerWidth - menuWidth - 10;
+            }
+
+            if (top + menuHeight > window.innerHeight - 10) {
+                top = window.innerHeight - menuHeight - 10;
+            }
+            if (top < 10) top = 10;
+
+            folderActionMenu.style.left = `${left}px`;
+            folderActionMenu.style.top = `${top}px`;
+            folderActionMenu.style.visibility = "";
+            folderActionMenu.classList.add("open");
+        }
+
+        if (folderMenuShare) {
+            folderMenuShare.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const targetFolder = folderActionMenu ? folderActionMenu.dataset.targetFolder : "";
+                closeFolderContextMenu();
+                if (!targetFolder) return;
+
+                if (folderSelect.value !== targetFolder) {
+                    folderSelect.value = targetFolder;
+                    folderSelect.dispatchEvent(new Event("change"));
+                    updateFolderDisplay();
+                }
+                const btnExport = document.getElementById("btnExport");
+                if (btnExport) btnExport.click();
+            });
+        }
+
+        if (folderMenuDelete) {
+            folderMenuDelete.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const targetFolder = folderActionMenu ? folderActionMenu.dataset.targetFolder : "";
+                closeFolderContextMenu();
+                if (!targetFolder) return;
+
+                if (folderSelect.value !== targetFolder) {
+                    folderSelect.value = targetFolder;
+                    folderSelect.dispatchEvent(new Event("change"));
+                    updateFolderDisplay();
+                }
+                const btnDeleteFolder = document.getElementById("btnDeleteFolder");
+                if (btnDeleteFolder) btnDeleteFolder.click();
+            });
+        }
+
+        document.addEventListener("click", (e) => {
+            if (folderActionMenu && folderActionMenu.classList.contains("open")) {
+                if (!folderActionMenu.contains(e.target) && (!activeFolderMoreBtn || !activeFolderMoreBtn.contains(e.target))) {
+                    closeFolderContextMenu();
+                }
+            }
+        });
+
+        if (sidebarFolderList) {
+            sidebarFolderList.addEventListener("scroll", closeFolderContextMenu);
+        }
+        window.addEventListener("resize", closeFolderContextMenu);
+
         function syncSidebarFolderList() {
             if (!sidebarFolderList) return;
+            closeFolderContextMenu();
             sidebarFolderList.innerHTML = "";
             const options = Array.from(folderSelect.options).filter(opt => opt.value !== "");
             const currentSelected = folderSelect.value || "";
@@ -3207,8 +3389,11 @@
                 item.className = "nav-folder-item" + (isSelected ? " active" : "");
                 item.dataset.folderName = opt.value;
                 item.innerHTML = `
-                    <span class="material-symbols-outlined">folder</span>
-                    <span class="folder-name-label">${opt.textContent}</span>
+                    <span class="material-symbols-outlined nav-folder-icon">folder</span>
+                    <span class="folder-name-label" title="${opt.textContent.replace(/"/g, '&quot;')}">${opt.textContent}</span>
+                    <button type="button" class="folder-more-btn" title="More options" aria-label="More options">
+                        <span class="material-symbols-outlined">more_vert</span>
+                    </button>
                 `;
                 item.addEventListener("click", () => {
                     if (isMobileView()) closeMobileSidebar();
@@ -3218,6 +3403,15 @@
                     }
                     updateFolderDisplay();
                 });
+
+                const moreBtn = item.querySelector(".folder-more-btn");
+                if (moreBtn) {
+                    moreBtn.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        openFolderContextMenu(e, opt.value, moreBtn);
+                    });
+                }
+
                 sidebarFolderList.appendChild(item);
             });
         }
@@ -3358,6 +3552,7 @@
         if (btnNewDropdown && newDriveMenu) {
             btnNewDropdown.addEventListener("click", (e) => {
                 e.stopPropagation();
+                if (typeof closeFolderContextMenu === "function") closeFolderContextMenu();
                 if (viewDropdownMenu) viewDropdownMenu.classList.remove("open");
                 if (sortDropdownMenu) sortDropdownMenu.classList.remove("open");
                 const accountMenu = document.getElementById("accountDropdownMenu");
