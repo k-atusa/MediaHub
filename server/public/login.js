@@ -69,6 +69,14 @@ document.getElementById("btnRegister").addEventListener("click", async () => {
     } catch (e) { alert("❌ Register failed"); }
 });
 
+// Handle Enter key for login
+document.getElementById("username").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("btnLogin").click();
+});
+document.getElementById("password").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("btnLogin").click();
+});
+
 // Login
 document.getElementById("btnLogin").addEventListener("click", async () => {
     const res = await makeKeys(); if (!res) return;
