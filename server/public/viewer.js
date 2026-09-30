@@ -335,7 +335,46 @@ function render(buf, body) {
     const kind = getKind(flName);
     body.innerHTML = "";
     if (kind === 'video') { const v = document.createElement("video"); v.controls = true; v.src = url; v.style.width = "100%"; body.appendChild(v); }
-    else if (kind === 'image') { const i = document.createElement("img"); i.src = url; i.style.width = "100%"; body.appendChild(i); }
+    else if (kind === 'image') {
+        const i = document.createElement("img");
+        i.src = url;
+        i.style.width = "100%";
+        i.style.height = "100%";
+        i.style.objectFit = "contain";
+        i.style.cursor = "grab";
+        i.style.transition = "transform 0.1s ease-out";
+        
+        let scale = 1, panning = false, pointX = 0, pointY = 0, start = { x: 0, y: 0 };
+        const setTransform = () => i.style.transform = `translate(${pointX}px, ${pointY}px) scale(${scale})`;
+        
+        i.onmousedown = (e) => { e.preventDefault(); start = { x: e.clientX - pointX, y: e.clientY - pointY }; panning = true; i.style.cursor = "grabbing"; };
+        i.onmouseup = () => { panning = false; i.style.cursor = "grab"; };
+        i.onmouseleave = () => { panning = false; i.style.cursor = "grab"; };
+        i.onmousemove = (e) => {
+            e.preventDefault();
+            if (!panning) return;
+            pointX = (e.clientX - start.x);
+            pointY = (e.clientY - start.y);
+            setTransform();
+        };
+        i.onwheel = (e) => {
+            e.preventDefault();
+            const xs = (e.clientX - pointX) / scale, ys = (e.clientY - pointY) / scale;
+            const delta = (e.wheelDelta ? e.wheelDelta : -e.deltaY);
+            if (delta > 0) scale *= 1.1; else scale /= 1.1;
+            if (scale < 0.2) scale = 0.2; if (scale > 20) scale = 20;
+            pointX = e.clientX - xs * scale;
+            pointY = e.clientY - ys * scale;
+            setTransform();
+        };
+        i.ondblclick = (e) => { e.preventDefault(); scale = 1; pointX = 0; pointY = 0; setTransform(); };
+        
+        body.style.overflow = "hidden";
+        body.style.display = "flex";
+        body.style.alignItems = "center";
+        body.style.justifyContent = "center";
+        body.appendChild(i);
+    }
     else if (kind === 'pdf') { const f = document.createElement("iframe"); f.src = url; f.style.width = "100%"; f.style.height = "90vh"; body.appendChild(f); }
     else { const t = document.createElement("textarea"); t.value = new TextDecoder().decode(buf); t.style.width = "100%"; t.style.height = "90vh"; body.appendChild(t); }
 }

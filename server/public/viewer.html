@@ -479,10 +479,7 @@
         </div>
 
         <div class="topbar-actions">
-            <!-- Theme Toggle Button -->
-            <button class="icon-btn" id="btnThemeToggle" title="Theme: System (Auto)">
-                <span class="material-symbols-outlined" id="themeIcon">brightness_auto</span>
-            </button>
+
             <button id="btnEdit" class="icon-btn" title="Rename">
                 <span class="material-symbols-outlined">edit</span>
             </button>
@@ -537,54 +534,7 @@
         </div>
     </dialog>
 
-    <!-- Theme Manager Script -->
     <script>
-        const btnThemeToggle = document.getElementById("btnThemeToggle");
-        const themeIcon = document.getElementById("themeIcon");
-
-        function updateThemeUI() {
-            const mode = localStorage.getItem("theme") || "system";
-            if (mode === "dark") {
-                themeIcon.textContent = "dark_mode";
-                btnThemeToggle.title = "Theme: Dark";
-            } else if (mode === "light") {
-                themeIcon.textContent = "light_mode";
-                btnThemeToggle.title = "Theme: Light";
-            } else {
-                themeIcon.textContent = "brightness_auto";
-                btnThemeToggle.title = "Theme: System default";
-            }
-        }
-
-        function setTheme(mode) {
-            if (mode === "system") {
-                localStorage.setItem("theme", "system");
-                document.documentElement.removeAttribute("data-theme");
-            } else {
-                localStorage.setItem("theme", mode);
-                document.documentElement.setAttribute("data-theme", mode);
-            }
-            updateThemeUI();
-        }
-
-        btnThemeToggle.addEventListener("click", () => {
-            const current = localStorage.getItem("theme") || "system";
-            if (current === "system") {
-                setTheme("dark");
-            } else if (current === "dark") {
-                setTheme("light");
-            } else {
-                setTheme("system");
-            }
-        });
-
-        window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-            if ((localStorage.getItem("theme") || "system") === "system") {
-                updateThemeUI();
-            }
-        });
-        updateThemeUI();
-
         // Material You Dialog Helpers
         window.showNotice = function(msg, title = "Notice", icon = "campaign") {
             const modal = document.getElementById("noticeModal");
