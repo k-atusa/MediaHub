@@ -601,12 +601,31 @@ async function loadThm(filePid, ext, imgEl, fileKeyRaw) {
     imgEl.src = URL.createObjectURL(new Blob([await sm.DeBin(new Uint8Array(await res.arrayBuffer()))]));
 }
 
+// Upload cancellation state
+let currentUploadState = {
+    isCancelled: false,
+    currentXHR: null,
+    activeFileIdx: -1,
+};
+
+window.cancelUpload = (fileIdx) => {
+    currentUploadState.isCancelled = true;
+    if (currentUploadState.currentXHR) {
+        try {
+            currentUploadState.currentXHR.abort();
+        } catch (e) {}
+    }
+    if (window.markUploadCancelled) {
+        window.markUploadCancelled(fileIdx !== undefined ? fileIdx : currentUploadState.activeFileIdx);
+    }
+};
+
 // Handle file upload.
 document.getElementById("btnUpload").addEventListener("click", async () => {
     const fileIn = document.getElementById("fileInput");
     const btnUp = document.getElementById("btnUpload");
-    const files = fileIn.files;
-    if (files.length === 0) {
+    const rawFiles = Array.from(fileIn.files);
+    if (rawFiles.length === 0) {
         if (window.showNotice) {
             window.showNotice("Please select files to upload.", "Upload", "info");
         } else {
@@ -615,18 +634,51 @@ document.getElementById("btnUpload").addEventListener("click", async () => {
         return;
     }
 
+    // 1. Pre-check for existing files & confirm overwrite BEFORE disabling buttons or showing upload widget
+    const filesToUpload = [];
+    for (const file of rawFiles) {
+        if (state.flsMap[file.name]) {
+            const shouldOverwrite = await showConfirmModal(
+                `File "${file.name}" already exists. Overwrite?`,
+                "File Exists",
+                "warning",
+                "Overwrite",
+                true
+            );
+            if (shouldOverwrite) {
+                filesToUpload.push(file);
+            }
+        } else {
+            filesToUpload.push(file);
+        }
+    }
+
+    // If user cancelled all overwrites or no files left to upload
+    if (filesToUpload.length === 0) {
+        fileIn.value = "";
+        return;
+    }
+
+    // 2. Open upload widget ONLY for confirmed files
+    if (window.showUploadProgressWidget) {
+        window.showUploadProgressWidget(filesToUpload);
+    }
+
     fileIn.disabled = true;
     btnUp.disabled = true;
     const origTxt = btnUp.textContent;
+    currentUploadState.isCancelled = false;
 
     try {
-        for (let i = 0; i < files.length; i++) {
-            const file = files[i];
+        for (let i = 0; i < filesToUpload.length; i++) {
+            if (currentUploadState.isCancelled) {
+                break;
+            }
+            currentUploadState.activeFileIdx = i;
+            const file = filesToUpload[i];
+
+            // If overwriting, remove old file from server first
             if (state.flsMap[file.name]) {
-                const shouldOverwrite = await showConfirmModal(`File "${file.name}" already exists. Overwrite?`, "File Exists", "warning", "Overwrite", true);
-                if (!shouldOverwrite) {
-                    continue;
-                }
                 const oldRaw = mask.XOR(state.flsMap[file.name]);
                 const oldFlPid = getObjPid(oldRaw.slice(0, 44));
                 oldRaw.fill(0);
@@ -637,7 +689,11 @@ document.getElementById("btnUpload").addEventListener("click", async () => {
                     console.warn("Failed to delete old file/thumbnail", e);
                 }
             }
-            btnUp.textContent = `🚀 ${i + 1}/${files.length}`;
+
+            btnUp.textContent = `🚀 ${i + 1}/${filesToUpload.length}`;
+            if (window.updateFileProgress) {
+                window.updateFileProgress(i, 0, filesToUpload.length);
+            }
 
             const fileKey = new Uint8Array(44); fileKey.set(Random(32), 0); fileKey.set(Random(12), 32); const filePid = getObjPid(fileKey);
 
@@ -646,10 +702,25 @@ document.getElementById("btnUpload").addEventListener("click", async () => {
             if (file.type.startsWith("image/")) thumb = await makeImg(file);
             else if (file.type.startsWith("video/")) thumb = await makeVid(file);
 
-            // Encrypt file.
+            if (currentUploadState.isCancelled) throw new Error("UPLOAD_CANCELLED");
+
+            // Encrypt file with real-time chunk progress (0% - 50%).
+            let encryptedBytes = 0;
             const smx = new SymMaster("gcmx1", fileKey.slice(0, 32));
             const encChks = [];
-            await smx.EnFile(new FileSrc(file), file.size, { write: async (c) => encChks.push(c) });
+            await smx.EnFile(new FileSrc(file), file.size, {
+                write: async (c) => {
+                    if (currentUploadState.isCancelled) throw new Error("UPLOAD_CANCELLED");
+                    encChks.push(c);
+                    encryptedBytes += c.length;
+                    if (window.updateFileProgress) {
+                        const filePercent = Math.min(50, Math.round((encryptedBytes / (file.size || 1)) * 50));
+                        window.updateFileProgress(i, filePercent, filesToUpload.length);
+                    }
+                }
+            });
+
+            if (currentUploadState.isCancelled) throw new Error("UPLOAD_CANCELLED");
 
             const encSize = encChks.reduce((a, c) => a + c.length, 0);
             const padSize = PadLen(encSize);
@@ -669,11 +740,41 @@ document.getElementById("btnUpload").addEventListener("click", async () => {
                 }
             }
 
-            await fetch(`${SERVER}/api/media/${state.id}/${filePid}/dat`, { method: "POST", headers: { "X-User-Hash": usrHsh }, body: medBuf });
+            if (currentUploadState.isCancelled) throw new Error("UPLOAD_CANCELLED");
+
+            // Upload via XHR with real-time network transfer progress (50% - 95%)
+            await new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                currentUploadState.currentXHR = xhr;
+                xhr.open("POST", `${SERVER}/api/media/${state.id}/${filePid}/dat`);
+                xhr.setRequestHeader("X-User-Hash", usrHsh);
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable && window.updateFileProgress) {
+                        const uploadPercent = 50 + Math.min(45, Math.round((e.loaded / e.total) * 45));
+                        window.updateFileProgress(i, uploadPercent, filesToUpload.length);
+                    }
+                };
+                xhr.onload = () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        resolve();
+                    } else {
+                        reject(new Error(`Upload failed with status ${xhr.status}`));
+                    }
+                };
+                xhr.onabort = () => reject(new Error("UPLOAD_CANCELLED"));
+                xhr.onerror = () => reject(new Error("Network upload failed"));
+                xhr.send(medBuf);
+            });
+            currentUploadState.currentXHR = null;
 
             if (thumb) {
                 const thmSm = new SymMaster("gcm1", fileKey.slice(0, 32));
                 await fetch(`${SERVER}/api/media/${state.id}/${filePid}/thumb`, { method: "POST", headers: { "X-User-Hash": usrHsh }, body: await thmSm.EnBin(new Uint8Array(await thumb.arrayBuffer())) });
+            }
+
+            // Mark this file 100% complete
+            if (window.updateFileProgress) {
+                window.updateFileProgress(i, 100, filesToUpload.length);
             }
 
             // Save key to map.
@@ -685,23 +786,34 @@ document.getElementById("btnUpload").addEventListener("click", async () => {
             flInfo.fill(0);
         }
 
-        // Sync metadata.
-        btnUp.textContent = "🔄 Syncing...";
-        const rawSK = mask.XOR(state.key);
-        const metSm = new SymMaster("gcm1", rawSK.slice(0, 32));
-        rawSK.fill(0);
-        const um = rawMap(state.flsMap);
-        const encoded = EncodeCfg(um);
-        wipeMap(um);
-        await fetch(`${SERVER}/api/storage/${state.id}/names`, { method: "POST", headers: { "X-User-Hash": usrHsh }, body: await metSm.EnBin(encoded) });
-        encoded.fill(0);
+        // Sync metadata if any files were uploaded.
+        if (filesToUpload.length > 0 && !currentUploadState.isCancelled) {
+            btnUp.textContent = "🔄 Syncing...";
+            const rawSK = mask.XOR(state.key);
+            const metSm = new SymMaster("gcm1", rawSK.slice(0, 32));
+            rawSK.fill(0);
+            const um = rawMap(state.flsMap);
+            const encoded = EncodeCfg(um);
+            wipeMap(um);
+            await fetch(`${SERVER}/api/storage/${state.id}/names`, { method: "POST", headers: { "X-User-Hash": usrHsh }, body: await metSm.EnBin(encoded) });
+            encoded.fill(0);
+        }
 
         fileIn.value = "";
         await loadFld();
     } catch (err) {
-        console.error(err);
-        alert("❌ Upload error: " + err.message);
+        if (err.message === "UPLOAD_CANCELLED") {
+            console.log("Upload was cancelled by user.");
+            if (fileIn) fileIn.value = "";
+            await loadFld();
+        } else {
+            console.error(err);
+            alert("❌ Upload error: " + err.message);
+        }
     } finally {
+        currentUploadState.isCancelled = false;
+        currentUploadState.currentXHR = null;
+        currentUploadState.activeFileIdx = -1;
         fileIn.disabled = false;
         btnUp.disabled = false;
         btnUp.textContent = origTxt;

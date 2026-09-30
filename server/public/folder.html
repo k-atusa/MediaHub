@@ -1312,71 +1312,56 @@
             }
         }
 
-        /* Material You (M3) Floating Upload Progress Widget (Bottom Right) */
+        /* Google Drive Floating Upload Progress Widget (Bottom Right) */
         .upload-progress-widget {
             position: fixed;
-            bottom: 24px;
+            bottom: 0;
             right: 24px;
-            width: 380px;
-            background-color: var(--m3-surface-container);
-            border: 1px solid var(--g-border-subtle);
-            border-radius: 24px;
-            box-shadow: var(--m3-elevation-widget);
+            width: 360px;
+            background-color: var(--g-surface);
+            border: 1px solid var(--g-border);
+            border-bottom: none;
+            border-radius: 8px 8px 0 0;
+            box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.28), 0 1px 4px 0 rgba(0, 0, 0, 0.16);
             z-index: 2000;
             overflow: hidden;
             font-family: inherit;
-            transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1), opacity 0.25s ease;
-            animation: m3WidgetSlideUp 0.3s cubic-bezier(0.2, 0, 0, 1);
+            transition: transform 0.25s cubic-bezier(0, 0, 0.2, 1), opacity 0.2s ease;
+            animation: gDriveSlideUp 0.25s cubic-bezier(0, 0, 0.2, 1);
         }
 
-        @keyframes m3WidgetSlideUp {
+        @keyframes gDriveSlideUp {
             from {
-                transform: translateY(32px) scale(0.96);
+                transform: translateY(100%);
                 opacity: 0;
             }
 
             to {
-                transform: translateY(0) scale(1);
+                transform: translateY(0);
                 opacity: 1;
             }
         }
 
         .upload-widget-header {
-            height: 54px;
-            padding: 0 12px 0 20px;
+            height: 48px;
+            padding: 0 8px 0 16px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            background-color: var(--m3-surface-container-high);
+            background-color: var(--g-surface);
             border-bottom: 1px solid var(--g-border-subtle);
             user-select: none;
             cursor: pointer;
+            position: relative;
         }
 
         .upload-widget-title-group {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
             overflow: hidden;
-        }
-
-        /* M3 Tonal Status Badge */
-        .m3-status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 12px;
-            border-radius: 9999px;
-            background-color: var(--m3-primary-container);
-            color: var(--m3-on-primary-container);
-            font-size: 12.5px;
-            font-weight: 500;
-            transition: background-color 0.25s, color 0.25s;
-        }
-
-        .m3-status-badge.complete {
-            background-color: var(--m3-success-container);
-            color: var(--m3-success-on-container);
+            flex: 1;
+            min-width: 0;
         }
 
         .upload-widget-title {
@@ -1391,12 +1376,12 @@
         .upload-widget-actions {
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 2px;
         }
 
         .widget-action-btn {
-            width: 36px;
-            height: 36px;
+            width: 32px;
+            height: 32px;
             border-radius: 50%;
             border: none;
             background: transparent;
@@ -1409,7 +1394,7 @@
         }
 
         .widget-action-btn:hover {
-            background-color: var(--m3-surface-container-highest);
+            background-color: var(--g-hover-bg);
             color: var(--g-text-main);
         }
 
@@ -1418,146 +1403,130 @@
         }
 
         .upload-widget-body {
-            padding: 16px 20px 20px 20px;
+            max-height: 240px;
+            overflow-y: auto;
+            background-color: var(--g-surface);
+            padding: 4px 0;
             display: flex;
             flex-direction: column;
-            gap: 14px;
-            background-color: var(--m3-surface-container);
-            transition: max-height 0.3s ease, padding 0.3s ease;
         }
 
         .upload-widget-body.collapsed {
             display: none;
         }
 
-        /* Material You (M3) Linear Progress Indicator */
-        .m3-linear-progress {
-            width: 100%;
+        .upload-file-list {
             display: flex;
             flex-direction: column;
-            gap: 6px;
         }
 
-        .m3-linear-track {
-            width: 100%;
-            height: 6px;
-            background-color: var(--m3-track);
-            border-radius: 9999px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .m3-linear-indicator {
-            height: 100%;
-            width: 0%;
-            background-color: var(--m3-primary);
-            border-radius: 9999px;
-            transition: width 0.35s cubic-bezier(0.2, 0, 0, 1);
-        }
-
-        .m3-linear-indicator.complete {
-            background-color: var(--m3-success);
-        }
-
-        .m3-linear-stop {
-            position: absolute;
-            right: 0;
-            top: 0;
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background-color: var(--m3-primary);
-            opacity: 0.75;
-            transition: opacity 0.2s ease;
-        }
-
-        .m3-linear-stop.hidden {
-            opacity: 0;
-        }
-
-        /* M3 Indeterminate Animation for Metadata Syncing */
-        .m3-linear-progress.indeterminate .m3-linear-indicator {
-            width: 100%;
-            position: absolute;
-            animation: m3LinearIndeterminate 2s cubic-bezier(0.65, 0.815, 0.735, 0.395) infinite;
-        }
-
-        @keyframes m3LinearIndeterminate {
-            0% {
-                transform: translateX(-100%);
-            }
-
-            50% {
-                transform: translateX(0%);
-            }
-
-            100% {
-                transform: translateX(100%);
-            }
-        }
-
-        .upload-file-status {
+        .upload-file-item {
+            height: 44px;
+            padding: 0 16px;
             display: flex;
             align-items: center;
-            gap: 14px;
+            gap: 12px;
+            transition: background-color 0.15s ease;
         }
 
-        .upload-status-icon-wrap {
-            width: 44px;
-            height: 44px;
-            border-radius: 14px;
-            background-color: var(--m3-primary-container);
-            color: var(--m3-primary);
+        .upload-file-item:hover {
+            background-color: var(--g-hover-bg);
+        }
+
+        .upload-item-type-icon {
+            font-size: 20px;
+            flex-shrink: 0;
             display: flex;
             align-items: center;
             justify-content: center;
-            flex-shrink: 0;
-            transition: background-color 0.25s, color 0.25s;
-        }
-
-        .upload-status-icon-wrap.complete {
-            background-color: var(--m3-success-container);
-            color: var(--m3-success);
-        }
-
-        .upload-status-icon {
-            font-size: 24px;
             user-select: none;
         }
 
-        .upload-status-text {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
-            overflow: hidden;
-            min-width: 0;
-        }
-
-        .upload-filename {
-            font-size: 14px;
-            font-weight: 500;
+        .upload-item-name {
+            font-size: 13px;
             color: var(--g-text-main);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            letter-spacing: 0.1px;
+            flex: 1;
+            min-width: 0;
         }
 
-        .upload-subtext {
-            font-size: 12px;
-            color: var(--g-text-muted);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .upload-percentage {
-            font-size: 13px;
-            font-weight: 500;
-            font-family: 'Roboto Mono', monospace;
-            color: var(--m3-primary);
+        .upload-item-status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
             flex-shrink: 0;
+            width: 28px;
+            height: 28px;
+        }
+
+        .upload-item-status .status-complete-icon {
+            font-size: 20px;
+            color: var(--m3-success, #1e8e3e);
+            font-variation-settings: 'FILL' 1;
+        }
+
+        /* Circular Progress Button with Hover Cancel X */
+        .upload-progress-btn {
+            position: relative;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            padding: 0;
+            transition: background-color 0.15s ease;
+        }
+
+        .upload-progress-btn:hover {
+            background-color: var(--g-hover-bg, rgba(0, 0, 0, 0.06));
+        }
+
+        .upload-progress-btn .progress-ring-svg {
+            width: 22px;
+            height: 22px;
+            transform: rotate(-90deg);
+            display: block;
+        }
+
+        .upload-progress-btn .progress-ring-bg {
+            fill: none;
+            stroke: var(--m3-track, #e0e2ec);
+            stroke-width: 2.4;
+        }
+
+        .upload-progress-btn .progress-ring-circle {
+            fill: none;
+            stroke: var(--g-primary-blue, #1a73e8);
+            stroke-width: 2.4;
+            stroke-linecap: round;
+            stroke-dasharray: 56.548;
+            stroke-dashoffset: 56.548;
+            transition: stroke-dashoffset 0.12s linear, stroke 0.15s ease;
+        }
+
+        .upload-progress-btn .progress-cancel-icon {
+            position: absolute;
+            font-size: 14px;
+            color: var(--g-text-muted);
+            opacity: 0;
+            transition: opacity 0.15s ease, color 0.15s ease;
+            user-select: none;
+            pointer-events: none;
+        }
+
+        .upload-progress-btn:hover .progress-cancel-icon {
+            opacity: 1;
+            color: var(--g-danger, #d93025);
+        }
+
+        .upload-progress-btn:hover .progress-ring-circle {
+            stroke: var(--g-danger, #d93025);
         }
 
         /* Hidden Controls Required for folder.js compatibility */
@@ -2668,19 +2637,15 @@
         </div>
     </div>
 
-    <!-- Material You (M3) Floating Upload Progress Widget (Bottom Right) -->
+    <!-- Google Drive Floating Upload Progress Widget (Bottom Right) -->
     <div id="uploadProgressWidget" class="upload-progress-widget hidden">
         <div class="upload-widget-header" id="uploadWidgetHeader">
             <div class="upload-widget-title-group">
-                <span class="m3-status-badge" id="uploadStatusBadge">
-                    <span class="material-symbols-outlined" id="uploadBadgeIcon" style="font-size: 16px;">upload</span>
-                    <span id="uploadBadgeText">Uploading</span>
-                </span>
-                <span class="upload-widget-title" id="uploadWidgetTitle">1 item</span>
+                <span class="upload-widget-title" id="uploadWidgetTitle">1 upload complete</span>
             </div>
             <div class="upload-widget-actions">
                 <button class="widget-action-btn" id="btnMinimizeUploadWidget" type="button" title="Minimize / Expand">
-                    <span class="material-symbols-outlined" id="uploadWidgetChevron">expand_more</span>
+                    <span class="material-symbols-outlined" id="uploadWidgetChevron">keyboard_arrow_down</span>
                 </button>
                 <button class="widget-action-btn" id="btnCloseUploadWidget" type="button" title="Close">
                     <span class="material-symbols-outlined">close</span>
@@ -2688,23 +2653,8 @@
             </div>
         </div>
         <div class="upload-widget-body" id="uploadWidgetBody">
-            <div class="upload-file-status">
-                <div class="upload-status-icon-wrap" id="uploadStatusIconWrap">
-                    <span class="material-symbols-outlined upload-status-icon" id="uploadStatusIcon">upload_file</span>
-                </div>
-                <div class="upload-status-text">
-                    <span class="upload-filename" id="uploadCurrentFilename">Preparing files...</span>
-                    <span class="upload-subtext" id="uploadSubtext">Encrypting & uploading...</span>
-                </div>
-                <span class="upload-percentage" id="uploadPercentage">0%</span>
-            </div>
-            <!-- Material You (M3) Linear Progress Indicator -->
-            <div class="m3-linear-progress" id="uploadProgressContainer" role="progressbar" aria-valuenow="0"
-                aria-valuemin="0" aria-valuemax="100">
-                <div class="m3-linear-track">
-                    <div class="m3-linear-indicator" id="uploadProgressBarFill"></div>
-                    <div class="m3-linear-stop" id="uploadProgressStop"></div>
-                </div>
+            <div class="upload-file-list" id="uploadFileList">
+                <!-- Dynamically rendered file rows -->
             </div>
         </div>
     </div>
@@ -3567,38 +3517,50 @@
             });
         }
 
-        // 7. Material You (M3) Floating Upload Progress Widget (Bottom Right)
+        // 7. Google Drive Floating Upload Progress Widget (Bottom Right)
         const uploadProgressWidget = document.getElementById("uploadProgressWidget");
         const uploadWidgetHeader = document.getElementById("uploadWidgetHeader");
         const uploadWidgetTitle = document.getElementById("uploadWidgetTitle");
-        const uploadStatusBadge = document.getElementById("uploadStatusBadge");
-        const uploadBadgeIcon = document.getElementById("uploadBadgeIcon");
-        const uploadBadgeText = document.getElementById("uploadBadgeText");
         const btnMinimizeUploadWidget = document.getElementById("btnMinimizeUploadWidget");
         const btnCloseUploadWidget = document.getElementById("btnCloseUploadWidget");
         const uploadWidgetChevron = document.getElementById("uploadWidgetChevron");
+        const uploadHeaderProgress = document.getElementById("uploadHeaderProgress");
+        const uploadHeaderProgressFill = document.getElementById("uploadHeaderProgressFill");
         const uploadWidgetBody = document.getElementById("uploadWidgetBody");
-        const uploadStatusIconWrap = document.getElementById("uploadStatusIconWrap");
-        const uploadStatusIcon = document.getElementById("uploadStatusIcon");
-        const uploadCurrentFilename = document.getElementById("uploadCurrentFilename");
-        const uploadSubtext = document.getElementById("uploadSubtext");
-        const uploadPercentage = document.getElementById("uploadPercentage");
-        const uploadProgressContainer = document.getElementById("uploadProgressContainer");
-        const uploadProgressBarFill = document.getElementById("uploadProgressBarFill");
-        const uploadProgressStop = document.getElementById("uploadProgressStop");
+        const uploadFileList = document.getElementById("uploadFileList");
 
         let activeUploadFiles = [];
         let uploadDismissTimer = null;
         let isUploadOngoing = false;
 
+        function getGoogleFileIcon(filename) {
+            const ext = (filename.split('.').pop() || '').toLowerCase();
+            if (['mp4', 'mkv', 'avi', 'mov', 'webm', 'ts', 'm4v', '3gp', 'flv'].includes(ext)) {
+                return { icon: 'movie', color: '#e06d53' };
+            }
+            if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'heic', 'avif'].includes(ext)) {
+                return { icon: 'image', color: '#ea4335' };
+            }
+            if (['mp3', 'wav', 'flac', 'm4a', 'aac', 'ogg', 'wma'].includes(ext)) {
+                return { icon: 'audiotrack', color: '#f29900' };
+            }
+            if (['pdf'].includes(ext)) {
+                return { icon: 'picture_as_pdf', color: '#ea4335' };
+            }
+            if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) {
+                return { icon: 'folder_zip', color: '#5f6368' };
+            }
+            return { icon: 'description', color: '#4285f4' };
+        }
+
         function setUploadWidgetCollapsed(collapsed) {
             if (!uploadWidgetBody) return;
             if (collapsed) {
                 uploadWidgetBody.classList.add("collapsed");
-                if (uploadWidgetChevron) uploadWidgetChevron.textContent = "expand_less";
+                if (uploadWidgetChevron) uploadWidgetChevron.textContent = "keyboard_arrow_up";
             } else {
                 uploadWidgetBody.classList.remove("collapsed");
-                if (uploadWidgetChevron) uploadWidgetChevron.textContent = "expand_more";
+                if (uploadWidgetChevron) uploadWidgetChevron.textContent = "keyboard_arrow_down";
             }
         }
 
@@ -3628,6 +3590,92 @@
             });
         }
 
+        const RING_CIRCUMFERENCE = 56.548;
+
+        function createProgressRingHtml(idx, percent = 0) {
+            const offset = RING_CIRCUMFERENCE - (RING_CIRCUMFERENCE * Math.max(0, Math.min(100, percent)) / 100);
+            return `
+                <button type="button" class="upload-progress-btn" id="uploadProgressBtn_${idx}" title="Cancel upload" onclick="if(window.cancelUpload) window.cancelUpload(${idx})">
+                    <svg class="progress-ring-svg" viewBox="0 0 24 24">
+                        <circle class="progress-ring-bg" cx="12" cy="12" r="9"></circle>
+                        <circle class="progress-ring-circle" cx="12" cy="12" r="9" style="stroke-dasharray: ${RING_CIRCUMFERENCE}; stroke-dashoffset: ${offset};"></circle>
+                    </svg>
+                    <span class="material-symbols-outlined progress-cancel-icon">close</span>
+                </button>
+            `;
+        }
+
+        window.updateFileProgress = (fileIdx, filePercent, totalFiles) => {
+            const total = totalFiles || (activeUploadFiles && activeUploadFiles.length) || 1;
+            const statusEl = document.getElementById(`uploadItemStatus_${fileIdx}`);
+            if (statusEl) {
+                if (filePercent >= 100) {
+                    statusEl.innerHTML = `<span class="material-symbols-outlined status-complete-icon">check_circle</span>`;
+                } else {
+                    let circle = statusEl.querySelector(".progress-ring-circle");
+                    if (!circle) {
+                        statusEl.innerHTML = createProgressRingHtml(fileIdx, filePercent);
+                        circle = statusEl.querySelector(".progress-ring-circle");
+                    }
+                    if (circle) {
+                        const offset = RING_CIRCUMFERENCE - (RING_CIRCUMFERENCE * Math.max(0, Math.min(100, filePercent)) / 100);
+                        circle.style.strokeDashoffset = `${offset}`;
+                    }
+                }
+            }
+
+            if (uploadWidgetTitle) {
+                uploadWidgetTitle.textContent = `Uploading ${total} ${total === 1 ? 'item' : 'items'} (${fileIdx + 1}/${total})...`;
+            }
+        };
+
+        window.markUploadCancelled = (fileIdx) => {
+            if (uploadWidgetTitle) {
+                uploadWidgetTitle.textContent = "Upload cancelled";
+            }
+            if (fileIdx !== undefined && fileIdx >= 0) {
+                const statusEl = document.getElementById(`uploadItemStatus_${fileIdx}`);
+                if (statusEl) {
+                    statusEl.innerHTML = `<span class="material-symbols-outlined" style="font-size: 20px; color: var(--g-text-muted);" title="Upload cancelled">block</span>`;
+                }
+            }
+            activeUploadFiles.forEach((_, idx) => {
+                const statusEl = document.getElementById(`uploadItemStatus_${idx}`);
+                if (statusEl && statusEl.querySelector(".upload-progress-btn")) {
+                    statusEl.innerHTML = `<span class="material-symbols-outlined" style="font-size: 20px; color: var(--g-text-muted);" title="Upload cancelled">block</span>`;
+                }
+            });
+            clearTimeout(uploadDismissTimer);
+            uploadDismissTimer = setTimeout(() => {
+                if (uploadProgressWidget) {
+                    uploadProgressWidget.style.opacity = "0";
+                    uploadProgressWidget.style.transform = "translateY(100%)";
+                    setTimeout(() => {
+                        uploadProgressWidget.classList.add("hidden");
+                    }, 250);
+                }
+            }, 4000);
+        };
+
+        function renderUploadFileList() {
+            if (!uploadFileList) return;
+            uploadFileList.innerHTML = "";
+            activeUploadFiles.forEach((file, idx) => {
+                const typeInfo = getGoogleFileIcon(file.name);
+                const item = document.createElement("div");
+                item.className = "upload-file-item";
+                item.id = `uploadItem_${idx}`;
+                item.innerHTML = `
+                    <span class="material-symbols-outlined upload-item-type-icon" style="color: ${typeInfo.color};">${typeInfo.icon}</span>
+                    <span class="upload-item-name" title="${file.name.replace(/"/g, '&quot;')}">${file.name}</span>
+                    <div class="upload-item-status" id="uploadItemStatus_${idx}">
+                        ${idx === 0 ? createProgressRingHtml(idx, 0) : '<span class="material-symbols-outlined" style="font-size: 18px; color: var(--g-text-muted);">schedule</span>'}
+                    </div>
+                `;
+                uploadFileList.appendChild(item);
+            });
+        }
+
         function showUploadProgressWidget(files) {
             clearTimeout(uploadDismissTimer);
             activeUploadFiles = files && files.length ? files : [];
@@ -3636,174 +3684,84 @@
             if (uploadProgressWidget) {
                 uploadProgressWidget.classList.remove("hidden");
                 uploadProgressWidget.style.opacity = "1";
-                uploadProgressWidget.style.transform = "translateY(0) scale(1)";
+                uploadProgressWidget.style.transform = "translateY(0)";
             }
             setUploadWidgetCollapsed(false);
 
-            if (uploadProgressContainer) {
-                uploadProgressContainer.classList.remove("indeterminate");
-            }
-            if (uploadProgressBarFill) {
-                uploadProgressBarFill.classList.remove("complete");
-                uploadProgressBarFill.style.width = "4%";
-            }
-            if (uploadProgressStop) {
-                uploadProgressStop.classList.remove("hidden");
-            }
-
-            if (uploadStatusBadge) {
-                uploadStatusBadge.classList.remove("complete");
-            }
-            if (uploadBadgeIcon) {
-                uploadBadgeIcon.textContent = "upload";
-            }
-            if (uploadBadgeText) {
-                uploadBadgeText.textContent = "Uploading";
-            }
-
-            if (uploadStatusIconWrap) {
-                uploadStatusIconWrap.classList.remove("complete");
-            }
-            if (uploadStatusIcon) {
-                uploadStatusIcon.textContent = "upload_file";
-            }
-
             if (uploadWidgetTitle) {
-                uploadWidgetTitle.textContent = `${count} ${count === 1 ? 'file' : 'files'}`;
+                uploadWidgetTitle.textContent = `Uploading ${count} ${count === 1 ? 'item' : 'items'}...`;
             }
-            if (uploadCurrentFilename) {
-                uploadCurrentFilename.textContent = activeUploadFiles[0]?.name || "Selected files";
-            }
-            if (uploadSubtext) {
-                uploadSubtext.textContent = `Encrypting & uploading (1 of ${count})...`;
-            }
-            if (uploadPercentage) {
-                uploadPercentage.textContent = "4%";
-            }
+
+            renderUploadFileList();
         }
+        window.showUploadProgressWidget = showUploadProgressWidget;
 
         function updateUploadProgressStep(currentIdx, totalCount) {
             if (!totalCount || totalCount <= 0) return;
             const cur = Math.max(1, Math.min(currentIdx, totalCount));
-            const percent = Math.min(92, Math.round(((cur - 0.4) / totalCount) * 100));
 
-            if (uploadProgressContainer) {
-                uploadProgressContainer.classList.remove("indeterminate");
-            }
-            if (uploadProgressBarFill) {
-                uploadProgressBarFill.style.width = `${percent}%`;
-            }
-            if (uploadProgressStop) {
-                uploadProgressStop.classList.remove("hidden");
-            }
-            if (uploadPercentage) {
-                uploadPercentage.textContent = `${percent}%`;
-            }
-
-            if (uploadBadgeText) {
-                uploadBadgeText.textContent = `${cur}/${totalCount}`;
-            }
             if (uploadWidgetTitle) {
-                uploadWidgetTitle.textContent = `${totalCount} ${totalCount === 1 ? 'file' : 'files'}`;
+                uploadWidgetTitle.textContent = `Uploading ${totalCount} ${totalCount === 1 ? 'item' : 'items'} (${cur}/${totalCount})...`;
             }
 
-            const currentFile = activeUploadFiles[cur - 1];
-            if (currentFile && uploadCurrentFilename) {
-                uploadCurrentFilename.textContent = currentFile.name;
-            }
-            if (uploadSubtext) {
-                uploadSubtext.textContent = `Encrypting & uploading (${cur} of ${totalCount})...`;
-            }
+            // Update item row statuses
+            activeUploadFiles.forEach((_, idx) => {
+                const statusEl = document.getElementById(`uploadItemStatus_${idx}`);
+                if (!statusEl) return;
+                if (idx < cur - 1) {
+                    statusEl.innerHTML = `<span class="material-symbols-outlined status-complete-icon">check_circle</span>`;
+                } else if (idx === cur - 1) {
+                    if (!statusEl.querySelector(".progress-ring-svg")) {
+                        statusEl.innerHTML = createProgressRingHtml(idx, 0);
+                    }
+                } else {
+                    statusEl.innerHTML = `<span class="material-symbols-outlined" style="font-size: 18px; color: var(--g-text-muted);">schedule</span>`;
+                }
+            });
         }
 
         function setUploadSyncingState() {
-            if (uploadProgressContainer) {
-                uploadProgressContainer.classList.add("indeterminate");
-            }
-            if (uploadProgressStop) {
-                uploadProgressStop.classList.add("hidden");
-            }
-            if (uploadBadgeIcon) {
-                uploadBadgeIcon.textContent = "sync";
-            }
-            if (uploadBadgeText) {
-                uploadBadgeText.textContent = "Syncing";
-            }
-            if (uploadPercentage) {
-                uploadPercentage.textContent = "96%";
-            }
-            if (uploadSubtext) {
-                uploadSubtext.textContent = "Syncing encrypted metadata with server...";
+            if (uploadWidgetTitle) {
+                uploadWidgetTitle.textContent = "Syncing with MediaHub...";
             }
         }
+        window.setUploadSyncingState = setUploadSyncingState;
 
         function markUploadComplete() {
-            if (uploadProgressContainer) {
-                uploadProgressContainer.classList.remove("indeterminate");
-            }
-            if (uploadProgressBarFill) {
-                uploadProgressBarFill.style.width = "100%";
-                uploadProgressBarFill.classList.add("complete");
-            }
-            if (uploadProgressStop) {
-                uploadProgressStop.classList.add("hidden");
-            }
-            if (uploadPercentage) {
-                uploadPercentage.textContent = "100%";
-            }
-
-            if (uploadStatusBadge) {
-                uploadStatusBadge.classList.add("complete");
-            }
-            if (uploadBadgeIcon) {
-                uploadBadgeIcon.textContent = "check_circle";
-            }
-            if (uploadBadgeText) {
-                uploadBadgeText.textContent = "Complete";
-            }
-
-            if (uploadStatusIconWrap) {
-                uploadStatusIconWrap.classList.add("complete");
-            }
-            if (uploadStatusIcon) {
-                uploadStatusIcon.textContent = "task_alt";
-            }
-
             const totalCount = activeUploadFiles.length || 1;
+
             if (uploadWidgetTitle) {
-                uploadWidgetTitle.textContent = `${totalCount} ${totalCount === 1 ? 'upload' : 'uploads'} finished`;
+                uploadWidgetTitle.textContent = `${totalCount} ${totalCount === 1 ? 'upload' : 'uploads'} complete`;
             }
-            if (uploadSubtext) {
-                uploadSubtext.textContent = "All files successfully encrypted and stored";
-            }
+
+            // Mark all items complete with Google Drive check_circle
+            activeUploadFiles.forEach((_, idx) => {
+                const statusEl = document.getElementById(`uploadItemStatus_${idx}`);
+                if (statusEl) {
+                    statusEl.innerHTML = `<span class="material-symbols-outlined status-complete-icon">check_circle</span>`;
+                }
+            });
 
             clearTimeout(uploadDismissTimer);
             uploadDismissTimer = setTimeout(() => {
                 if (uploadProgressWidget) {
                     uploadProgressWidget.style.opacity = "0";
-                    uploadProgressWidget.style.transform = "translateY(32px) scale(0.96)";
+                    uploadProgressWidget.style.transform = "translateY(100%)";
                     setTimeout(() => {
                         uploadProgressWidget.classList.add("hidden");
-                    }, 300);
+                    }, 250);
                 }
             }, 6000);
         }
+        window.markUploadComplete = markUploadComplete;
 
-        // MutationObserver to watch folder.js updating btnUpload
+        // MutationObserver to watch folder.js updating btnUpload status text
         const uploadBtnObserver = new MutationObserver(() => {
             const txt = (btnUpload.textContent || "").trim();
             const isDisabled = btnUpload.disabled;
 
-            if (isDisabled || txt.startsWith("🚀") || txt.includes("Syncing")) {
-                if (!isUploadOngoing) {
-                    isUploadOngoing = true;
-                    if (fileInput.files && fileInput.files.length > 0 && activeUploadFiles.length === 0) {
-                        activeUploadFiles = Array.from(fileInput.files);
-                    }
-                    showUploadProgressWidget(activeUploadFiles);
-                }
-
-                // Check text for 🚀 X/Y
+            if (txt.startsWith("🚀") || txt.includes("Syncing")) {
+                isUploadOngoing = true;
                 const match = txt.match(/🚀\s*(\d+)\s*\/\s*(\d+)/);
                 if (match) {
                     const cur = parseInt(match[1], 10);
@@ -3830,8 +3788,6 @@
         fileInput.addEventListener("change", () => {
             if (fileInput.files.length > 0) {
                 fileSizeCache = {};
-                activeUploadFiles = Array.from(fileInput.files);
-                showUploadProgressWidget(activeUploadFiles);
                 btnUpload.click();
             }
         });
