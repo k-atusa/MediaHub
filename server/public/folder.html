@@ -782,15 +782,17 @@
             color: var(--g-primary-blue);
         }
 
-        /* Dropdown Menus (View & Sort) */
+        /* Dropdown Menus (View, Sort & Filter) */
         .sort-action-wrapper,
-        .view-action-wrapper {
+        .view-action-wrapper,
+        .filter-action-wrapper {
             position: relative;
             display: inline-flex;
         }
 
         .sort-dropdown-menu,
-        .view-dropdown-menu {
+        .view-dropdown-menu,
+        .filter-dropdown-menu {
             position: absolute;
             top: calc(100% + 6px);
             left: 0;
@@ -806,8 +808,14 @@
         }
 
         .sort-dropdown-menu.open,
-        .view-dropdown-menu.open {
+        .view-dropdown-menu.open,
+        .filter-dropdown-menu.open {
             display: block;
+        }
+
+        .filter-dropdown-menu {
+            min-width: 240px;
+            max-width: 320px;
         }
 
         .sort-menu-header,
@@ -1941,7 +1949,8 @@
             }
 
             .sort-dropdown-menu,
-            .view-dropdown-menu {
+            .view-dropdown-menu,
+            .filter-dropdown-menu {
                 position: absolute;
                 top: calc(100% + 6px);
                 right: 0;
@@ -1964,7 +1973,7 @@
             }
         }
 
-        /* Keyword Filter Styles (Material You M3) */
+        /* Keyword Filter Dropdown & Badge Styles (Material You M3) */
         .filter-count-badge {
             background-color: var(--g-primary-blue);
             color: #ffffff;
@@ -2090,67 +2099,134 @@
             background-color: var(--g-hover-bg);
         }
 
-        /* Keyword Filter Dialog Items */
-        .keyword-list-container {
-            max-height: 280px;
+        /* Filter Dropdown Menu Elements */
+        .filter-menu-header {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--g-text-muted);
+            padding: 6px 10px 4px 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .filter-menu-clear-btn {
+            background: transparent;
+            border: none;
+            font-size: 11.5px;
+            font-weight: 600;
+            color: var(--g-primary-blue);
+            cursor: pointer;
+            padding: 2px 4px;
+            border-radius: 4px;
+        }
+
+        .filter-menu-clear-btn:hover {
+            text-decoration: underline;
+            background-color: var(--g-hover-bg);
+        }
+
+        .filter-dropdown-search-input {
+            width: 100%;
+            height: 32px;
+            padding: 0 10px 0 28px;
+            border: 1px solid var(--g-border);
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 12.5px;
+            outline: none;
+            background-color: var(--g-hover-bg);
+            color: var(--g-text-main);
+            box-sizing: border-box;
+            transition: border-color 0.15s, background-color 0.15s;
+        }
+
+        .filter-dropdown-search-input:focus {
+            border-color: var(--m3-primary);
+            background-color: var(--g-surface);
+        }
+
+        .filter-items-scroll-list {
+            max-height: 250px;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
             gap: 2px;
-            padding-right: 4px;
+            padding: 2px 4px;
         }
 
-        .keyword-list-container::-webkit-scrollbar {
-            width: 6px;
+        .filter-items-scroll-list::-webkit-scrollbar {
+            width: 5px;
         }
-        .keyword-list-container::-webkit-scrollbar-thumb {
+        .filter-items-scroll-list::-webkit-scrollbar-thumb {
             background: var(--g-border);
             border-radius: 3px;
         }
 
-        .keyword-item-row {
+        .filter-menu-item {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 8px 12px;
-            border-radius: 10px;
+            min-height: 36px;
+            padding: 4px 10px;
+            border-radius: 8px;
             cursor: pointer;
-            transition: background-color 0.15s;
             user-select: none;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--g-text-main);
+            transition: background-color 0.15s, color 0.15s;
         }
 
-        .keyword-item-row:hover {
+        .filter-menu-item:hover {
             background-color: var(--g-hover-bg);
         }
 
-        .keyword-item-row.selected {
-            background-color: var(--m3-surface-container-high);
+        .filter-menu-item.active {
+            background-color: var(--m3-primary-container, #d3e3fd);
+            color: var(--m3-on-primary-container, #041e49);
+            font-weight: 600;
         }
 
-        .keyword-item-left {
+        .filter-item-left {
             display: flex;
             align-items: center;
-            gap: 12px;
-            font-size: 14px;
-            font-weight: 500;
-            color: var(--g-text-main);
-            word-break: break-all;
+            gap: 8px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
-        .keyword-item-checkbox {
-            width: 18px;
-            height: 18px;
+        .filter-item-checkbox {
+            width: 16px;
+            height: 16px;
             accent-color: var(--g-primary-blue);
             cursor: pointer;
+            flex-shrink: 0;
         }
 
-        .keyword-item-count {
-            font-size: 12px;
+        .filter-item-count {
+            font-size: 11px;
             color: var(--g-text-muted);
             font-weight: 500;
             background-color: var(--m3-surface-container-highest);
-            padding: 2px 8px;
-            border-radius: 12px;
+            padding: 1px 6px;
+            border-radius: 10px;
+            margin-left: 6px;
+            flex-shrink: 0;
+        }
+
+        .filter-menu-item.active .filter-item-count {
+            background-color: rgba(255, 255, 255, 0.4);
+            color: var(--m3-on-primary-container);
+        }
+
+        .filter-empty-message {
+            padding: 18px 12px;
+            text-align: center;
+            color: var(--g-text-muted);
         }
     </style>
 </head>
@@ -2345,12 +2421,34 @@
                             </div>
                         </div>
                     </div>
-                    <!-- Keyword Filter Button -->
-                    <button class="top-action-btn" id="btnKeywordFilter" type="button" title="Filter by keywords">
-                        <span class="material-symbols-outlined" id="keywordFilterIcon">filter_list</span>
-                        <span>Filter</span>
-                        <span class="filter-count-badge" id="filterCountBadge" style="display: none;">0</span>
-                    </button>
+                    <!-- Keyword Filter Dropdown (Matches Sort & View dropdown style) -->
+                    <div class="filter-action-wrapper" id="filterActionWrapper">
+                        <button class="top-action-btn" id="btnKeywordFilter" type="button" aria-haspopup="true" aria-expanded="false" title="Filter files by keywords">
+                            <span class="material-symbols-outlined" id="keywordFilterIcon">filter_list</span>
+                            <span>Filter</span>
+                            <span class="filter-count-badge" id="filterCountBadge" style="display: none;">0</span>
+                        </button>
+                        <div class="filter-dropdown-menu" id="filterDropdownMenu">
+                            <div class="filter-menu-header">
+                                <span>Filter by keywords</span>
+                                <button type="button" id="btnClearAllKeywords" class="filter-menu-clear-btn" style="display: none;">Clear all</button>
+                            </div>
+                            <!-- Quick search within keywords -->
+                            <div class="filter-search-wrap" id="keywordSearchWrap" style="padding: 4px 8px 6px 8px; display: none;">
+                                <div style="position: relative; display: flex; align-items: center;">
+                                    <span class="material-symbols-outlined" style="position: absolute; left: 8px; font-size: 16px; color: var(--g-text-muted);">search</span>
+                                    <input type="text" id="keywordFilterSearchInput" class="filter-dropdown-search-input" placeholder="Search keywords..." autocomplete="off" spellcheck="false">
+                                </div>
+                            </div>
+                            <!-- Keywords scrollable list items -->
+                            <div class="filter-items-scroll-list" id="keywordListContainer"></div>
+                            <div id="keywordEmptyMessage" class="filter-empty-message" style="display: none;">
+                                <span class="material-symbols-outlined" style="font-size: 26px; margin-bottom: 4px; display: block; opacity: 0.6;">search_off</span>
+                                <div style="font-size: 13px; font-weight: 500; color: var(--g-text-main);">No keywords found</div>
+                                <div style="font-size: 11px; color: var(--g-text-muted); margin-top: 2px;">(Requires 4+ occurrences across files)</div>
+                            </div>
+                        </div>
+                    </div>
                     <button class="top-action-btn" id="btnImport" title="Import share token">
                         <span class="material-symbols-outlined">file_download</span>
                         <span>Import</span>
@@ -2559,42 +2657,6 @@
         <div id="noticeText" class="dialog-body"></div>
         <div class="dialog-actions">
             <button id="btnConfirmNotice" class="btn-dialog-primary" type="button">OK</button>
-        </div>
-    </dialog>
-
-    <!-- Keyword Filter Dialog (Material You Dialog) -->
-    <dialog id="keywordFilterModal">
-        <div class="dialog-title" style="display: flex; align-items: center; justify-content: space-between;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <span class="material-symbols-outlined" style="color: var(--g-primary-blue);">filter_list</span>
-                <span>Keyword Filter</span>
-            </div>
-            <button type="button" id="btnCloseKeywordModal" title="Close" style="background: none; border: none; cursor: pointer; color: var(--g-text-muted); display: flex; align-items: center; justify-content: center; padding: 4px; border-radius: 50%;">
-                <span class="material-symbols-outlined" style="font-size: 20px;">close</span>
-            </button>
-        </div>
-        <div class="dialog-body" style="padding-top: 4px; margin-bottom: 16px;">
-            <div style="font-size: 13px; color: var(--g-text-muted); margin-bottom: 12px;">
-                Filter files matching selected keywords (tokens with 4+ occurrences).
-            </div>
-            <!-- Quick search within keywords -->
-            <div class="keyword-search-wrap" id="keywordSearchWrap" style="margin-bottom: 10px; position: relative;">
-                <span class="material-symbols-outlined" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 18px; color: var(--g-text-muted);">search</span>
-                <input type="text" id="keywordFilterSearchInput" class="dialog-input" placeholder="Search keywords..." style="padding-left: 38px; margin-bottom: 0; font-size: 13.5px; height: 40px;" autocomplete="off" spellcheck="false">
-            </div>
-            <!-- Keywords list container -->
-            <div class="keyword-list-container" id="keywordListContainer"></div>
-            <div id="keywordEmptyMessage" style="display: none; text-align: center; padding: 24px 8px; color: var(--g-text-muted); font-size: 13px;">
-                <span class="material-symbols-outlined" style="font-size: 36px; margin-bottom: 6px; display: block; opacity: 0.6;">search_off</span>
-                No keywords found (requires 4+ occurrences across files)
-            </div>
-        </div>
-        <div class="dialog-actions" style="display: flex; justify-content: space-between; align-items: center;">
-            <button id="btnClearAllKeywords" class="btn-dialog-text" type="button" style="color: var(--g-danger, #b3261e);">Clear All</button>
-            <div style="display: flex; gap: 8px;">
-                <button id="btnCancelKeywordFilter" class="btn-dialog-text" type="button">Cancel</button>
-                <button id="btnApplyKeywordFilter" class="btn-dialog-primary" type="button">Apply</button>
-            </div>
         </div>
     </dialog>
 
@@ -2874,6 +2936,8 @@
             btnViewMenu.addEventListener("click", (e) => {
                 e.stopPropagation();
                 if (sortDropdownMenu) sortDropdownMenu.classList.remove("open");
+                const filterMenu = document.getElementById("filterDropdownMenu");
+                if (filterMenu) filterMenu.classList.remove("open");
                 if (typeof newDriveMenu !== "undefined" && newDriveMenu) newDriveMenu.classList.remove("open");
                 const accountMenu = document.getElementById("accountDropdownMenu");
                 if (accountMenu) accountMenu.classList.remove("open");
@@ -2991,6 +3055,8 @@
             btnSortMenu.addEventListener("click", (e) => {
                 e.stopPropagation();
                 if (viewDropdownMenu) viewDropdownMenu.classList.remove("open");
+                const filterMenu = document.getElementById("filterDropdownMenu");
+                if (filterMenu) filterMenu.classList.remove("open");
                 if (typeof newDriveMenu !== "undefined" && newDriveMenu) newDriveMenu.classList.remove("open");
                 const accountMenu = document.getElementById("accountDropdownMenu");
                 if (accountMenu) accountMenu.classList.remove("open");
@@ -3073,7 +3139,7 @@
 
         function updateFolderDisplay() {
             const current = folderSelect.value || "";
-            const btnKeywordFilter = document.getElementById("btnKeywordFilter");
+            const filterActionWrapper = document.getElementById("filterActionWrapper");
             const activeFilterChipsBar = document.getElementById("activeFilterChipsBar");
 
             if (current) {
@@ -3089,7 +3155,7 @@
 
                 btnDeleteFolder.style.display = "";
                 btnExport.style.display = "";
-                if (btnKeywordFilter) btnKeywordFilter.style.display = "";
+                if (filterActionWrapper) filterActionWrapper.style.display = "";
                 if (viewActionWrapper) viewActionWrapper.style.display = "";
                 if (sortActionWrapper) sortActionWrapper.style.display = "";
 
@@ -3114,7 +3180,7 @@
 
                 btnDeleteFolder.style.display = "none";
                 btnExport.style.display = "none";
-                if (btnKeywordFilter) btnKeywordFilter.style.display = "none";
+                if (filterActionWrapper) filterActionWrapper.style.display = "none";
                 if (activeFilterChipsBar) activeFilterChipsBar.style.display = "none";
                 if (viewActionWrapper) viewActionWrapper.style.display = "none";
                 if (sortActionWrapper) sortActionWrapper.style.display = "none";
@@ -4077,22 +4143,93 @@
         };
         window.alert = (msg) => window.showNotice(msg);
 
-        // Keyword Filter UI Integration
+        // Keyword Filter UI & Dropdown Integration
+        const filterActionWrapper = document.getElementById("filterActionWrapper");
         const btnKeywordFilter = document.getElementById("btnKeywordFilter");
+        const filterDropdownMenu = document.getElementById("filterDropdownMenu");
         const filterCountBadge = document.getElementById("filterCountBadge");
         const activeFilterChipsBar = document.getElementById("activeFilterChipsBar");
         const activeChipsList = document.getElementById("activeChipsList");
         const btnClearActiveChips = document.getElementById("btnClearActiveChips");
-        const keywordFilterModal = document.getElementById("keywordFilterModal");
         const keywordListContainer = document.getElementById("keywordListContainer");
         const keywordEmptyMessage = document.getElementById("keywordEmptyMessage");
         const keywordFilterSearchInput = document.getElementById("keywordFilterSearchInput");
-        const btnApplyKeywordFilter = document.getElementById("btnApplyKeywordFilter");
         const btnClearAllKeywords = document.getElementById("btnClearAllKeywords");
-        const btnCancelKeywordFilter = document.getElementById("btnCancelKeywordFilter");
-        const btnCloseKeywordModal = document.getElementById("btnCloseKeywordModal");
 
-        let tempSelectedKeywords = new Set();
+        function renderKeywordDropdownItems(filterQuery = "") {
+            if (!keywordListContainer) return;
+            const filterState = window.getKeywordFilterState ? window.getKeywordFilterState() : { availKeywords: [], keywordCounts: {}, selectKeywords: [] };
+            const { availKeywords, keywordCounts, selectKeywords } = filterState;
+            keywordListContainer.innerHTML = "";
+
+            const selectedSet = new Set(selectKeywords || []);
+            const query = (filterQuery || "").trim().toLowerCase();
+            const filteredKeywords = (availKeywords || []).filter(kw => !query || kw.toLowerCase().includes(query));
+
+            const searchWrap = document.getElementById("keywordSearchWrap");
+            if (searchWrap) {
+                searchWrap.style.display = (availKeywords && availKeywords.length >= 6) ? "block" : "none";
+            }
+
+            if (btnClearAllKeywords) {
+                btnClearAllKeywords.style.display = (selectedSet.size > 0) ? "inline-block" : "none";
+            }
+
+            if (!availKeywords || availKeywords.length === 0) {
+                keywordListContainer.style.display = "none";
+                if (keywordEmptyMessage) {
+                    keywordEmptyMessage.style.display = "block";
+                    keywordEmptyMessage.innerHTML = `
+                        <span class="material-symbols-outlined" style="font-size: 24px; margin-bottom: 4px; display: block; opacity: 0.6;">search_off</span>
+                        <div style="font-size: 13px; font-weight: 500; color: var(--g-text-main);">No keywords found</div>
+                        <div style="font-size: 11px; color: var(--g-text-muted); margin-top: 2px;">(Requires 4+ occurrences across files)</div>
+                    `;
+                }
+                return;
+            }
+
+            if (filteredKeywords.length === 0) {
+                keywordListContainer.style.display = "none";
+                if (keywordEmptyMessage) {
+                    keywordEmptyMessage.style.display = "block";
+                    keywordEmptyMessage.innerHTML = `
+                        <span class="material-symbols-outlined" style="font-size: 24px; margin-bottom: 4px; display: block; opacity: 0.6;">search_off</span>
+                        <div style="font-size: 13px; font-weight: 500; color: var(--g-text-main);">No keywords matching "${filterQuery}"</div>
+                    `;
+                }
+                return;
+            }
+
+            keywordListContainer.style.display = "flex";
+            if (keywordEmptyMessage) keywordEmptyMessage.style.display = "none";
+
+            filteredKeywords.forEach(kw => {
+                const isChecked = selectedSet.has(kw);
+                const count = keywordCounts[kw] || 0;
+                const item = document.createElement("div");
+                item.className = "filter-menu-item" + (isChecked ? " active" : "");
+
+                item.innerHTML = `
+                    <div class="filter-item-left">
+                        <input type="checkbox" class="filter-item-checkbox" ${isChecked ? "checked" : ""}>
+                        <span class="filter-item-name">${kw}</span>
+                    </div>
+                    <span class="filter-item-count">${count}</span>
+                `;
+
+                const chk = item.querySelector(".filter-item-checkbox");
+                item.addEventListener("click", async (e) => {
+                    if (e.target !== chk) {
+                        chk.checked = !chk.checked;
+                    }
+                    if (window.toggleKeywordFilter) {
+                        await window.toggleKeywordFilter(kw);
+                    }
+                });
+
+                keywordListContainer.appendChild(item);
+            });
+        }
 
         function updateKeywordFilterUI() {
             if (!window.getKeywordFilterState) return;
@@ -4100,13 +4237,14 @@
             const isFolderSelected = Boolean(folderSelect && folderSelect.value);
 
             if (!isFolderSelected) {
-                if (btnKeywordFilter) btnKeywordFilter.style.display = "none";
+                if (filterActionWrapper) filterActionWrapper.style.display = "none";
                 if (activeFilterChipsBar) activeFilterChipsBar.style.display = "none";
                 return;
             }
 
+            if (filterActionWrapper) filterActionWrapper.style.display = "";
+
             if (btnKeywordFilter) {
-                btnKeywordFilter.style.display = "";
                 if (selectKeywords.length > 0) {
                     btnKeywordFilter.classList.add("active-filter");
                     if (filterCountBadge) {
@@ -4119,6 +4257,12 @@
                         filterCountBadge.style.display = "none";
                     }
                 }
+            }
+
+            // If dropdown is open, re-render items
+            if (filterDropdownMenu && filterDropdownMenu.classList.contains("open")) {
+                const query = keywordFilterSearchInput ? keywordFilterSearchInput.value : "";
+                renderKeywordDropdownItems(query);
             }
 
             // Render active filter chips bar
@@ -4149,95 +4293,34 @@
         }
         window.updateKeywordFilterUI = updateKeywordFilterUI;
 
-        function renderKeywordListInModal(filterQuery = "") {
-            if (!keywordListContainer || !window.getKeywordFilterState) return;
-            const { availKeywords, keywordCounts } = window.getKeywordFilterState();
-            keywordListContainer.innerHTML = "";
+        // Toggle filter dropdown button
+        if (btnKeywordFilter && filterDropdownMenu) {
+            btnKeywordFilter.addEventListener("click", (e) => {
+                e.stopPropagation();
+                if (sortDropdownMenu) sortDropdownMenu.classList.remove("open");
+                if (viewDropdownMenu) viewDropdownMenu.classList.remove("open");
+                if (typeof newDriveMenu !== "undefined" && newDriveMenu) newDriveMenu.classList.remove("open");
+                const accountMenu = document.getElementById("accountDropdownMenu");
+                if (accountMenu) accountMenu.classList.remove("open");
 
-            const query = filterQuery.trim().toLowerCase();
-            const filteredKeywords = availKeywords.filter(kw => !query || kw.toLowerCase().includes(query));
+                const isOpen = filterDropdownMenu.classList.toggle("open");
+                btnKeywordFilter.setAttribute("aria-expanded", isOpen ? "true" : "false");
 
-            if (availKeywords.length === 0) {
-                keywordListContainer.style.display = "none";
-                if (keywordEmptyMessage) {
-                    keywordEmptyMessage.style.display = "block";
-                    keywordEmptyMessage.innerHTML = `
-                        <span class="material-symbols-outlined" style="font-size: 36px; margin-bottom: 6px; display: block; opacity: 0.6;">search_off</span>
-                        No keywords found in this folder<br><span style="font-size: 11.5px; opacity: 0.8;">(Keywords require 4+ occurrences across files)</span>
-                    `;
-                }
-                return;
-            }
-
-            if (filteredKeywords.length === 0) {
-                keywordListContainer.style.display = "none";
-                if (keywordEmptyMessage) {
-                    keywordEmptyMessage.style.display = "block";
-                    keywordEmptyMessage.innerHTML = `
-                        <span class="material-symbols-outlined" style="font-size: 36px; margin-bottom: 6px; display: block; opacity: 0.6;">search_off</span>
-                        No keywords matching "${filterQuery}"
-                    `;
-                }
-                return;
-            }
-
-            keywordListContainer.style.display = "flex";
-            if (keywordEmptyMessage) keywordEmptyMessage.style.display = "none";
-
-            filteredKeywords.forEach(kw => {
-                const isChecked = tempSelectedKeywords.has(kw);
-                const count = keywordCounts[kw] || 0;
-                const row = document.createElement("div");
-                row.className = "keyword-item-row" + (isChecked ? " selected" : "");
-
-                row.innerHTML = `
-                    <div class="keyword-item-left">
-                        <input type="checkbox" class="keyword-item-checkbox" ${isChecked ? "checked" : ""}>
-                        <span class="keyword-item-name">${kw}</span>
-                    </div>
-                    <span class="keyword-item-count">${count}</span>
-                `;
-
-                const chk = row.querySelector(".keyword-item-checkbox");
-                row.addEventListener("click", (e) => {
-                    if (e.target !== chk) {
-                        chk.checked = !chk.checked;
+                if (isOpen) {
+                    if (keywordFilterSearchInput) keywordFilterSearchInput.value = "";
+                    renderKeywordDropdownItems("");
+                    if (keywordFilterSearchInput) {
+                        setTimeout(() => keywordFilterSearchInput.focus(), 50);
                     }
-                    if (chk.checked) {
-                        tempSelectedKeywords.add(kw);
-                        row.classList.add("selected");
-                    } else {
-                        tempSelectedKeywords.delete(kw);
-                        row.classList.remove("selected");
-                    }
-                });
-
-                keywordListContainer.appendChild(row);
+                }
             });
-        }
 
-        function openKeywordFilterDialog() {
-            if (!keywordFilterModal || !window.getKeywordFilterState) return;
-            const { availKeywords, selectKeywords } = window.getKeywordFilterState();
-
-            if (availKeywords.length === 0) {
-                if (window.showNotice) {
-                    window.showNotice("No keywords found in this folder. (Keywords must appear in at least 4 files)", "Keyword Filter", "info");
-                } else {
-                    alert("No keywords found");
+            document.addEventListener("click", (e) => {
+                if (filterActionWrapper && !filterActionWrapper.contains(e.target)) {
+                    filterDropdownMenu.classList.remove("open");
+                    btnKeywordFilter.setAttribute("aria-expanded", "false");
                 }
-                return;
-            }
-
-            tempSelectedKeywords = new Set(selectKeywords);
-            if (keywordFilterSearchInput) keywordFilterSearchInput.value = "";
-            renderKeywordListInModal("");
-            keywordFilterModal.showModal();
-            if (keywordFilterSearchInput) keywordFilterSearchInput.focus();
-        }
-
-        if (btnKeywordFilter) {
-            btnKeywordFilter.addEventListener("click", openKeywordFilterDialog);
+            });
         }
 
         if (btnClearActiveChips) {
@@ -4246,37 +4329,15 @@
             });
         }
 
-        if (keywordFilterSearchInput) {
-            keywordFilterSearchInput.addEventListener("input", () => {
-                renderKeywordListInModal(keywordFilterSearchInput.value);
-            });
-        }
-
-        if (btnApplyKeywordFilter) {
-            btnApplyKeywordFilter.addEventListener("click", async () => {
-                if (keywordFilterModal) keywordFilterModal.close();
-                if (window.applyKeywordFilter) {
-                    await window.applyKeywordFilter(tempSelectedKeywords);
-                }
-            });
-        }
-
         if (btnClearAllKeywords) {
             btnClearAllKeywords.addEventListener("click", () => {
-                tempSelectedKeywords.clear();
-                renderKeywordListInModal(keywordFilterSearchInput ? keywordFilterSearchInput.value : "");
+                if (window.clearKeywordFilter) window.clearKeywordFilter();
             });
         }
 
-        if (btnCancelKeywordFilter) {
-            btnCancelKeywordFilter.addEventListener("click", () => {
-                if (keywordFilterModal) keywordFilterModal.close();
-            });
-        }
-
-        if (btnCloseKeywordModal) {
-            btnCloseKeywordModal.addEventListener("click", () => {
-                if (keywordFilterModal) keywordFilterModal.close();
+        if (keywordFilterSearchInput) {
+            keywordFilterSearchInput.addEventListener("input", () => {
+                renderKeywordDropdownItems(keywordFilterSearchInput.value);
             });
         }
 

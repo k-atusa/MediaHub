@@ -333,6 +333,7 @@ async function loadFld() {
         dec.fill(0);
         maskMap(state.flsMap);
     }
+    buildKeywords();
     await showFls();
 }
 
