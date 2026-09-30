@@ -954,6 +954,7 @@
 
         .sort-menu-header,
         .view-menu-header {
+            display: none;
             font-size: 11px;
             font-weight: 600;
             text-transform: uppercase;
@@ -2208,6 +2209,21 @@
                 max-width: min(320px, calc(100vw - 20px));
             }
 
+            .sort-menu-header,
+            .view-menu-header {
+                display: block;
+            }
+
+            .filter-header-title {
+                display: inline;
+            }
+
+            .filter-menu-header {
+                display: flex;
+                justify-content: space-between;
+                padding: 6px 10px 4px 10px;
+            }
+
             .list-view-header {
                 grid-template-columns: 1fr 80px 36px;
                 gap: 8px;
@@ -2353,10 +2369,19 @@
             text-transform: uppercase;
             letter-spacing: 0.8px;
             color: var(--g-text-muted);
-            padding: 6px 10px 4px 10px;
-            display: flex;
+            padding: 4px 10px;
+            display: none;
             align-items: center;
             justify-content: space-between;
+        }
+
+        .filter-menu-header.has-clear {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .filter-header-title {
+            display: none;
         }
 
         .filter-menu-clear-btn {
@@ -2693,8 +2718,8 @@
                             <span class="filter-count-badge" id="filterCountBadge" style="display: none;">0</span>
                         </button>
                         <div class="filter-dropdown-menu" id="filterDropdownMenu">
-                            <div class="filter-menu-header">
-                                <span>Filter by keywords</span>
+                            <div class="filter-menu-header" id="filterMenuHeader">
+                                <span class="filter-header-title">Filter by keywords</span>
                                 <button type="button" id="btnClearAllKeywords" class="filter-menu-clear-btn" style="display: none;">Clear all</button>
                             </div>
                             <!-- Quick search within keywords -->
@@ -4746,8 +4771,17 @@
                 searchWrap.style.display = (availKeywords && availKeywords.length >= 6) ? "block" : "none";
             }
 
+            const filterMenuHeader = document.getElementById("filterMenuHeader");
             if (btnClearAllKeywords) {
-                btnClearAllKeywords.style.display = (selectedSet.size > 0) ? "inline-block" : "none";
+                const hasSelected = (selectedSet.size > 0);
+                btnClearAllKeywords.style.display = hasSelected ? "inline-block" : "none";
+                if (filterMenuHeader) {
+                    if (hasSelected) {
+                        filterMenuHeader.classList.add("has-clear");
+                    } else {
+                        filterMenuHeader.classList.remove("has-clear");
+                    }
+                }
             }
 
             if (!availKeywords || availKeywords.length === 0) {
