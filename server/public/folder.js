@@ -318,6 +318,8 @@ document.getElementById("folderSelect").addEventListener("change", async (e) => 
 
 // Fetch folder files.
 async function loadFld() {
+    keywordsBuilt = false;
+    selectKeywords.clear();
     document.getElementById("uploadContainer").classList.remove("hidden");
     document.getElementById("mediaContainer").classList.remove("hidden");
     const res = await fetch(`${SERVER}/api/storage/${state.id}/names`);
@@ -346,6 +348,92 @@ function getEntrySize(flKeyMasked) {
     return sz;
 }
 
+// Keyword Filter Engine (Matches MediaHub-android)
+const BRACKET_PATTERN = /[\[\(]([^\]\)]+)[\]\)]/g;
+const SPLIT_PATTERN = /[._\-\s]+/;
+
+let keywordsBuilt = false;
+const availKeywords = [];
+const keywordCounts = {};
+const selectKeywords = new Set();
+const tokenCache = new Map();
+
+function extractTokens(nameOnly) {
+    const tokens = [];
+    const lower = nameOnly.toLowerCase();
+
+    // Extract bracket contents and replace with spaces
+    const remaining = lower.replace(BRACKET_PATTERN, (_, group) => {
+        const trimmed = group.trim();
+        if (trimmed) tokens.push(trimmed);
+        return " ";
+    });
+
+    // Split remaining string
+    const parts = remaining.split(SPLIT_PATTERN);
+    for (const p of parts) {
+        const trimmed = p.trim();
+        if (trimmed) tokens.push(trimmed);
+    }
+    return tokens;
+}
+
+function isValidKeyword(token) {
+    let byteLen = 0;
+    for (let i = 0; i < token.length; i++) {
+        const code = token.charCodeAt(i);
+        if (code <= 0x7F) byteLen += 1;
+        else if (code <= 0x7FF) byteLen += 2;
+        else byteLen += 3;
+    }
+    if (byteLen < 4) return false;
+
+    // Must have at least one non-digit character
+    for (let i = 0; i < token.length; i++) {
+        const c = token.charAt(i);
+        if (c < '0' || c > '9') return true;
+    }
+    return false;
+}
+
+function buildKeywords() {
+    availKeywords.length = 0;
+    Object.keys(keywordCounts).forEach(k => delete keywordCounts[k]);
+    tokenCache.clear();
+    const wordCount = {};
+
+    const allFiles = Object.keys(state.flsMap);
+    for (const fileName of allFiles) {
+        let nameOnly = fileName;
+        const dotIdx = fileName.lastIndexOf('.');
+        if (dotIdx > 0) nameOnly = fileName.substring(0, dotIdx);
+
+        const tokens = extractTokens(nameOnly);
+        const unique = new Set(tokens);
+        tokenCache.set(fileName, unique);
+
+        for (const t of unique) {
+            if (isValidKeyword(t)) {
+                wordCount[t] = (wordCount[t] || 0) + 1;
+            }
+        }
+    }
+
+    for (const [kw, count] of Object.entries(wordCount)) {
+        if (count >= 4) {
+            availKeywords.push(kw);
+            keywordCounts[kw] = count;
+        }
+    }
+    availKeywords.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+
+    const availSet = new Set(availKeywords);
+    for (const kw of Array.from(selectKeywords)) {
+        if (!availSet.has(kw)) selectKeywords.delete(kw);
+    }
+    keywordsBuilt = true;
+}
+
 // Render files grid.
 async function showFls() {
     const grid = document.getElementById("mediaGrid"); grid.innerHTML = "";
@@ -356,6 +444,19 @@ async function showFls() {
     const query = (searchInput ? searchInput.value || "" : "").trim().toLowerCase();
     if (query) {
         entries = entries.filter(([name]) => name.toLowerCase().includes(query));
+    }
+
+    // Keyword filtering (AND condition across all selected keywords)
+    if (selectKeywords.size > 0) {
+        if (!keywordsBuilt) buildKeywords();
+        entries = entries.filter(([name]) => {
+            const tokenSet = tokenCache.get(name);
+            if (!tokenSet) return false;
+            for (const kw of selectKeywords) {
+                if (!tokenSet.has(kw)) return false;
+            }
+            return true;
+        });
     }
 
     const sortMode = state.sort || localStorage.getItem("mediahub_sort") || "name-asc";
@@ -410,6 +511,10 @@ async function showFls() {
         });
         grid.appendChild(card);
     }
+
+    if (window.updateKeywordFilterUI) {
+        window.updateKeywordFilterUI();
+    }
 }
 
 window.setFileSort = async (mode) => {
@@ -422,6 +527,39 @@ window.getFileSort = () => state.sort;
 window.refreshFilesView = async () => {
     state.page = 1;
     await showFls();
+};
+
+// Global keyword filter API for UI
+window.getKeywordFilterState = () => {
+    if (!keywordsBuilt) buildKeywords();
+    return {
+        availKeywords: [...availKeywords],
+        keywordCounts: { ...keywordCounts },
+        selectKeywords: Array.from(selectKeywords),
+        totalFiles: Object.keys(state.flsMap).length
+    };
+};
+
+window.applyKeywordFilter = async (newKeywordsSet) => {
+    selectKeywords.clear();
+    if (newKeywordsSet) {
+        for (const kw of newKeywordsSet) selectKeywords.add(kw);
+    }
+    state.page = 1;
+    await showFls();
+    const mediaContainer = document.getElementById("mediaContainer");
+    if (mediaContainer) mediaContainer.scrollTop = 0;
+};
+
+window.clearKeywordFilter = async () => {
+    await window.applyKeywordFilter(new Set());
+};
+
+window.toggleKeywordFilter = async (kw) => {
+    const s = new Set(selectKeywords);
+    if (s.has(kw)) s.delete(kw);
+    else s.add(kw);
+    await window.applyKeywordFilter(s);
 };
 
 // Hook live search on topSearchInput

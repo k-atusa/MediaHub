@@ -1963,6 +1963,195 @@
                 gap: 8px;
             }
         }
+
+        /* Keyword Filter Styles (Material You M3) */
+        .filter-count-badge {
+            background-color: var(--g-primary-blue);
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 600;
+            line-height: 1;
+            padding: 2px 6px;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 2px;
+            min-width: 16px;
+            height: 16px;
+            box-sizing: border-box;
+        }
+
+        .top-action-btn.active-filter {
+            background-color: var(--m3-primary-container);
+            color: var(--m3-on-primary-container);
+        }
+
+        .top-action-btn.active-filter .material-symbols-outlined {
+            color: var(--m3-on-primary-container);
+        }
+
+        .top-action-btn.active-filter .filter-count-badge {
+            background-color: var(--m3-primary);
+            color: var(--m3-on-primary);
+        }
+
+        /* Active Filter Chips Bar */
+        .active-filter-chips-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 24px;
+            background-color: var(--m3-surface-container);
+            border-bottom: 1px solid var(--g-border-subtle);
+            font-size: 13px;
+            flex-wrap: wrap;
+            animation: m3FadeIn 0.15s ease-out;
+            z-index: 10;
+        }
+
+        @keyframes m3FadeIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .chips-label {
+            font-weight: 600;
+            color: var(--g-text-muted);
+            font-size: 11.5px;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .chips-scroll-wrap {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+            flex: 1;
+        }
+
+        .filter-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px 4px 10px;
+            border-radius: 8px;
+            background-color: var(--m3-primary-container);
+            color: var(--m3-on-primary-container);
+            font-size: 12.5px;
+            font-weight: 500;
+            cursor: default;
+            transition: background-color 0.15s, transform 0.1s;
+        }
+
+        .filter-chip:hover {
+            background-color: var(--g-fab-hover);
+        }
+
+        .filter-chip .chip-remove-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            padding: 2px;
+            margin-left: 2px;
+            color: var(--m3-on-primary-container);
+            cursor: pointer;
+            border-radius: 50%;
+            opacity: 0.75;
+            transition: opacity 0.15s, background-color 0.15s;
+        }
+
+        .filter-chip .chip-remove-btn:hover {
+            opacity: 1;
+            background-color: rgba(0, 0, 0, 0.08);
+        }
+
+        .clear-chips-btn {
+            background: transparent;
+            border: none;
+            color: var(--g-primary-blue);
+            font-size: 12.5px;
+            font-weight: 500;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 6px;
+            margin-left: auto;
+            transition: background-color 0.15s;
+        }
+
+        .clear-chips-btn:hover {
+            text-decoration: underline;
+            background-color: var(--g-hover-bg);
+        }
+
+        /* Keyword Filter Dialog Items */
+        .keyword-list-container {
+            max-height: 280px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            padding-right: 4px;
+        }
+
+        .keyword-list-container::-webkit-scrollbar {
+            width: 6px;
+        }
+        .keyword-list-container::-webkit-scrollbar-thumb {
+            background: var(--g-border);
+            border-radius: 3px;
+        }
+
+        .keyword-item-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background-color 0.15s;
+            user-select: none;
+        }
+
+        .keyword-item-row:hover {
+            background-color: var(--g-hover-bg);
+        }
+
+        .keyword-item-row.selected {
+            background-color: var(--m3-surface-container-high);
+        }
+
+        .keyword-item-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--g-text-main);
+            word-break: break-all;
+        }
+
+        .keyword-item-checkbox {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--g-primary-blue);
+            cursor: pointer;
+        }
+
+        .keyword-item-count {
+            font-size: 12px;
+            color: var(--g-text-muted);
+            font-weight: 500;
+            background-color: var(--m3-surface-container-highest);
+            padding: 2px 8px;
+            border-radius: 12px;
+        }
     </style>
 </head>
 
@@ -2156,6 +2345,12 @@
                             </div>
                         </div>
                     </div>
+                    <!-- Keyword Filter Button -->
+                    <button class="top-action-btn" id="btnKeywordFilter" type="button" title="Filter by keywords">
+                        <span class="material-symbols-outlined" id="keywordFilterIcon">filter_list</span>
+                        <span>Filter</span>
+                        <span class="filter-count-badge" id="filterCountBadge" style="display: none;">0</span>
+                    </button>
                     <button class="top-action-btn" id="btnImport" title="Import share token">
                         <span class="material-symbols-outlined">file_download</span>
                         <span>Import</span>
@@ -2184,6 +2379,16 @@
 
             <!-- Media Container (Contains empty state, list header, and grid/list for selected folder) -->
             <section id="mediaContainer" style="display: none; flex-direction: column; flex: 1; overflow-y: auto;">
+                <!-- Active Filter Chips Bar (Shown when keyword filters are applied) -->
+                <div id="activeFilterChipsBar" class="active-filter-chips-bar" style="display: none;">
+                    <span class="chips-label">
+                        <span class="material-symbols-outlined" style="font-size: 16px; color: var(--g-primary-blue);">filter_alt</span>
+                        Filters:
+                    </span>
+                    <div class="chips-scroll-wrap" id="activeChipsList"></div>
+                    <button class="clear-chips-btn" id="btnClearActiveChips" type="button">Clear all</button>
+                </div>
+
                 <!-- List View Column Header (Visible only in List Mode) -->
                 <div id="listViewHeader" class="list-view-header">
                     <div class="list-header-col list-header-name">Name</div>
@@ -2354,6 +2559,42 @@
         <div id="noticeText" class="dialog-body"></div>
         <div class="dialog-actions">
             <button id="btnConfirmNotice" class="btn-dialog-primary" type="button">OK</button>
+        </div>
+    </dialog>
+
+    <!-- Keyword Filter Dialog (Material You Dialog) -->
+    <dialog id="keywordFilterModal">
+        <div class="dialog-title" style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="material-symbols-outlined" style="color: var(--g-primary-blue);">filter_list</span>
+                <span>Keyword Filter</span>
+            </div>
+            <button type="button" id="btnCloseKeywordModal" title="Close" style="background: none; border: none; cursor: pointer; color: var(--g-text-muted); display: flex; align-items: center; justify-content: center; padding: 4px; border-radius: 50%;">
+                <span class="material-symbols-outlined" style="font-size: 20px;">close</span>
+            </button>
+        </div>
+        <div class="dialog-body" style="padding-top: 4px; margin-bottom: 16px;">
+            <div style="font-size: 13px; color: var(--g-text-muted); margin-bottom: 12px;">
+                Filter files matching selected keywords (tokens with 4+ occurrences).
+            </div>
+            <!-- Quick search within keywords -->
+            <div class="keyword-search-wrap" id="keywordSearchWrap" style="margin-bottom: 10px; position: relative;">
+                <span class="material-symbols-outlined" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 18px; color: var(--g-text-muted);">search</span>
+                <input type="text" id="keywordFilterSearchInput" class="dialog-input" placeholder="Search keywords..." style="padding-left: 38px; margin-bottom: 0; font-size: 13.5px; height: 40px;" autocomplete="off" spellcheck="false">
+            </div>
+            <!-- Keywords list container -->
+            <div class="keyword-list-container" id="keywordListContainer"></div>
+            <div id="keywordEmptyMessage" style="display: none; text-align: center; padding: 24px 8px; color: var(--g-text-muted); font-size: 13px;">
+                <span class="material-symbols-outlined" style="font-size: 36px; margin-bottom: 6px; display: block; opacity: 0.6;">search_off</span>
+                No keywords found (requires 4+ occurrences across files)
+            </div>
+        </div>
+        <div class="dialog-actions" style="display: flex; justify-content: space-between; align-items: center;">
+            <button id="btnClearAllKeywords" class="btn-dialog-text" type="button" style="color: var(--g-danger, #b3261e);">Clear All</button>
+            <div style="display: flex; gap: 8px;">
+                <button id="btnCancelKeywordFilter" class="btn-dialog-text" type="button">Cancel</button>
+                <button id="btnApplyKeywordFilter" class="btn-dialog-primary" type="button">Apply</button>
+            </div>
         </div>
     </dialog>
 
@@ -2832,6 +3073,9 @@
 
         function updateFolderDisplay() {
             const current = folderSelect.value || "";
+            const btnKeywordFilter = document.getElementById("btnKeywordFilter");
+            const activeFilterChipsBar = document.getElementById("activeFilterChipsBar");
+
             if (current) {
                 // Folder Selected
                 breadcrumbName.textContent = current;
@@ -2845,6 +3089,7 @@
 
                 btnDeleteFolder.style.display = "";
                 btnExport.style.display = "";
+                if (btnKeywordFilter) btnKeywordFilter.style.display = "";
                 if (viewActionWrapper) viewActionWrapper.style.display = "";
                 if (sortActionWrapper) sortActionWrapper.style.display = "";
 
@@ -2869,6 +3114,8 @@
 
                 btnDeleteFolder.style.display = "none";
                 btnExport.style.display = "none";
+                if (btnKeywordFilter) btnKeywordFilter.style.display = "none";
+                if (activeFilterChipsBar) activeFilterChipsBar.style.display = "none";
                 if (viewActionWrapper) viewActionWrapper.style.display = "none";
                 if (sortActionWrapper) sortActionWrapper.style.display = "none";
 
@@ -3038,16 +3285,38 @@
                 const emptySubtitle = document.getElementById("emptyStateSubtitle");
                 const emptyBtn = document.getElementById("btnEmptyUploadAction");
 
+                const filterState = window.getKeywordFilterState ? window.getKeywordFilterState() : { selectKeywords: [] };
+                const hasActiveFilter = Boolean(filterState.selectKeywords && filterState.selectKeywords.length > 0);
+
                 if (query) {
                     if (emptyIcon) emptyIcon.textContent = "search_off";
                     if (emptyTitle) emptyTitle.textContent = "No matching files found";
                     if (emptySubtitle) emptySubtitle.textContent = `No files matching "${query}".`;
                     if (emptyBtn) emptyBtn.style.display = "none";
+                } else if (hasActiveFilter) {
+                    if (emptyIcon) emptyIcon.textContent = "filter_list_off";
+                    if (emptyTitle) emptyTitle.textContent = "No files match selected keywords";
+                    if (emptySubtitle) emptySubtitle.textContent = "Try unchecking some keywords or click clear to reset.";
+                    if (emptyBtn) {
+                        emptyBtn.style.display = "inline-flex";
+                        emptyBtn.innerHTML = `<span class="material-symbols-outlined">filter_alt_off</span><span>Clear filter</span>`;
+                        emptyBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            if (window.clearKeywordFilter) window.clearKeywordFilter();
+                        };
+                    }
                 } else {
                     if (emptyIcon) emptyIcon.textContent = "cloud_upload";
                     if (emptyTitle) emptyTitle.textContent = "This folder is empty";
                     if (emptySubtitle) emptySubtitle.textContent = "Drag and drop files anywhere on the page, or use the upload button.";
-                    if (emptyBtn) emptyBtn.style.display = "inline-flex";
+                    if (emptyBtn) {
+                        emptyBtn.style.display = "inline-flex";
+                        emptyBtn.innerHTML = `<span class="material-symbols-outlined">add</span><span>Upload</span>`;
+                        emptyBtn.onclick = () => {
+                            const fileInput = document.getElementById("fileInput");
+                            if (fileInput) fileInput.click();
+                        };
+                    }
                 }
 
                 emptyState.style.display = "flex";
@@ -3808,6 +4077,209 @@
         };
         window.alert = (msg) => window.showNotice(msg);
 
+        // Keyword Filter UI Integration
+        const btnKeywordFilter = document.getElementById("btnKeywordFilter");
+        const filterCountBadge = document.getElementById("filterCountBadge");
+        const activeFilterChipsBar = document.getElementById("activeFilterChipsBar");
+        const activeChipsList = document.getElementById("activeChipsList");
+        const btnClearActiveChips = document.getElementById("btnClearActiveChips");
+        const keywordFilterModal = document.getElementById("keywordFilterModal");
+        const keywordListContainer = document.getElementById("keywordListContainer");
+        const keywordEmptyMessage = document.getElementById("keywordEmptyMessage");
+        const keywordFilterSearchInput = document.getElementById("keywordFilterSearchInput");
+        const btnApplyKeywordFilter = document.getElementById("btnApplyKeywordFilter");
+        const btnClearAllKeywords = document.getElementById("btnClearAllKeywords");
+        const btnCancelKeywordFilter = document.getElementById("btnCancelKeywordFilter");
+        const btnCloseKeywordModal = document.getElementById("btnCloseKeywordModal");
+
+        let tempSelectedKeywords = new Set();
+
+        function updateKeywordFilterUI() {
+            if (!window.getKeywordFilterState) return;
+            const { availKeywords, keywordCounts, selectKeywords } = window.getKeywordFilterState();
+            const isFolderSelected = Boolean(folderSelect && folderSelect.value);
+
+            if (!isFolderSelected) {
+                if (btnKeywordFilter) btnKeywordFilter.style.display = "none";
+                if (activeFilterChipsBar) activeFilterChipsBar.style.display = "none";
+                return;
+            }
+
+            if (btnKeywordFilter) {
+                btnKeywordFilter.style.display = "";
+                if (selectKeywords.length > 0) {
+                    btnKeywordFilter.classList.add("active-filter");
+                    if (filterCountBadge) {
+                        filterCountBadge.style.display = "inline-flex";
+                        filterCountBadge.textContent = selectKeywords.length;
+                    }
+                } else {
+                    btnKeywordFilter.classList.remove("active-filter");
+                    if (filterCountBadge) {
+                        filterCountBadge.style.display = "none";
+                    }
+                }
+            }
+
+            // Render active filter chips bar
+            if (activeFilterChipsBar && activeChipsList) {
+                if (selectKeywords.length > 0) {
+                    activeFilterChipsBar.style.display = "flex";
+                    activeChipsList.innerHTML = "";
+                    selectKeywords.forEach(kw => {
+                        const chip = document.createElement("span");
+                        chip.className = "filter-chip";
+                        chip.innerHTML = `
+                            <span>${kw}</span>
+                            <button type="button" class="chip-remove-btn" title="Remove filter: ${kw}">
+                                <span class="material-symbols-outlined" style="font-size: 14px;">close</span>
+                            </button>
+                        `;
+                        chip.querySelector(".chip-remove-btn").addEventListener("click", (e) => {
+                            e.stopPropagation();
+                            if (window.toggleKeywordFilter) window.toggleKeywordFilter(kw);
+                        });
+                        activeChipsList.appendChild(chip);
+                    });
+                } else {
+                    activeFilterChipsBar.style.display = "none";
+                    activeChipsList.innerHTML = "";
+                }
+            }
+        }
+        window.updateKeywordFilterUI = updateKeywordFilterUI;
+
+        function renderKeywordListInModal(filterQuery = "") {
+            if (!keywordListContainer || !window.getKeywordFilterState) return;
+            const { availKeywords, keywordCounts } = window.getKeywordFilterState();
+            keywordListContainer.innerHTML = "";
+
+            const query = filterQuery.trim().toLowerCase();
+            const filteredKeywords = availKeywords.filter(kw => !query || kw.toLowerCase().includes(query));
+
+            if (availKeywords.length === 0) {
+                keywordListContainer.style.display = "none";
+                if (keywordEmptyMessage) {
+                    keywordEmptyMessage.style.display = "block";
+                    keywordEmptyMessage.innerHTML = `
+                        <span class="material-symbols-outlined" style="font-size: 36px; margin-bottom: 6px; display: block; opacity: 0.6;">search_off</span>
+                        No keywords found in this folder<br><span style="font-size: 11.5px; opacity: 0.8;">(Keywords require 4+ occurrences across files)</span>
+                    `;
+                }
+                return;
+            }
+
+            if (filteredKeywords.length === 0) {
+                keywordListContainer.style.display = "none";
+                if (keywordEmptyMessage) {
+                    keywordEmptyMessage.style.display = "block";
+                    keywordEmptyMessage.innerHTML = `
+                        <span class="material-symbols-outlined" style="font-size: 36px; margin-bottom: 6px; display: block; opacity: 0.6;">search_off</span>
+                        No keywords matching "${filterQuery}"
+                    `;
+                }
+                return;
+            }
+
+            keywordListContainer.style.display = "flex";
+            if (keywordEmptyMessage) keywordEmptyMessage.style.display = "none";
+
+            filteredKeywords.forEach(kw => {
+                const isChecked = tempSelectedKeywords.has(kw);
+                const count = keywordCounts[kw] || 0;
+                const row = document.createElement("div");
+                row.className = "keyword-item-row" + (isChecked ? " selected" : "");
+
+                row.innerHTML = `
+                    <div class="keyword-item-left">
+                        <input type="checkbox" class="keyword-item-checkbox" ${isChecked ? "checked" : ""}>
+                        <span class="keyword-item-name">${kw}</span>
+                    </div>
+                    <span class="keyword-item-count">${count}</span>
+                `;
+
+                const chk = row.querySelector(".keyword-item-checkbox");
+                row.addEventListener("click", (e) => {
+                    if (e.target !== chk) {
+                        chk.checked = !chk.checked;
+                    }
+                    if (chk.checked) {
+                        tempSelectedKeywords.add(kw);
+                        row.classList.add("selected");
+                    } else {
+                        tempSelectedKeywords.delete(kw);
+                        row.classList.remove("selected");
+                    }
+                });
+
+                keywordListContainer.appendChild(row);
+            });
+        }
+
+        function openKeywordFilterDialog() {
+            if (!keywordFilterModal || !window.getKeywordFilterState) return;
+            const { availKeywords, selectKeywords } = window.getKeywordFilterState();
+
+            if (availKeywords.length === 0) {
+                if (window.showNotice) {
+                    window.showNotice("No keywords found in this folder. (Keywords must appear in at least 4 files)", "Keyword Filter", "info");
+                } else {
+                    alert("No keywords found");
+                }
+                return;
+            }
+
+            tempSelectedKeywords = new Set(selectKeywords);
+            if (keywordFilterSearchInput) keywordFilterSearchInput.value = "";
+            renderKeywordListInModal("");
+            keywordFilterModal.showModal();
+            if (keywordFilterSearchInput) keywordFilterSearchInput.focus();
+        }
+
+        if (btnKeywordFilter) {
+            btnKeywordFilter.addEventListener("click", openKeywordFilterDialog);
+        }
+
+        if (btnClearActiveChips) {
+            btnClearActiveChips.addEventListener("click", () => {
+                if (window.clearKeywordFilter) window.clearKeywordFilter();
+            });
+        }
+
+        if (keywordFilterSearchInput) {
+            keywordFilterSearchInput.addEventListener("input", () => {
+                renderKeywordListInModal(keywordFilterSearchInput.value);
+            });
+        }
+
+        if (btnApplyKeywordFilter) {
+            btnApplyKeywordFilter.addEventListener("click", async () => {
+                if (keywordFilterModal) keywordFilterModal.close();
+                if (window.applyKeywordFilter) {
+                    await window.applyKeywordFilter(tempSelectedKeywords);
+                }
+            });
+        }
+
+        if (btnClearAllKeywords) {
+            btnClearAllKeywords.addEventListener("click", () => {
+                tempSelectedKeywords.clear();
+                renderKeywordListInModal(keywordFilterSearchInput ? keywordFilterSearchInput.value : "");
+            });
+        }
+
+        if (btnCancelKeywordFilter) {
+            btnCancelKeywordFilter.addEventListener("click", () => {
+                if (keywordFilterModal) keywordFilterModal.close();
+            });
+        }
+
+        if (btnCloseKeywordModal) {
+            btnCloseKeywordModal.addEventListener("click", () => {
+                if (keywordFilterModal) keywordFilterModal.close();
+            });
+        }
+
         // Backdrop click close for all dialogs
         document.querySelectorAll("dialog").forEach(dialog => {
             dialog.addEventListener("click", (e) => {
@@ -3824,6 +4296,7 @@
             syncRootFolderGrid();
             updateFolderDisplay();
             syncUserProfileUI();
+            updateKeywordFilterUI();
         }
 
         if (document.readyState === "loading") {
