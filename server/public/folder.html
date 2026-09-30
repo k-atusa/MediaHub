@@ -877,8 +877,8 @@
         .filter-dropdown-menu {
             position: absolute;
             top: calc(100% + 6px);
-            left: 0;
-            min-width: 210px;
+            right: 0;
+            left: auto;
             background-color: var(--m3-surface-container);
             border-radius: 16px;
             box-shadow: var(--m3-elevation-widget);
@@ -895,9 +895,20 @@
             display: block;
         }
 
-        .filter-dropdown-menu {
+        .view-dropdown-menu {
+            min-width: 220px;
+            width: max-content;
+        }
+
+        .sort-dropdown-menu {
             min-width: 240px;
+            width: max-content;
+        }
+
+        .filter-dropdown-menu {
+            min-width: 260px;
             max-width: 320px;
+            width: max-content;
         }
 
         .sort-menu-header,
@@ -957,6 +968,7 @@
         .view-menu-item .menu-label {
             flex: 1;
             font-weight: inherit;
+            white-space: nowrap;
         }
 
         .sort-menu-item .check-icon,
@@ -2072,10 +2084,23 @@
                 top: calc(100% + 6px);
                 right: 0;
                 left: auto;
-                min-width: 200px;
-                max-width: 85vw;
+                width: max-content;
+                max-width: calc(100vw - 20px);
                 z-index: 1000;
                 box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+            }
+
+            .view-dropdown-menu {
+                min-width: 220px;
+            }
+
+            .sort-dropdown-menu {
+                min-width: 240px;
+            }
+
+            .filter-dropdown-menu {
+                min-width: 260px;
+                max-width: min(320px, calc(100vw - 20px));
             }
 
             .list-view-header {
