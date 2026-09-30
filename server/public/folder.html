@@ -2248,7 +2248,6 @@
         </div>
 
         <div class="header-search-box" id="headerSearchBox">
-            <span class="material-symbols-outlined search-icon" id="searchBoxLeadingIcon">search</span>
             <input type="text" class="search-input" placeholder="Search in MediaHub" id="topSearchInput" autocomplete="off" spellcheck="false">
             <button class="search-clear-btn" id="btnSearchClear" type="button" title="Clear search" style="display: none;">
                 <span class="material-symbols-outlined" style="font-size: 18px;">close</span>
@@ -3198,10 +3197,10 @@
             rootFolderGrid.innerHTML = "";
             let options = Array.from(folderSelect.options).filter(opt => opt.value !== "");
             const searchInput = document.getElementById("topSearchInput");
-            const query = (searchInput ? searchInput.value || "" : "").trim().toLowerCase();
+            const query = (searchInput ? searchInput.value || "" : "").normalize('NFC').trim().toLowerCase();
 
             if (query) {
-                options = options.filter(opt => opt.textContent.toLowerCase().includes(query));
+                options = options.filter(opt => (opt.textContent || "").normalize('NFC').toLowerCase().includes(query));
             }
 
             if (options.length === 0) {
@@ -3908,11 +3907,10 @@
         const topSearchInput = document.getElementById("topSearchInput");
         const btnSearchClear = document.getElementById("btnSearchClear");
         const btnMobileSearchToggle = document.getElementById("btnMobileSearchToggle");
-        const searchBoxLeadingIcon = document.getElementById("searchBoxLeadingIcon");
         const driveHeader = document.querySelector(".drive-header");
 
         if (topSearchInput) {
-            topSearchInput.addEventListener("input", () => {
+            const handleSearchChange = () => {
                 const val = (topSearchInput.value || "").trim();
                 if (btnSearchClear) {
                     btnSearchClear.style.display = val.length > 0 ? "inline-flex" : "none";
@@ -3921,7 +3919,10 @@
                 if (rootFolderView && rootFolderView.style.display !== "none") {
                     syncRootFolderGrid();
                 }
-            });
+            };
+
+            topSearchInput.addEventListener("input", handleSearchChange);
+            topSearchInput.addEventListener("compositionend", handleSearchChange);
 
             topSearchInput.addEventListener("keydown", (e) => {
                 if (e.key === "Escape") {
@@ -3950,14 +3951,6 @@
                     if (isActive && topSearchInput) {
                         topSearchInput.focus();
                     }
-                }
-            });
-        }
-
-        if (searchBoxLeadingIcon) {
-            searchBoxLeadingIcon.addEventListener("click", () => {
-                if (driveHeader && driveHeader.classList.contains("mobile-search-active")) {
-                    driveHeader.classList.remove("mobile-search-active");
                 }
             });
         }
@@ -4163,8 +4156,8 @@
             keywordListContainer.innerHTML = "";
 
             const selectedSet = new Set(selectKeywords || []);
-            const query = (filterQuery || "").trim().toLowerCase();
-            const filteredKeywords = (availKeywords || []).filter(kw => !query || kw.toLowerCase().includes(query));
+            const query = (filterQuery || "").normalize('NFC').trim().toLowerCase();
+            const filteredKeywords = (availKeywords || []).filter(kw => !query || (kw || "").normalize('NFC').toLowerCase().includes(query));
 
             const searchWrap = document.getElementById("keywordSearchWrap");
             if (searchWrap) {
@@ -4336,9 +4329,11 @@
         }
 
         if (keywordFilterSearchInput) {
-            keywordFilterSearchInput.addEventListener("input", () => {
+            const handleFilterInput = () => {
                 renderKeywordDropdownItems(keywordFilterSearchInput.value);
-            });
+            };
+            keywordFilterSearchInput.addEventListener("input", handleFilterInput);
+            keywordFilterSearchInput.addEventListener("compositionend", handleFilterInput);
         }
 
         // Backdrop click close for all dialogs

@@ -361,7 +361,7 @@ const tokenCache = new Map();
 
 function extractTokens(nameOnly) {
     const tokens = [];
-    const lower = nameOnly.toLowerCase();
+    const lower = (nameOnly || "").normalize('NFC').toLowerCase();
 
     // Extract bracket contents and replace with spaces
     const remaining = lower.replace(BRACKET_PATTERN, (_, group) => {
@@ -440,11 +440,11 @@ async function showFls() {
     const grid = document.getElementById("mediaGrid"); grid.innerHTML = "";
     let entries = Object.entries(state.flsMap);
 
-    // Search query filtering (case-insensitive)
+    // Search query filtering (case-insensitive & NFC normalized for Korean/multilingual)
     const searchInput = document.getElementById("topSearchInput");
-    const query = (searchInput ? searchInput.value || "" : "").trim().toLowerCase();
+    const query = (searchInput ? searchInput.value || "" : "").normalize('NFC').trim().toLowerCase();
     if (query) {
-        entries = entries.filter(([name]) => name.toLowerCase().includes(query));
+        entries = entries.filter(([name]) => (name || "").normalize('NFC').toLowerCase().includes(query));
     }
 
     // Keyword filtering (AND condition across all selected keywords)
@@ -567,17 +567,25 @@ window.toggleKeywordFilter = async (kw) => {
 const searchInputEl = document.getElementById("topSearchInput");
 if (searchInputEl) {
     let searchDebounce = null;
-    searchInputEl.addEventListener("input", () => {
+    const triggerSearch = (immediate = false) => {
         clearTimeout(searchDebounce);
-        searchDebounce = setTimeout(async () => {
+        const doSearch = async () => {
             if (state.id) {
                 state.page = 1;
                 await showFls();
                 const mediaContainer = document.getElementById("mediaContainer");
                 if (mediaContainer) mediaContainer.scrollTop = 0;
             }
-        }, 120);
-    });
+        };
+        if (immediate) {
+            doSearch();
+        } else {
+            searchDebounce = setTimeout(doSearch, 100);
+        }
+    };
+
+    searchInputEl.addEventListener("input", () => triggerSearch(false));
+    searchInputEl.addEventListener("compositionend", () => triggerSearch(true));
 }
 
 // Fetch thumb file.
