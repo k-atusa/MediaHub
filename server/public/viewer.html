@@ -152,30 +152,21 @@
             background-color: var(--preview-hover);
         }
 
-        /* Google Drive Style File Name Field */
+        /* Google Drive Style File Name Display */
         #txName {
-            height: 38px;
-            background: transparent;
-            border: 1px solid transparent;
-            border-radius: 6px;
             color: var(--preview-text);
             font-family: inherit;
-            font-size: 15px;
+            font-size: 16px;
             font-weight: 500;
-            padding: 0 10px;
-            outline: none;
-            max-width: 460px;
+            padding: 0 8px;
+            max-width: 480px;
             flex: 1;
-            transition: background-color 0.15s, border-color 0.15s, color 0.15s;
-        }
-
-        #txName:hover {
-            background-color: var(--preview-hover);
-        }
-
-        #txName:focus {
-            background-color: var(--preview-surface);
-            border-color: var(--preview-primary);
+            min-width: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            user-select: text;
+            cursor: default;
         }
 
         .topbar-actions {
@@ -701,7 +692,7 @@
             }
 
             #txName {
-                font-size: 13px;
+                font-size: 14px;
             }
 
             .btn-floating-nav {
@@ -887,7 +878,7 @@
             <button onclick="window.location.href='./folder.html'" class="icon-btn" title="Close / Back to Drive">
                 <span class="material-symbols-outlined">arrow_back</span>
             </button>
-            <input type="text" id="txName" placeholder="File name">
+            <span id="txName" class="topbar-filename"></span>
             <button id="btnViewerMore" class="icon-btn viewer-more-btn" title="More options" aria-label="More options">
                 <span class="material-symbols-outlined">more_vert</span>
             </button>

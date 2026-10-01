@@ -43,7 +43,11 @@ if (paramFld && paramFile) {
 }
 
 if (!flKey || !flName || !fldId || !fldKey) window.location.href = "./folder.html";
-document.getElementById("txName").value = flName;
+const tx = document.getElementById("txName");
+if (tx) {
+    tx.textContent = flName;
+    tx.title = flName;
+}
 
 // Supported media extension categories
 const VIDEO_EXTS = ['mp4', 'webm', 'mov', 'mkv'];
@@ -396,7 +400,10 @@ async function performRename(newNm) {
         sessionStorage.setItem("currentFileName", rawNewNm);
         flName = rawNewNm;
         const tx = document.getElementById("txName");
-        if (tx) tx.value = rawNewNm;
+        if (tx) {
+            tx.textContent = rawNewNm;
+            tx.title = rawNewNm;
+        }
         if (window.showNotice) {
             window.showNotice(`✅ Renamed to "${rawNewNm}"`, "Success", "check_circle");
         } else {
@@ -800,12 +807,7 @@ if (btnShare) {
     btnShare.addEventListener("click", shareFl);
 }
 document.getElementById("btnEdit")?.addEventListener("click", () => {
-    const currentVal = document.getElementById("txName")?.value.trim();
-    if (currentVal && currentVal !== flName) {
-        performRename(currentVal);
-    } else {
-        openRenameModal();
-    }
+    openRenameModal();
 });
 document.getElementById("btnDown")?.addEventListener("click", downFl);
 document.getElementById("btnDelete")?.addEventListener("click", delFl);
