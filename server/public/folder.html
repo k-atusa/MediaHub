@@ -2790,7 +2790,7 @@
             <button class="mobile-search-back-btn" id="btnMobileSearchClose" type="button" title="Back">
                 <span class="material-symbols-outlined">arrow_back</span>
             </button>
-            <input type="text" class="search-input" placeholder="Search in MediaHub" id="topSearchInput" autocomplete="off" spellcheck="false">
+            <input type="text" class="search-input" placeholder="Search in MediaHub" id="topSearchInput" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
             <button class="search-clear-btn" id="btnSearchClear" type="button" title="Clear search" style="display: none;">
                 <span class="material-symbols-outlined" style="font-size: 18px;">close</span>
             </button>
@@ -2998,7 +2998,7 @@
                             <div class="filter-search-wrap" id="keywordSearchWrap" style="padding: 4px 8px 6px 8px; display: none;">
                                 <div style="position: relative; display: flex; align-items: center;">
                                     <span class="material-symbols-outlined" style="position: absolute; left: 8px; font-size: 16px; color: var(--g-text-muted);">search</span>
-                                    <input type="text" id="keywordFilterSearchInput" class="filter-dropdown-search-input" placeholder="Search keywords..." autocomplete="off" spellcheck="false">
+                                    <input type="text" id="keywordFilterSearchInput" class="filter-dropdown-search-input" placeholder="Search keywords..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
                                 </div>
                             </div>
                             <!-- Keywords scrollable list items -->
@@ -3091,10 +3091,10 @@
         <input type="file" id="folderInput" webkitdirectory directory multiple>
         <button id="btnUpload">Upload</button>
         <button id="btnTrim">Trim</button>
-        <input type="text" id="newFolderName">
+        <input type="text" id="newFolderName" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
         <button id="btnCreateFolder">Create</button>
-        <input type="text" id="renameOldFolderName" style="display: none;">
-        <input type="text" id="renameNewFolderName" style="display: none;">
+        <input type="text" id="renameOldFolderName" style="display: none;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <input type="text" id="renameNewFolderName" style="display: none;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
         <button id="btnRenameFolder" style="display: none;"></button>
         <button id="btnExport" style="display: none;"></button>
         <button id="btnDeleteFolder" style="display: none;"></button>
@@ -3144,7 +3144,7 @@
             <span class="material-symbols-outlined">create_new_folder</span>
         </div>
         <div class="dialog-title">New folder</div>
-        <input type="text" id="modalFolderNameInput" class="dialog-input" placeholder="Untitled folder">
+        <input type="text" id="modalFolderNameInput" class="dialog-input" placeholder="Untitled folder" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
         <div class="dialog-btn-group">
             <button class="btn-dialog-cancel" id="btnCancelNewFolder" type="button">Cancel</button>
             <button class="btn-dialog-confirm" id="btnConfirmNewFolder" type="button">Create</button>
@@ -3157,7 +3157,7 @@
             <span class="material-symbols-outlined">drive_file_rename_outline</span>
         </div>
         <div class="dialog-title">Rename</div>
-        <input type="text" id="modalRenameFolderNameInput" class="dialog-input" placeholder="Folder name" autocomplete="off" spellcheck="false">
+        <input type="text" id="modalRenameFolderNameInput" class="dialog-input" placeholder="Folder name" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
         <div id="renameFolderErrorText" style="color: var(--g-danger, #b3261e); font-size: 13px; margin-top: -12px; margin-bottom: 16px; display: none;"></div>
         <div class="dialog-btn-group">
             <button class="btn-dialog-cancel" id="btnCancelRenameFolder" type="button">Cancel</button>
@@ -3171,7 +3171,7 @@
             <span class="material-symbols-outlined">drive_file_rename_outline</span>
         </div>
         <div class="dialog-title">Rename</div>
-        <input type="text" id="modalRenameFileNameInput" class="dialog-input" placeholder="File name" autocomplete="off" spellcheck="false">
+        <input type="text" id="modalRenameFileNameInput" class="dialog-input" placeholder="File name" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-form-type="other">
         <div id="renameFileErrorText" style="color: var(--g-danger, #b3261e); font-size: 13px; margin-top: -12px; margin-bottom: 16px; display: none;"></div>
         <div class="dialog-btn-group">
             <button class="btn-dialog-cancel" id="btnCancelRenameFile" type="button">Cancel</button>
@@ -3185,8 +3185,8 @@
             <span class="material-symbols-outlined">lock_reset</span>
         </div>
         <div class="dialog-title">Change Password</div>
-        <input type="password" id="newPassword" class="dialog-input" placeholder="New Password">
-        <input type="password" id="newPasswordConfirm" class="dialog-input" placeholder="Confirm Password">
+        <input type="password" id="newPassword" class="dialog-input" placeholder="New Password" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
+        <input type="password" id="newPasswordConfirm" class="dialog-input" placeholder="Confirm Password" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
         <div class="dialog-btn-group">
             <button id="btnCancelPw" class="btn-dialog-cancel" type="button">Cancel</button>
             <button id="btnConfirmPw" class="btn-dialog-confirm" type="button">Save</button>
@@ -3227,7 +3227,7 @@
             <div id="shareModalDesc" style="margin-bottom: 16px;">Set a password to encrypt this folder's share token.
                 Anyone with the token file and password can access the folder.</div>
             <input type="password" id="sharePasswordInput" class="dialog-input" placeholder="Set share password"
-                autocomplete="new-password">
+                autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
             <div id="shareErrorText"
                 style="color: var(--g-danger); font-size: 13px; margin-top: -12px; margin-bottom: 8px; display: none;">
             </div>
@@ -3263,7 +3263,7 @@
         <div class="dialog-body">
             <div style="margin-bottom: 16px;">Enter the password to decrypt and import this folder share token.</div>
             <input type="password" id="importPasswordInput" class="dialog-input" placeholder="Enter share password"
-                autocomplete="current-password">
+                autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
             <div id="importErrorText"
                 style="color: var(--g-danger); font-size: 13px; margin-top: -12px; margin-bottom: 8px; display: none;">
             </div>
@@ -4703,6 +4703,11 @@
             }
             if (modalRenameFileInput) {
                 modalRenameFileInput.value = fileName;
+                modalRenameFileInput.setAttribute("autocomplete", "off");
+                modalRenameFileInput.setAttribute("autocorrect", "off");
+                modalRenameFileInput.setAttribute("autocapitalize", "off");
+                modalRenameFileInput.setAttribute("spellcheck", "false");
+                modalRenameFileInput.setAttribute("data-lpignore", "true");
             }
             if (renameFileModal) {
                 renameFileModal.showModal();
@@ -5965,8 +5970,21 @@
             });
         });
 
+        function disableAllAutocomplete() {
+            document.querySelectorAll('input:not([type="checkbox"]):not([type="file"]):not([type="radio"])').forEach(input => {
+                if (!input.hasAttribute('autocomplete') || input.getAttribute('autocomplete') !== 'new-password') {
+                    input.setAttribute('autocomplete', 'off');
+                }
+                input.setAttribute('autocorrect', 'off');
+                input.setAttribute('autocapitalize', 'off');
+                input.setAttribute('spellcheck', 'false');
+                input.setAttribute('data-lpignore', 'true');
+            });
+        }
+
         // Initial setup
         function initSetup() {
+            disableAllAutocomplete();
             syncSidebarFolderList();
             syncRootFolderGrid();
             updateFolderDisplay();

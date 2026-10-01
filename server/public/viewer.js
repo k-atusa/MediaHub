@@ -434,6 +434,11 @@ function openRenameModal() {
         errText.textContent = "";
     }
     input.value = flName;
+    input.setAttribute("autocomplete", "off");
+    input.setAttribute("autocorrect", "off");
+    input.setAttribute("autocapitalize", "off");
+    input.setAttribute("spellcheck", "false");
+    input.setAttribute("data-lpignore", "true");
     modal.showModal();
     input.focus();
     const lastDot = flName.lastIndexOf('.');
