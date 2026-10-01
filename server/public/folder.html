@@ -876,7 +876,8 @@
             background-color: rgba(255, 255, 255, 0.12);
         }
 
-        @media (hover: none), (max-width: 768px) {
+        @media (hover: none),
+        (max-width: 768px) {
             .file-more-btn {
                 opacity: 1;
             }
@@ -1593,10 +1594,12 @@
                 left: -35%;
                 width: 35%;
             }
+
             60% {
                 left: 100%;
                 width: 70%;
             }
+
             100% {
                 left: 100%;
                 width: 70%;
@@ -2343,6 +2346,7 @@
                     opacity: 0;
                     transform: scale(0.97);
                 }
+
                 to {
                     opacity: 1;
                     transform: scale(1);
@@ -2550,8 +2554,15 @@
         }
 
         @keyframes m3FadeIn {
-            from { opacity: 0; transform: translateY(-4px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(-4px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .chips-label {
@@ -2699,6 +2710,7 @@
         .filter-items-scroll-list::-webkit-scrollbar {
             width: 5px;
         }
+
         .filter-items-scroll-list::-webkit-scrollbar-thumb {
             background: var(--g-border);
             border-radius: 3px;
@@ -2790,15 +2802,18 @@
             <button class="mobile-search-back-btn" id="btnMobileSearchClose" type="button" title="Back">
                 <span class="material-symbols-outlined">arrow_back</span>
             </button>
-            <input type="text" class="search-input" placeholder="Search in MediaHub" id="topSearchInput" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
-            <button class="search-clear-btn" id="btnSearchClear" type="button" title="Clear search" style="display: none;">
+            <input type="text" class="search-input" placeholder="Search in MediaHub" id="topSearchInput"
+                autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
+            <button class="search-clear-btn" id="btnSearchClear" type="button" title="Clear search"
+                style="display: none;">
                 <span class="material-symbols-outlined" style="font-size: 18px;">close</span>
             </button>
         </div>
 
         <div class="header-right">
             <!-- Mobile Search Toggle Button -->
-            <button class="header-icon-btn mobile-search-toggle" id="btnMobileSearchToggle" type="button" title="Search">
+            <button class="header-icon-btn mobile-search-toggle" id="btnMobileSearchToggle" type="button"
+                title="Search">
                 <span class="material-symbols-outlined">search</span>
             </button>
             <!-- Account Menu Dropdown (Triggered by Avatar) -->
@@ -2913,7 +2928,9 @@
                     </div>
                     <div class="workspace-title-row" style="display: flex; align-items: center; gap: 8px;">
                         <h1 class="workspace-folder-title" id="currentFolderTitle">My Drive</h1>
-                        <button id="btnCurrentFolderMore" type="button" style="display: none; width: 32px; height: 32px; border-radius: 50%; border: none; background: transparent; align-items: center; justify-content: center; cursor: pointer; color: var(--g-text-secondary, #5f6368); transition: background-color 0.15s ease;" title="Folder options" aria-label="Folder options">
+                        <button id="btnCurrentFolderMore" type="button"
+                            style="display: none; width: 32px; height: 32px; border-radius: 50%; border: none; background: transparent; align-items: center; justify-content: center; cursor: pointer; color: var(--g-text-secondary, #5f6368); transition: background-color 0.15s ease;"
+                            title="Folder options" aria-label="Folder options">
                             <span class="material-symbols-outlined" style="font-size: 20px;">more_vert</span>
                         </button>
                     </div>
@@ -2922,7 +2939,8 @@
                 <div class="workspace-action-group">
                     <!-- View Options Dropdown Menu (Windows File Explorer Style) -->
                     <div class="view-action-wrapper" id="viewActionWrapper">
-                        <button class="top-action-btn" id="btnViewMenu" type="button" aria-haspopup="true" aria-expanded="false" title="View options">
+                        <button class="top-action-btn" id="btnViewMenu" type="button" aria-haspopup="true"
+                            aria-expanded="false" title="View options">
                             <span class="material-symbols-outlined" id="viewModeIcon">grid_view</span>
                             <span>View</span>
                         </button>
@@ -2958,7 +2976,8 @@
                     </div>
                     <!-- Sort As Dropdown Menu -->
                     <div class="sort-action-wrapper" id="sortActionWrapper">
-                        <button class="top-action-btn" id="btnSortMenu" type="button" aria-haspopup="true" aria-expanded="false" title="Sort files">
+                        <button class="top-action-btn" id="btnSortMenu" type="button" aria-haspopup="true"
+                            aria-expanded="false" title="Sort files">
                             <span class="material-symbols-outlined" id="sortModeIcon">swap_vert</span>
                             <span id="sortModeText">Sort as</span>
                         </button>
@@ -2989,7 +3008,8 @@
                     </div>
                     <!-- Keyword Filter Dropdown (Matches Sort & View dropdown style) -->
                     <div class="filter-action-wrapper" id="filterActionWrapper">
-                        <button class="top-action-btn" id="btnKeywordFilter" type="button" aria-haspopup="true" aria-expanded="false" title="Filter files by keywords">
+                        <button class="top-action-btn" id="btnKeywordFilter" type="button" aria-haspopup="true"
+                            aria-expanded="false" title="Filter files by keywords">
                             <span class="material-symbols-outlined" id="keywordFilterIcon">filter_list</span>
                             <span>Filter</span>
                             <span class="filter-count-badge" id="filterCountBadge" style="display: none;">0</span>
@@ -2997,21 +3017,30 @@
                         <div class="filter-dropdown-menu" id="filterDropdownMenu">
                             <div class="filter-menu-header" id="filterMenuHeader">
                                 <span class="filter-header-title">Filter by keywords</span>
-                                <button type="button" id="btnClearAllKeywords" class="filter-menu-clear-btn" style="display: none;">Clear all</button>
+                                <button type="button" id="btnClearAllKeywords" class="filter-menu-clear-btn"
+                                    style="display: none;">Clear all</button>
                             </div>
                             <!-- Quick search within keywords -->
-                            <div class="filter-search-wrap" id="keywordSearchWrap" style="padding: 4px 8px 6px 8px; display: none;">
+                            <div class="filter-search-wrap" id="keywordSearchWrap"
+                                style="padding: 4px 8px 6px 8px; display: none;">
                                 <div style="position: relative; display: flex; align-items: center;">
-                                    <span class="material-symbols-outlined" style="position: absolute; left: 8px; font-size: 16px; color: var(--g-text-muted);">search</span>
-                                    <input type="text" id="keywordFilterSearchInput" class="filter-dropdown-search-input" placeholder="Search keywords..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
+                                    <span class="material-symbols-outlined"
+                                        style="position: absolute; left: 8px; font-size: 16px; color: var(--g-text-muted);">search</span>
+                                    <input type="text" id="keywordFilterSearchInput"
+                                        class="filter-dropdown-search-input" placeholder="Search keywords..."
+                                        autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+                                        data-lpignore="true">
                                 </div>
                             </div>
                             <!-- Keywords scrollable list items -->
                             <div class="filter-items-scroll-list" id="keywordListContainer"></div>
                             <div id="keywordEmptyMessage" class="filter-empty-message" style="display: none;">
-                                <span class="material-symbols-outlined" style="font-size: 26px; margin-bottom: 4px; display: block; opacity: 0.6;">search_off</span>
-                                <div style="font-size: 13px; font-weight: 500; color: var(--g-text-main);">No keywords found</div>
-                                <div style="font-size: 11px; color: var(--g-text-muted); margin-top: 2px;">(Requires 4+ occurrences across files)</div>
+                                <span class="material-symbols-outlined"
+                                    style="font-size: 26px; margin-bottom: 4px; display: block; opacity: 0.6;">search_off</span>
+                                <div style="font-size: 13px; font-weight: 500; color: var(--g-text-main);">No keywords
+                                    found</div>
+                                <div style="font-size: 11px; color: var(--g-text-muted); margin-top: 2px;">(Requires 4+
+                                    occurrences across files)</div>
                             </div>
                         </div>
                     </div>
@@ -3034,7 +3063,8 @@
                 <!-- Active Filter Chips Bar (Shown when keyword filters are applied) -->
                 <div id="activeFilterChipsBar" class="active-filter-chips-bar" style="display: none;">
                     <span class="chips-label">
-                        <span class="material-symbols-outlined" style="font-size: 16px; color: var(--g-primary-blue);">filter_alt</span>
+                        <span class="material-symbols-outlined"
+                            style="font-size: 16px; color: var(--g-primary-blue);">filter_alt</span>
                         Filters:
                     </span>
                     <div class="chips-scroll-wrap" id="activeChipsList"></div>
@@ -3065,7 +3095,8 @@
                 <div class="empty-state-view" id="emptyStateContainer">
                     <span class="material-symbols-outlined empty-cloud-icon" id="emptyStateIcon">cloud_upload</span>
                     <div class="empty-title" id="emptyStateTitle">This folder is empty</div>
-                    <div class="empty-subtitle" id="emptyStateSubtitle">Drag and drop files anywhere on the page, or use the upload button.</div>
+                    <div class="empty-subtitle" id="emptyStateSubtitle">Drag and drop files anywhere on the page, or use
+                        the upload button.</div>
                     <button class="btn-empty-upload" id="btnEmptyUploadAction">
                         <span class="material-symbols-outlined">add</span>
                         <span>Upload</span>
@@ -3096,10 +3127,13 @@
         <input type="file" id="folderInput" webkitdirectory directory multiple>
         <button id="btnUpload">Upload</button>
         <button id="btnTrim">Trim</button>
-        <input type="text" id="newFolderName" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
+        <input type="text" id="newFolderName" autocomplete="off" autocorrect="off" autocapitalize="off"
+            spellcheck="false" data-lpignore="true">
         <button id="btnCreateFolder">Create</button>
-        <input type="text" id="renameOldFolderName" style="display: none;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-        <input type="text" id="renameNewFolderName" style="display: none;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <input type="text" id="renameOldFolderName" style="display: none;" autocomplete="off" autocorrect="off"
+            autocapitalize="off" spellcheck="false">
+        <input type="text" id="renameNewFolderName" style="display: none;" autocomplete="off" autocorrect="off"
+            autocapitalize="off" spellcheck="false">
         <button id="btnRenameFolder" style="display: none;"></button>
         <button id="btnExport" style="display: none;"></button>
         <button id="btnUnlinkFolder" style="display: none;"></button>
@@ -3144,7 +3178,8 @@
             <span class="menu-label">Download</span>
         </div>
         <div class="drive-menu-item" id="fileMenuDelete" style="color: var(--g-danger, #b3261e);">
-            <span class="material-symbols-outlined menu-icon" style="color: var(--g-danger, #b3261e);">delete_outline</span>
+            <span class="material-symbols-outlined menu-icon"
+                style="color: var(--g-danger, #b3261e);">delete_outline</span>
             <span class="menu-label" style="color: var(--g-danger, #b3261e);">Delete</span>
         </div>
     </div>
@@ -3155,7 +3190,8 @@
             <span class="material-symbols-outlined">create_new_folder</span>
         </div>
         <div class="dialog-title">New folder</div>
-        <input type="text" id="modalFolderNameInput" class="dialog-input" placeholder="Untitled folder" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
+        <input type="text" id="modalFolderNameInput" class="dialog-input" placeholder="Untitled folder"
+            autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
         <div class="dialog-btn-group">
             <button class="btn-dialog-cancel" id="btnCancelNewFolder" type="button">Cancel</button>
             <button class="btn-dialog-confirm" id="btnConfirmNewFolder" type="button">Create</button>
@@ -3168,8 +3204,11 @@
             <span class="material-symbols-outlined">drive_file_rename_outline</span>
         </div>
         <div class="dialog-title">Rename</div>
-        <input type="text" id="modalRenameFolderNameInput" class="dialog-input" placeholder="Folder name" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
-        <div id="renameFolderErrorText" style="color: var(--g-danger, #b3261e); font-size: 13px; margin-top: -12px; margin-bottom: 16px; display: none;"></div>
+        <input type="text" id="modalRenameFolderNameInput" class="dialog-input" placeholder="Folder name"
+            autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
+        <div id="renameFolderErrorText"
+            style="color: var(--g-danger, #b3261e); font-size: 13px; margin-top: -12px; margin-bottom: 16px; display: none;">
+        </div>
         <div class="dialog-btn-group">
             <button class="btn-dialog-cancel" id="btnCancelRenameFolder" type="button">Cancel</button>
             <button class="btn-dialog-confirm" id="btnConfirmRenameFolder" type="button">OK</button>
@@ -3182,8 +3221,11 @@
             <span class="material-symbols-outlined">drive_file_rename_outline</span>
         </div>
         <div class="dialog-title">Rename</div>
-        <input type="text" id="modalRenameFileNameInput" class="dialog-input" placeholder="File name" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-form-type="other">
-        <div id="renameFileErrorText" style="color: var(--g-danger, #b3261e); font-size: 13px; margin-top: -12px; margin-bottom: 16px; display: none;"></div>
+        <input type="text" id="modalRenameFileNameInput" class="dialog-input" placeholder="File name" autocomplete="off"
+            autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-form-type="other">
+        <div id="renameFileErrorText"
+            style="color: var(--g-danger, #b3261e); font-size: 13px; margin-top: -12px; margin-bottom: 16px; display: none;">
+        </div>
         <div class="dialog-btn-group">
             <button class="btn-dialog-cancel" id="btnCancelRenameFile" type="button">Cancel</button>
             <button class="btn-dialog-confirm" id="btnConfirmRenameFile" type="button">OK</button>
@@ -3196,8 +3238,10 @@
             <span class="material-symbols-outlined">lock_reset</span>
         </div>
         <div class="dialog-title">Change Password</div>
-        <input type="password" id="newPassword" class="dialog-input" placeholder="New Password" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
-        <input type="password" id="newPasswordConfirm" class="dialog-input" placeholder="Confirm Password" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
+        <input type="password" id="newPassword" class="dialog-input" placeholder="New Password"
+            autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
+        <input type="password" id="newPasswordConfirm" class="dialog-input" placeholder="Confirm Password"
+            autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
         <div class="dialog-btn-group">
             <button id="btnCancelPw" class="btn-dialog-cancel" type="button">Cancel</button>
             <button id="btnConfirmPw" class="btn-dialog-confirm" type="button">Save</button>
@@ -3211,12 +3255,18 @@
         </div>
         <div class="dialog-title">Clear Server Cache</div>
         <div class="dialog-body" id="clearCacheModalBody">
-            This will scan all your encrypted folders on the server and safely remove unreferenced orphan files to free up storage space.
+            This will scan all your encrypted folders on the server and safely remove unreferenced orphan files to free
+            up storage space.
         </div>
         <div id="clearCacheStatusArea" style="display: none; margin-bottom: 16px;">
-            <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px;">
-                <div id="clearCacheStatusText" style="font-size: 14px; color: var(--g-text-main); line-height: 1.5; word-break: break-all; text-align: left;">Scanning encrypted folders...</div>
-                <div id="clearCacheProgressPercent" style="font-size: 13px; font-weight: 500; color: var(--g-primary-blue); flex-shrink: 0; display: none;">0%</div>
+            <div
+                style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px;">
+                <div id="clearCacheStatusText"
+                    style="font-size: 14px; color: var(--g-text-main); line-height: 1.5; word-break: break-all; text-align: left;">
+                    Scanning encrypted folders...</div>
+                <div id="clearCacheProgressPercent"
+                    style="font-size: 13px; font-weight: 500; color: var(--g-primary-blue); flex-shrink: 0; display: none;">
+                    0%</div>
             </div>
             <div class="m3-linear-progress">
                 <div id="clearCacheProgressBar" class="m3-linear-bar indeterminate"></div>
@@ -3238,7 +3288,8 @@
             <div id="shareModalDesc" style="margin-bottom: 16px;">Set a password to encrypt this folder's share token.
                 Anyone with the token file and password can access the folder.</div>
             <input type="password" id="sharePasswordInput" class="dialog-input" placeholder="Set share password"
-                autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
+                autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false"
+                data-lpignore="true">
             <div id="shareErrorText"
                 style="color: var(--g-danger); font-size: 13px; margin-top: -12px; margin-bottom: 8px; display: none;">
             </div>
@@ -3256,7 +3307,8 @@
             <span>Remove folder from account?</span>
         </div>
         <div class="dialog-body" id="unlinkFolderText">
-            Are you sure you want to remove this folder from your account? The folder and all files inside it will remain accessible on the server for other users who share it.
+            Are you sure you want to remove this folder from your account? The folder and all files inside it will
+            remain accessible on the server for other users who share it.
         </div>
         <div class="dialog-actions">
             <button id="btnCancelUnlinkFolder" class="btn-dialog-text" type="button">Cancel</button>

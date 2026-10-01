@@ -63,7 +63,7 @@ async function saveUsr() {
 }
 
 // No-op for backward compatibility
-window.syncCanonicalFolderNames = () => {};
+window.syncCanonicalFolderNames = () => { };
 
 // Load map from server.
 async function loadUsr() {
@@ -1038,7 +1038,7 @@ window.cancelUpload = (fileIdx) => {
     if (currentUploadState.currentXHR) {
         try {
             currentUploadState.currentXHR.abort();
-        } catch (e) {}
+        } catch (e) { }
     }
     if (window.markUploadCancelled) {
         window.markUploadCancelled(fileIdx !== undefined ? fileIdx : currentUploadState.activeFileIdx);
