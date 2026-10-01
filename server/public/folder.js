@@ -65,6 +65,49 @@ async function saveUsr() {
 // No-op for backward compatibility
 window.syncCanonicalFolderNames = () => { };
 
+// Local unlinked folder tracking for client-side orphan management
+function getUnlinkedFolderIds() {
+    try {
+        return JSON.parse(localStorage.getItem("mh_unlinked_folders") || "[]");
+    } catch (_) {
+        return [];
+    }
+}
+
+function trackFolderUnlinked(fldId) {
+    if (!fldId) return;
+    try {
+        const unlinked = getUnlinkedFolderIds();
+        if (!unlinked.includes(fldId)) {
+            unlinked.push(fldId);
+            localStorage.setItem("mh_unlinked_folders", JSON.stringify(unlinked));
+        }
+    } catch (_) {}
+}
+
+function trackFolderDeleted(fldId) {
+    if (!fldId) return;
+    try {
+        const unlinked = getUnlinkedFolderIds();
+        const filtered = unlinked.filter(id => id !== fldId);
+        localStorage.setItem("mh_unlinked_folders", JSON.stringify(filtered));
+    } catch (_) {}
+}
+
+function trackFolderRestored(fldId) {
+    if (!fldId) return;
+    try {
+        const unlinked = getUnlinkedFolderIds();
+        const filtered = unlinked.filter(id => id !== fldId);
+        localStorage.setItem("mh_unlinked_folders", JSON.stringify(filtered));
+    } catch (_) {}
+}
+
+window.getUnlinkedFolderIds = getUnlinkedFolderIds;
+window.trackFolderUnlinked = trackFolderUnlinked;
+window.trackFolderDeleted = trackFolderDeleted;
+window.trackFolderRestored = trackFolderRestored;
+
 // Load map from server.
 async function loadUsr() {
     const res = await fetch(`${SERVER}/api/userdata/${usrHsh}`);
@@ -99,10 +142,12 @@ document.getElementById("btnCreateFolder").addEventListener("click", async () =>
     const name = document.getElementById("newFolderName").value.trim();
     if (!name || state.fldMap[name]) return alert("⚠️ Invalid name");
     const rk = new Uint8Array(44); rk.set(Random(32), 0); rk.set(Random(12), 32);
+    const fldId = getObjPid(rk);
     const maskedKey = mask.XOR(rk);
     rk.fill(0);
     state.fldMap[name] = maskedKey;
     await saveUsr(); showFld();
+    trackFolderRestored(fldId);
     document.getElementById("newFolderName").value = "";
 });
 
@@ -419,6 +464,7 @@ document.getElementById("btnImport").addEventListener("click", () => {
             if (oldFldId !== fldId) {
                 try {
                     await fetch(`${SERVER}/api/storage/${oldFldId}/names`, { method: "DELETE", headers: { "X-User-Hash": usrHsh } });
+                    await trackFolderDeleted(oldFldId);
                 } catch (e) {
                     console.warn("Failed to delete old folder storage", e);
                 }
@@ -426,6 +472,7 @@ document.getElementById("btnImport").addEventListener("click", () => {
         }
         state.fldMap[effectiveName] = info.key;
         await saveUsr();
+        trackFolderRestored(fldId);
         await loadUsr();
         if (window.showNotice) window.showNotice(`✅ Folder "${effectiveName}" imported successfully.`, "Success", "check_circle");
     };
@@ -1258,7 +1305,13 @@ async function executeUnlinkFolder(rawFolderName) {
     }
 
     try {
+        const maskedKey = state.fldMap[actualKey];
+        const rawK = mask.XOR(maskedKey);
+        const fldId = getObjPid(rawK);
+        rawK.fill(0);
+
         delete state.fldMap[actualKey];
+        await trackFolderUnlinked(fldId);
 
         const isActive = (state.name === actualKey || (state.name && state.name.normalize('NFC') === actualKey.normalize('NFC')));
         if (isActive) {
@@ -1308,6 +1361,7 @@ async function executeDeleteFolder(rawFolderName) {
         rawK.fill(0);
 
         await fetch(`${SERVER}/api/storage/${fldId}/names`, { method: "DELETE", headers: { "X-User-Hash": usrHsh } });
+        await trackFolderDeleted(fldId);
 
         delete state.fldMap[actualKey];
 

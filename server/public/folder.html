@@ -5516,16 +5516,48 @@
                     const sm = new SymMaster("gcm1", rawUK);
                     rawUK.fill(0);
 
-                    const usrRes = await fetch(`${window.location.origin}/api/userdata/${usrHsh}`);
-                    if (!usrRes.ok) {
-                        throw new Error(usrRes.status === 404 ? "User data not found" : "Failed to load user data");
+                    let fldMap = {};
+                    try {
+                        const usrRes = await fetch(`${window.location.origin}/api/userdata/${usrHsh}`);
+                        if (usrRes.ok) {
+                            const usrDec = await sm.DeBin(new Uint8Array(await usrRes.arrayBuffer()));
+                            fldMap = DecodeCfg(usrDec) || {};
+                            usrDec.fill(0);
+                        }
+                    } catch (uErr) {
+                        console.warn("Could not load userdata for clear cache:", uErr);
                     }
-                    const usrDec = await sm.DeBin(new Uint8Array(await usrRes.arrayBuffer()));
-                    const fldMap = DecodeCfg(usrDec);
-                    usrDec.fill(0);
 
-                    const folderEntries = Object.entries(fldMap);
-                    if (folderEntries.length === 0) {
+                    // Candidate folders map: fldId -> { fldId, isOwned, name, key }
+                    const candidateMap = new Map();
+
+                    // 1. Folders owned by current user (active)
+                    for (const [fName, fldKey] of Object.entries(fldMap)) {
+                        if (!fldKey || fldKey.length < 44) continue;
+                        const fldId = getObjPid(fldKey);
+                        if (!fldId) continue;
+                        candidateMap.set(fldId, {
+                            fldId,
+                            isOwned: true,
+                            name: fName,
+                            key: fldKey
+                        });
+                    }
+
+                    // 2. Unlinked folder candidates from client-local localStorage
+                    try {
+                        const unlinked = (window.getUnlinkedFolderIds ? window.getUnlinkedFolderIds() : JSON.parse(localStorage.getItem("mh_unlinked_folders") || "[]"));
+                        for (const uId of unlinked) {
+                            if (!uId || candidateMap.has(uId)) continue;
+                            candidateMap.set(uId, {
+                                fldId: uId,
+                                isOwned: false,
+                                name: "unreferenced folder"
+                            });
+                        }
+                    } catch (_) {}
+
+                    if (candidateMap.size === 0) {
                         clearCacheModal.dataset.preventBackdropClose = "false";
                         clearCacheStatusArea.style.display = "none";
                         clearCacheModalBody.style.display = "block";
@@ -5548,77 +5580,104 @@
                         clearCacheProgressPercent.textContent = "0%";
                     }
 
+                    const candidateList = Array.from(candidateMap.values());
                     let totalCleanedFolders = 0;
                     let totalOrphanFiles = 0;
                     let totalOrphanPids = 0;
                     let totalKeptPids = 0;
-                    let reportLines = [];
+                    let totalOrphanFoldersDeleted = 0;
 
-                    for (let i = 0; i < folderEntries.length; i++) {
-                        const [fName, fldKey] = folderEntries[i];
-                        const currentPercent = Math.round((i / folderEntries.length) * 100);
+                    for (let i = 0; i < candidateList.length; i++) {
+                        const item = candidateList[i];
+                        const currentPercent = Math.round((i / candidateList.length) * 100);
                         if (clearCacheProgressBar) clearCacheProgressBar.style.width = `${currentPercent}%`;
                         if (clearCacheProgressPercent) clearCacheProgressPercent.textContent = `${currentPercent}%`;
-                        clearCacheStatusText.textContent = `Cleaning folder (${i + 1}/${folderEntries.length}): ${fName}...`;
+                        const displayName = (item.name && item.name !== "Orphan Folder" && item.name !== "Unlinked Folder") ? item.name : "unreferenced folder";
+                        clearCacheStatusText.textContent = `Cleaning (${i + 1}/${candidateList.length}): ${displayName}...`;
 
-                        try {
-                            const fldId = getObjPid(fldKey);
-                            const fldSm = new SymMaster("gcm1", fldKey.slice(0, 32));
-                            const flsRes = await fetch(`${window.location.origin}/api/storage/${fldId}/names`);
+                        if (item.isOwned) {
+                            try {
+                                const fldSm = new SymMaster("gcm1", item.key.slice(0, 32));
+                                const flsRes = await fetch(`${window.location.origin}/api/storage/${item.fldId}/names`);
 
-                            let validPids = [];
-                            if (flsRes.ok) {
-                                const flsDec = await fldSm.DeBin(new Uint8Array(await flsRes.arrayBuffer()));
-                                const flsMap = DecodeCfg(flsDec);
-                                flsDec.fill(0);
+                                let validPids = [];
+                                if (flsRes.ok) {
+                                    const flsDec = await fldSm.DeBin(new Uint8Array(await flsRes.arrayBuffer()));
+                                    const flsMap = DecodeCfg(flsDec);
+                                    flsDec.fill(0);
 
-                                for (const [, flKey] of Object.entries(flsMap)) {
-                                    if (flKey && flKey.length >= 44) {
-                                        const pid = getObjPid(flKey);
-                                        if (pid) validPids.push(pid);
+                                    for (const [, flKey] of Object.entries(flsMap)) {
+                                        if (flKey && flKey.length >= 44) {
+                                            const pid = getObjPid(flKey);
+                                            if (pid) validPids.push(pid);
+                                        }
                                     }
                                 }
+
+                                // Call /api/trim/{fldId}
+                                const trimRes = await fetch(`${window.location.origin}/api/trim/${item.fldId}`, {
+                                    method: "POST",
+                                    headers: {
+                                        "Content-Type": "application/json",
+                                        "X-User-Hash": usrHsh
+                                    },
+                                    body: JSON.stringify({ pids: validPids })
+                                });
+
+                                if (trimRes.ok) {
+                                    const msg = await trimRes.text();
+                                    totalCleanedFolders++;
+                                    const match = msg.match(/Trimmed (\d+) files \((\d+) orphan PIDs removed, (\d+) PIDs kept\)/);
+                                    if (match) {
+                                        const delFiles = parseInt(match[1], 10);
+                                        const delPids = parseInt(match[2], 10);
+                                        const keptPids = parseInt(match[3], 10);
+                                        totalOrphanFiles += delFiles;
+                                        totalOrphanPids += delPids;
+                                        totalKeptPids += keptPids;
+                                    }
+                                } else {
+                                    const errData = await trimRes.json().catch(() => ({ error: trimRes.statusText }));
+                                    console.warn(`Trim warning for ${item.name}:`, errData.error);
+                                }
+                            } catch (fErr) {
+                                console.warn(`Trim failed for folder ${item.name}:`, fErr);
                             }
-
-                            // Call /api/trim/{fldId}
-                            const trimRes = await fetch(`${window.location.origin}/api/trim/${fldId}`, {
-                                method: "POST",
-                                headers: {
-                                    "Content-Type": "application/json",
-                                    "X-User-Hash": usrHsh
-                                },
-                                body: JSON.stringify({ pids: validPids })
-                            });
-
-                            if (trimRes.ok) {
-                                const msg = await trimRes.text();
-                                totalCleanedFolders++;
-                                const match = msg.match(/Trimmed (\d+) files \((\d+) orphan PIDs removed, (\d+) PIDs kept\)/);
-                                if (match) {
-                                    const delFiles = parseInt(match[1], 10);
-                                    const delPids = parseInt(match[2], 10);
-                                    const keptPids = parseInt(match[3], 10);
-                                    totalOrphanFiles += delFiles;
-                                    totalOrphanPids += delPids;
-                                    totalKeptPids += keptPids;
-                                    if (delFiles > 0) {
-                                        reportLines.push(`📁 ${fName}: Removed ${delFiles} orphan file(s)`);
+                        } else {
+                            // Unlinked folder: remove orphan folder & unreferenced files from server
+                            try {
+                                const delRes = await fetch(`${window.location.origin}/api/storage/${item.fldId}/names`, {
+                                    method: "DELETE",
+                                    headers: { "X-User-Hash": usrHsh }
+                                });
+                                if (delRes.ok || delRes.status === 404) {
+                                    if (delRes.ok) {
+                                        totalOrphanFoldersDeleted++;
+                                    }
+                                    if (window.trackFolderDeleted) {
+                                        window.trackFolderDeleted(item.fldId);
                                     }
                                 }
-                            } else {
-                                const errData = await trimRes.json().catch(() => ({ error: trimRes.statusText }));
-                                console.warn(`Trim warning for ${fName}:`, errData.error);
+                            } catch (oErr) {
+                                console.warn(`Orphan folder cleanup failed:`, oErr);
                             }
-                        } catch (fErr) {
-                            console.warn(`Trim failed for folder ${fName}:`, fErr);
                         }
 
-                        const donePercent = Math.round(((i + 1) / folderEntries.length) * 100);
+                        const donePercent = Math.round(((i + 1) / candidateList.length) * 100);
                         if (clearCacheProgressBar) clearCacheProgressBar.style.width = `${donePercent}%`;
                         if (clearCacheProgressPercent) clearCacheProgressPercent.textContent = `${donePercent}%`;
                     }
 
+                    // Purge Service Worker in-memory caches
+                    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+                        try {
+                            navigator.serviceWorker.controller.postMessage({ action: 'CLEAR_CACHE' });
+                        } catch (_) {}
+                    }
+
                     // Invalidate all-folders cache
+                    allFoldersFilesCache = null;
+                    allFoldersFilesCacheTime = 0;
                     if (typeof fetchAllFoldersAndFiles === "function") {
                         await fetchAllFoldersAndFiles(true);
                     }
@@ -5627,10 +5686,8 @@
                     clearCacheModal.dataset.preventBackdropClose = "false";
                     clearCacheStatusArea.style.display = "none";
                     clearCacheModalBody.style.display = "block";
-                    let resultHtml = `<div style="font-weight: 500; font-size: 15px; color: var(--g-text-main); margin-bottom: 6px;">${totalOrphanFiles > 0 ? "✅ Cache cleared successfully!" : "✨ Cache is already clean!"}</div><div style="font-size: 13.5px; color: var(--g-text-sub); line-height: 1.5; margin-bottom: ${reportLines.length > 0 ? "10px" : "0"};">Scanned <b>${totalCleanedFolders}</b> folder(s).<br>${totalOrphanFiles > 0 ? `Removed <b>${totalOrphanFiles}</b> orphan file(s) (${totalOrphanPids} items).` : "No orphan files found."}</div>`;
-                    if (reportLines.length > 0) {
-                        resultHtml += `<div style="max-height: 120px; overflow-y: auto; font-size: 12.5px; color: var(--g-text-muted); line-height: 1.5;">${reportLines.map(line => `<div style="padding: 2px 0;">${line}</div>`).join("")}</div>`;
-                    }
+                    const totalItemsRemoved = totalOrphanFiles + totalOrphanFoldersDeleted;
+                    let resultHtml = `<div style="font-weight: 500; font-size: 15px; color: var(--g-text-main); margin-bottom: 6px;">${totalItemsRemoved > 0 ? "✅ Cache cleared successfully!" : "✨ Cache is already clean!"}</div><div style="font-size: 13.5px; color: var(--g-text-sub); line-height: 1.5;">Scanned <b>${candidateList.length}</b> folder location(s).<br>Removed <b>${totalOrphanFiles}</b> orphan file(s) and <b>${totalOrphanFoldersDeleted}</b> orphan folder(s).</div>`;
                     clearCacheModalBody.innerHTML = resultHtml;
 
                     // Show button group with only Done button (cancel button hidden)
