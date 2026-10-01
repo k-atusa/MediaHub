@@ -1219,7 +1219,7 @@ document.getElementById("btnUpload").addEventListener("click", async () => {
 
             // Make thumb by type.
             let thumb = null;
-            if (file.type.startsWith("image/")) thumb = await makeImg(file);
+            if (file.type.startsWith("image/") || file.name.toLowerCase().endsWith(".svg")) thumb = await makeImg(file);
             else if (file.type.startsWith("video/")) thumb = await makeVid(file);
 
             if (currentUploadState.isCancelled) throw new Error("UPLOAD_CANCELLED");

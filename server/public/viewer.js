@@ -35,31 +35,118 @@ let rawBuf = null;
 if (!flKey || !flName || !fldId || !fldKey) window.location.href = "./folder.html";
 document.getElementById("txName").value = flName;
 
+// Supported media extension categories
+const VIDEO_EXTS = ['mp4', 'webm', 'mov', 'mkv'];
+const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico'];
+const PDF_EXTS = ['pdf'];
+const TEXT_EXTS = [
+    'txt', 'log', 'md', 'json', 'csv', 'xml', 'html', 'css', 'js', 'ts',
+    'yaml', 'yml', 'sh', 'py', 'sql', 'ini', 'conf', 'c', 'cpp', 'h', 'go', 'rs',
+    'readme', 'license', 'makefile', 'dockerfile'
+];
+
+function formatBytes(bytes) {
+    if (bytes === undefined || bytes === null || isNaN(bytes) || bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB", "TB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return (bytes / Math.pow(k, i)).toFixed(i === 0 ? 0 : 1) + " " + sizes[i];
+}
+
+function getUnsupportedIcon(filename) {
+    const ext = ((filename || '').split('.').pop() || '').toLowerCase();
+    if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz'].includes(ext)) return 'folder_zip';
+    if (['exe', 'dmg', 'iso', 'bin', 'apk', 'app', 'msi', 'deb', 'rpm'].includes(ext)) return 'deployed_code';
+    if (['doc', 'docx', 'odt', 'rtf'].includes(ext)) return 'description';
+    if (['xls', 'xlsx', 'ods'].includes(ext)) return 'table_chart';
+    if (['ppt', 'pptx', 'odp'].includes(ext)) return 'slideshow';
+    if (['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac', 'wma'].includes(ext)) return 'audiotrack';
+    return 'draft';
+}
+
 // Get media type by ext.
 function getKind(name) {
-    const ext = name.split('.').pop().toLowerCase();
-    if (['mp4', 'webm', 'mov', 'mkv'].includes(ext)) return 'video';
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) return 'image';
-    if (['pdf'].includes(ext)) return 'pdf';
-    return 'text';
+    const ext = ((name || '').split('.').pop() || '').toLowerCase();
+    if (VIDEO_EXTS.includes(ext)) return 'video';
+    if (IMAGE_EXTS.includes(ext)) return 'image';
+    if (PDF_EXTS.includes(ext)) return 'pdf';
+    if (TEXT_EXTS.includes(ext)) return 'text';
+    return 'unsupported';
 }
 
 function getMime(name) {
-    const ext = name.split('.').pop().toLowerCase();
+    const ext = ((name || '').split('.').pop() || '').toLowerCase();
     const mimeMap = {
         'pdf': 'application/pdf',
-        'txt': 'text/plain',
+        'txt': 'text/plain;charset=utf-8',
+        'log': 'text/plain;charset=utf-8',
+        'md': 'text/markdown;charset=utf-8',
+        'json': 'application/json',
+        'csv': 'text/csv;charset=utf-8',
+        'xml': 'application/xml',
+        'html': 'text/html;charset=utf-8',
+        'css': 'text/css;charset=utf-8',
+        'js': 'text/javascript;charset=utf-8',
+        'ts': 'text/plain;charset=utf-8',
+        'yaml': 'text/yaml;charset=utf-8',
+        'yml': 'text/yaml;charset=utf-8',
+        'sh': 'text/plain;charset=utf-8',
+        'py': 'text/plain;charset=utf-8',
+        'sql': 'text/plain;charset=utf-8',
+        'ini': 'text/plain;charset=utf-8',
+        'conf': 'text/plain;charset=utf-8',
         'jpg': 'image/jpeg',
         'jpeg': 'image/jpeg',
         'png': 'image/png',
         'gif': 'image/gif',
         'webp': 'image/webp',
+        'svg': 'image/svg+xml',
+        'bmp': 'image/bmp',
+        'ico': 'image/x-icon',
         'mp4': 'video/mp4',
         'webm': 'video/webm',
         'mov': 'video/quicktime',
-        'mkv': 'video/x-matroska'
+        'mkv': 'video/x-matroska',
+        'zip': 'application/zip',
+        'tar': 'application/x-tar',
+        'gz': 'application/gzip',
+        '7z': 'application/x-7z-compressed',
+        'rar': 'application/vnd.rar',
+        'doc': 'application/msword',
+        'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'xls': 'application/vnd.ms-excel',
+        'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'ppt': 'application/vnd.ms-powerpoint',
+        'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
     };
     return mimeMap[ext] || 'application/octet-stream';
+}
+
+function renderUnsupported(body) {
+    const icon = getUnsupportedIcon(flName);
+    const sizeStr = origSize > 0 ? formatBytes(origSize) : '';
+    body.innerHTML = `
+        <div class="unsupported-preview-card">
+            <div class="unsupported-icon-box">
+                <span class="material-symbols-outlined unsupported-icon">${icon}</span>
+            </div>
+            <h2 class="unsupported-title">No preview available</h2>
+            <p class="unsupported-msg">Preview is not supported for this file.</p>
+            <div class="unsupported-meta">
+                <span class="unsupported-filename" title="${flName.replace(/"/g, '&quot;')}">${flName}</span>
+                ${sizeStr ? `<span class="unsupported-filesize">${sizeStr}</span>` : ''}
+            </div>
+            <button type="button" class="btn-unsupported-download" id="btnUnsupportedDownload">
+                <span class="material-symbols-outlined">download</span>
+                <span>Download</span>
+            </button>
+        </div>
+    `;
+
+    const btn = document.getElementById("btnUnsupportedDownload");
+    if (btn) {
+        btn.addEventListener("click", downFl);
+    }
 }
 
 // Load and render file.
@@ -69,6 +156,12 @@ async function start() {
     rawFK.fill(0);
     const body = document.getElementById("viewBody");
     const kind = getKind(flName);
+
+    // Unsupported: Show preview not supported card immediately
+    if (kind === 'unsupported') {
+        renderUnsupported(body);
+        return;
+    }
 
     // Video: Stream via SW.
     if (kind === 'video') {
@@ -240,23 +333,27 @@ async function editNm() {
 
 // Save decrypted file.
 async function downFl() {
-    const kind = getKind(flName);
-    // Full download for video save.
-    if (kind === 'video' && !rawBuf) {
+    // If not decrypted into rawBuf yet (e.g. video streaming or unsupported preview):
+    if (!rawBuf) {
         const rawFK = mask.XOR(flKey);
         const flPid = getObjPid(rawFK);
         rawFK.fill(0);
-        const body = document.getElementById("viewBody");
         const prog = document.createElement('div');
-        prog.style.cssText = 'position:fixed;top:50%;width:100%;text-align:center;z-index:999;background:rgba(0,0,0,0.7);padding:10px';
-        body.appendChild(prog);
-        prog.textContent = '📥 Downloading for save…';
+        prog.id = "downloadProgressToast";
+        prog.className = "download-progress-toast";
+        prog.innerHTML = `
+            <span class="material-symbols-outlined spin-icon">sync</span>
+            <span id="downloadProgressText">Downloading… 0%</span>
+        `;
+        document.body.appendChild(prog);
+        const progText = document.getElementById("downloadProgressText");
+
         try {
             // Download inline.
             const head = await fetch(`${SERVER}/api/media/${fldId}/${flPid}/dat`, { headers: { 'Range': 'bytes=0-0' } });
             const contentRange = head.headers.get('Content-Range');
             if (!head.ok || !contentRange) {
-                body.removeChild(prog);
+                prog.remove();
                 return alert('❌ Download failed: File not found or corrupted');
             }
             const totSize = parseInt(contentRange.split('/')[1], 10);
@@ -264,9 +361,15 @@ async function downFl() {
             while (loaded < totSize) {
                 const res = await fetch(`${SERVER}/api/media/${fldId}/${flPid}/dat`, { headers: { 'Range': `bytes=${loaded}-${totSize - 1}` } });
                 const reader = res.body.getReader();
-                while (true) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); loaded += value.length; prog.textContent = `📥 ${Math.round((loaded / totSize) * 100)}%`; }
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    chunks.push(value);
+                    loaded += value.length;
+                    if (progText) progText.textContent = `Downloading… ${Math.round((loaded / totSize) * 100)}%`;
+                }
             }
-            prog.textContent = '🔒 Decrypting…';
+            if (progText) progText.textContent = 'Decrypting…';
             const fullBuf = new Uint8Array(loaded); let off = 0;
             for (const c of chunks) { fullBuf.set(c, off); off += c.length; }
             const rawFK2 = mask.XOR(flKey);
@@ -276,8 +379,11 @@ async function downFl() {
             const plain = []; await smx.DeFile(new NetSrc(encBuf), encBuf.length, { write: async (c) => plain.push(c) });
             rawBuf = new Uint8Array(plain.reduce((a, c) => a + c.length, 0)); let fo = 0;
             for (const c of plain) { rawBuf.set(c, fo); fo += c.length; }
-        } catch (e) { body.removeChild(prog); return alert('❌ Download failed'); }
-        body.removeChild(prog);
+        } catch (e) {
+            prog.remove();
+            return alert('❌ Download failed: ' + (e.message || 'Unknown error'));
+        }
+        prog.remove();
     }
     if (!rawBuf) return alert('⚠️ Wait for decryption');
     const a = document.createElement('a');
@@ -413,12 +519,20 @@ function render(buf, body) {
         f.style.height = "90vh";
         body.appendChild(f);
     }
+    else if (kind === 'text') {
+        try {
+            const t = document.createElement("textarea");
+            t.value = new TextDecoder("utf-8", { fatal: true }).decode(buf);
+            t.style.width = "100%";
+            t.style.height = "90vh";
+            t.readOnly = true;
+            body.appendChild(t);
+        } catch (e) {
+            renderUnsupported(body);
+        }
+    }
     else {
-        const t = document.createElement("textarea");
-        t.value = new TextDecoder().decode(buf);
-        t.style.width = "100%";
-        t.style.height = "90vh";
-        body.appendChild(t);
+        renderUnsupported(body);
     }
 }
 

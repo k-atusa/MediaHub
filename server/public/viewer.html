@@ -254,6 +254,157 @@
             border-color: var(--preview-primary);
         }
 
+        /* Unsupported File Preview Card (Google Drive Style) */
+        .unsupported-preview-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            background-color: var(--preview-surface);
+            border: 1px solid var(--preview-outline);
+            border-radius: 28px;
+            padding: 44px 32px;
+            max-width: 440px;
+            width: 90%;
+            margin: auto;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+            animation: m3DialogPop 0.25s cubic-bezier(0.2, 0, 0, 1);
+            box-sizing: border-box;
+        }
+
+        .unsupported-icon-box {
+            width: 76px;
+            height: 76px;
+            border-radius: 50%;
+            background-color: var(--preview-hover);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .unsupported-icon {
+            font-size: 38px;
+            color: var(--preview-subtext);
+        }
+
+        .unsupported-title {
+            font-size: 20px;
+            font-weight: 500;
+            color: var(--preview-text);
+            margin-bottom: 8px;
+            letter-spacing: -0.2px;
+        }
+
+        .unsupported-msg {
+            font-size: 14px;
+            color: var(--preview-subtext);
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        .unsupported-meta {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            margin-bottom: 28px;
+            background-color: var(--preview-bg);
+            border: 1px solid var(--preview-outline);
+            padding: 10px 20px;
+            border-radius: 12px;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+
+        .unsupported-filename {
+            font-size: 13.5px;
+            font-weight: 500;
+            color: var(--preview-text);
+            max-width: 320px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .unsupported-filesize {
+            font-size: 12px;
+            color: var(--preview-subtext);
+        }
+
+        .btn-unsupported-download {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            height: 44px;
+            padding: 0 28px;
+            border-radius: 22px;
+            border: none;
+            background-color: var(--preview-primary);
+            color: #ffffff;
+            font-family: inherit;
+            font-size: 14.5px;
+            font-weight: 500;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+            transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+        }
+
+        [data-theme="dark"] .btn-unsupported-download,
+        :root:not([data-theme="light"]) .btn-unsupported-download {
+            background-color: var(--preview-primary);
+            color: #062e6f;
+        }
+
+        .btn-unsupported-download:hover {
+            opacity: 0.92;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-unsupported-download:active {
+            transform: translateY(0);
+        }
+
+        .btn-unsupported-download .material-symbols-outlined {
+            font-size: 20px;
+        }
+
+        /* Download progress floating pill toast */
+        .download-progress-toast {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+            background-color: var(--preview-surface);
+            color: var(--preview-text);
+            border: 1px solid var(--preview-outline);
+            border-radius: 24px;
+            padding: 16px 28px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+            font-size: 14.5px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            pointer-events: none;
+            animation: m3DialogPop 0.2s cubic-bezier(0.2, 0, 0, 1);
+        }
+
+        .spin-icon {
+            font-size: 22px;
+            color: var(--preview-primary);
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
         /* 3. Google Drive Floating Side Navigation Buttons */
         .btn-floating-nav {
             position: fixed;
