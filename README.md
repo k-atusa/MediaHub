@@ -4,12 +4,37 @@ project WHY(Web Hub Yard): Media Hub
 
 > MediaHub is encrypted media streaming service for users who want to share data with others
 
+## 사용법
+
+- 서버에 폴더를 생성하고 파일을 업로드하세요. 폴더를 공유할 수 있습니다.
+- 텍스트, pdf, 이미지, 동영상의 재생을 지원합니다.
+- 제로 트러스트 구조라 동시성 제어가 없습니다. **같은 폴더에서는 각 사람의 업로드가 끝난 뒤에 사용하세요**
+- 미디어허브는 가벼운 미디어 감상용입니다. 별도의 백업 이용을 권장합니다.
+
 ## Usage
 
 - Make your folder and upload files. You can share your folder with others.
 - MediaHub supports views of text, pdf, image, and video.
 - System does not care about concurrency: **Each user must upload after other user's session is cleared.**
 - Focus of MediaHub is lightweight media share/watch. Making your own backup drive with other service is recommended.
+
+## 주의사항
+
+- 콘텐츠를 보여주기 위해 전체 파일을 다운로드하고 복호화하는데 시간이 걸립니다.
+- 동영상의 경우 전체 다운로드 대신 실시간 스트리밍을 사용합니다.
+- 브라우저 상에서의 업로드는 파일 크기가 2GiB로 제한됩니다. 대량 업로드는 다른 클라이언트(데스크탑/안드로이드)를 사용하십시오.
+- 브라우저 간 웹 표준 준수 호환성이 다릅니다. 파이어폭스 사용을 권장하지만 크로미움 기반 브라우저도 괜찮습니다.
+- 사설 TLS 인증서를 사용한다면 크롬에서 동영상 스트리밍을 할 수 없습니다. 애플 WebKit 기반의 모든 브라우저는 스트리밍을 할 수 없습니다.
+
+## Limitation
+
+- It takes time to download and decrypt whole file and show. (Except for videos)
+- For video, it uses real-time streaming. Still, buffering can take time several seconds.
+- Uploading with browser limits file size to 2GiB. Use other clients(desktop/android) to large-scale upload.
+- There is some differences about following web standards among the browsers. Recommended is FireFox, but Chromium based are also good.
+- With private TLS certificate, you cannot use streaming in Chrome. Streaming is disabled for all WebKit browsers due to its limitation.
+
+---
 
 ## Architecture
 
@@ -42,13 +67,7 @@ public/
 | invite | string | invitation auth code | 가입 권한 코드 |
 | notice | string | public notification | 접속 시 보이는 공지 |
 
-## Limitation
-
-- It takes time to download and decrypt whole file and show. (Except for videos)
-- For video, it uses real-time streaming. Still, buffering can take time up to 1 minute.
-- With private TLS certificate, you cannot use streaming in Chrome. Streaming is disabled for all WebKit browsers due to its limitation.
-- Uploading with browser limits file size to 2GiB. Use python client to large-scale upload.
-- Python client requires USAG-Lib and OpenCV dependency.
+---
 
 ## Build & Run
 
