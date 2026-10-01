@@ -1245,64 +1245,124 @@ document.getElementById("btnUpload").addEventListener("click", async () => {
     }
 });
 
-// Delete folder.
-document.getElementById("btnDeleteFolder").addEventListener("click", () => {
-    if (!state.name || !state.id) return;
-    const modal = document.getElementById("deleteFolderModal");
-    if (!modal) {
-        if (!confirm("Delete this folder?")) return;
-        return executeDeleteFolder();
-    }
-    const textEl = document.getElementById("deleteFolderText");
-    const btnCancel = document.getElementById("btnCancelDeleteFolder");
-    const btnConfirm = document.getElementById("btnConfirmDeleteFolder");
+// Unlink folder (참조 해제 - remove from this user's account only)
+async function executeUnlinkFolder(rawFolderName) {
+    const target = (rawFolderName || state.name || "").trim();
+    if (!target) return;
 
-    if (textEl) {
-        textEl.innerHTML = `Are you sure you want to delete folder "<strong>${state.name.replace(/</g, "&lt;")}</strong>"? All files and metadata inside it will be permanently deleted.`;
+    let actualKey = target;
+    if (!state.fldMap[actualKey]) {
+        const found = Object.keys(state.fldMap).find(k => k.normalize('NFC') === target.normalize('NFC'));
+        if (found) actualKey = found;
+        else return;
     }
 
-    modal.showModal();
-
-    const cleanup = () => {
-        btnConfirm.removeEventListener("click", onConfirm);
-        btnCancel.removeEventListener("click", onCancel);
-    };
-
-    const onCancel = () => {
-        cleanup();
-        modal.close();
-    };
-
-    const onConfirm = async () => {
-        cleanup();
-        modal.close();
-        await executeDeleteFolder();
-    };
-
-    modal.addEventListener("close", cleanup, { once: true });
-    btnConfirm.addEventListener("click", onConfirm);
-    btnCancel.addEventListener("click", onCancel);
-});
-
-async function executeDeleteFolder() {
     try {
-        await fetch(`${SERVER}/api/storage/${state.id}/names`, { method: "DELETE", headers: { "X-User-Hash": usrHsh } });
-        delete state.fldMap[state.name];
-        state.name = "";
-        state.id = "";
-        state.key = null;
+        delete state.fldMap[actualKey];
+
+        const isActive = (state.name === actualKey || (state.name && state.name.normalize('NFC') === actualKey.normalize('NFC')));
+        if (isActive) {
+            state.name = "";
+            state.id = "";
+            state.key = null;
+            sessionStorage.removeItem("oldFold");
+        }
+
         await saveUsr();
         await loadUsr();
-        if (window.navToRoot) {
+
+        if (isActive && window.navToRoot) {
             window.navToRoot();
         } else {
-            document.getElementById("uploadContainer").classList.add("hidden");
-            document.getElementById("mediaContainer").classList.add("hidden");
+            if (window.syncSidebarFolderList) window.syncSidebarFolderList();
+            if (window.syncRootFolderGrid) window.syncRootFolderGrid();
+            if (window.updateFolderDisplay) window.updateFolderDisplay();
+        }
+
+        if (window.showNotice) {
+            window.showNotice(`✅ Removed "${actualKey}" from your account`, "Success", "check_circle");
+        }
+    } catch (e) {
+        console.error("Failed to unlink folder:", e);
+        if (window.showNotice) window.showNotice("❌ Failed to remove folder: " + e.message, "Error", "error");
+    }
+}
+window.unlinkFolder = executeUnlinkFolder;
+
+// Permanently delete folder from server (영구 삭제)
+async function executeDeleteFolder(rawFolderName) {
+    const target = (rawFolderName || state.name || "").trim();
+    if (!target) return;
+
+    let actualKey = target;
+    if (!state.fldMap[actualKey]) {
+        const found = Object.keys(state.fldMap).find(k => k.normalize('NFC') === target.normalize('NFC'));
+        if (found) actualKey = found;
+        else return;
+    }
+
+    try {
+        const maskedKey = state.fldMap[actualKey];
+        const rawK = mask.XOR(maskedKey);
+        const fldId = getObjPid(rawK);
+        rawK.fill(0);
+
+        await fetch(`${SERVER}/api/storage/${fldId}/names`, { method: "DELETE", headers: { "X-User-Hash": usrHsh } });
+
+        delete state.fldMap[actualKey];
+
+        const isActive = (state.name === actualKey || (state.name && state.name.normalize('NFC') === actualKey.normalize('NFC')));
+        if (isActive) {
+            state.name = "";
+            state.id = "";
+            state.key = null;
+            sessionStorage.removeItem("oldFold");
+        }
+
+        await saveUsr();
+        await loadUsr();
+
+        if (isActive && window.navToRoot) {
+            window.navToRoot();
+        } else {
+            if (window.syncSidebarFolderList) window.syncSidebarFolderList();
+            if (window.syncRootFolderGrid) window.syncRootFolderGrid();
+            if (window.updateFolderDisplay) window.updateFolderDisplay();
+        }
+
+        if (window.showNotice) {
+            window.showNotice(`🗑️ Folder "${actualKey}" permanently deleted`, "Deleted", "delete");
         }
     } catch (e) {
         console.error("Failed to delete folder:", e);
         if (window.showNotice) window.showNotice("❌ Failed to delete folder: " + e.message, "Error", "error");
     }
+}
+window.deleteFolder = executeDeleteFolder;
+
+// Delete/Unlink folder button listeners (compatibility)
+const btnDeleteFolder = document.getElementById("btnDeleteFolder");
+if (btnDeleteFolder) {
+    btnDeleteFolder.addEventListener("click", () => {
+        if (!state.name) return;
+        if (window.openDeleteFolderDialog) {
+            window.openDeleteFolderDialog(state.name);
+        } else {
+            executeDeleteFolder(state.name);
+        }
+    });
+}
+
+const btnUnlinkFolder = document.getElementById("btnUnlinkFolder");
+if (btnUnlinkFolder) {
+    btnUnlinkFolder.addEventListener("click", () => {
+        if (!state.name) return;
+        if (window.openUnlinkFolderDialog) {
+            window.openUnlinkFolderDialog(state.name);
+        } else {
+            executeUnlinkFolder(state.name);
+        }
+    });
 }
 
 // Handle pagination.

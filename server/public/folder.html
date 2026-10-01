@@ -2911,7 +2911,12 @@
                         <span class="breadcrumb-separator" id="breadcrumbSeparator">/</span>
                         <span class="breadcrumb-current" id="breadcrumbFolderName"></span>
                     </div>
-                    <h1 class="workspace-folder-title" id="currentFolderTitle">My Drive</h1>
+                    <div class="workspace-title-row" style="display: flex; align-items: center; gap: 8px;">
+                        <h1 class="workspace-folder-title" id="currentFolderTitle">My Drive</h1>
+                        <button id="btnCurrentFolderMore" type="button" style="display: none; width: 32px; height: 32px; border-radius: 50%; border: none; background: transparent; align-items: center; justify-content: center; cursor: pointer; color: var(--g-text-secondary, #5f6368); transition: background-color 0.15s ease;" title="Folder options" aria-label="Folder options">
+                            <span class="material-symbols-outlined" style="font-size: 20px;">more_vert</span>
+                        </button>
+                    </div>
                 </div>
 
                 <div class="workspace-action-group">
@@ -3097,6 +3102,7 @@
         <input type="text" id="renameNewFolderName" style="display: none;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
         <button id="btnRenameFolder" style="display: none;"></button>
         <button id="btnExport" style="display: none;"></button>
+        <button id="btnUnlinkFolder" style="display: none;"></button>
         <button id="btnDeleteFolder" style="display: none;"></button>
         <button id="btnChangePassword" style="display: none;"></button>
         <span id="lblUserHash" style="display: none;"></span>
@@ -3112,9 +3118,14 @@
             <span class="material-symbols-outlined menu-icon">share</span>
             <span class="menu-label">Share folder</span>
         </div>
-        <div class="drive-menu-item" id="folderMenuDelete">
-            <span class="material-symbols-outlined menu-icon">delete_outline</span>
-            <span class="menu-label">Delete folder</span>
+        <div class="drive-menu-item" id="folderMenuUnlink">
+            <span class="material-symbols-outlined menu-icon">link_off</span>
+            <span class="menu-label">Remove from account</span>
+        </div>
+        <div class="drive-menu-divider"></div>
+        <div class="drive-menu-item" id="folderMenuDelete" style="color: var(--g-danger, #b3261e);">
+            <span class="material-symbols-outlined menu-icon">delete_forever</span>
+            <span class="menu-label">Delete permanently</span>
         </div>
     </div>
 
@@ -3238,19 +3249,34 @@
         </div>
     </dialog>
 
-    <!-- Delete Folder Dialog (Material You Dialog) -->
+    <!-- Unlink Folder Dialog (Remove from account) (Material You Dialog) -->
+    <dialog id="unlinkFolderModal">
+        <div class="dialog-title">
+            <span class="material-symbols-outlined" style="color: var(--g-primary-blue, #0b57d0);">link_off</span>
+            <span>Remove folder from account?</span>
+        </div>
+        <div class="dialog-body" id="unlinkFolderText">
+            Are you sure you want to remove this folder from your account? The folder and all files inside it will remain accessible on the server for other users who share it.
+        </div>
+        <div class="dialog-actions">
+            <button id="btnCancelUnlinkFolder" class="btn-dialog-text" type="button">Cancel</button>
+            <button id="btnConfirmUnlinkFolder" class="btn-dialog-primary" type="button">Remove</button>
+        </div>
+    </dialog>
+
+    <!-- Delete Folder Permanently Dialog (Material You Dialog) -->
     <dialog id="deleteFolderModal">
         <div class="dialog-title">
-            <span class="material-symbols-outlined" style="color: var(--g-danger, #b3261e);">delete</span>
-            <span>Delete folder?</span>
+            <span class="material-symbols-outlined" style="color: var(--g-danger, #b3261e);">delete_forever</span>
+            <span>Delete folder permanently?</span>
         </div>
         <div class="dialog-body" id="deleteFolderText">
             Are you sure you want to delete this folder? All files and encrypted metadata inside it will be permanently
-            deleted.
+            deleted from the server for ALL users sharing this folder.
         </div>
         <div class="dialog-actions">
             <button id="btnCancelDeleteFolder" class="btn-dialog-text" type="button">Cancel</button>
-            <button id="btnConfirmDeleteFolder" class="btn-dialog-danger" type="button">Delete</button>
+            <button id="btnConfirmDeleteFolder" class="btn-dialog-danger" type="button">Delete permanently</button>
         </div>
     </dialog>
 
@@ -3868,6 +3894,9 @@
                 if (viewActionWrapper) viewActionWrapper.style.display = "";
                 if (sortActionWrapper) sortActionWrapper.style.display = "";
 
+                const btnCurrentFolderMore = document.getElementById("btnCurrentFolderMore");
+                if (btnCurrentFolderMore) btnCurrentFolderMore.style.display = "inline-flex";
+
                 // Highlight active in sidebar
                 document.querySelectorAll(".nav-folder-item").forEach(item => {
                     if (item.dataset.folderName === current) {
@@ -3882,6 +3911,9 @@
                 breadcrumbName.style.display = "none";
                 breadcrumbSeparator.style.display = "none";
                 folderTitle.textContent = "My Drive";
+
+                const btnCurrentFolderMore = document.getElementById("btnCurrentFolderMore");
+                if (btnCurrentFolderMore) btnCurrentFolderMore.style.display = "none";
 
                 rootFolderView.style.display = "flex";
                 mediaContainer.style.display = "none";
@@ -3900,6 +3932,16 @@
             }
         }
         window.updateFolderDisplay = updateFolderDisplay;
+
+        const btnCurrentFolderMore = document.getElementById("btnCurrentFolderMore");
+        if (btnCurrentFolderMore) {
+            btnCurrentFolderMore.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const current = folderSelect.value;
+                if (!current) return;
+                openFolderContextMenu(e, current, btnCurrentFolderMore);
+            });
+        }
 
         let rootSearchCounter = 0;
 
@@ -4165,20 +4207,24 @@
             });
         }
 
+        const folderMenuUnlink = document.getElementById("folderMenuUnlink");
+        if (folderMenuUnlink) {
+            folderMenuUnlink.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const targetFolder = folderActionMenu ? folderActionMenu.dataset.targetFolder : "";
+                closeFolderContextMenu();
+                if (!targetFolder) return;
+                openUnlinkFolderDialog(targetFolder);
+            });
+        }
+
         if (folderMenuDelete) {
             folderMenuDelete.addEventListener("click", (e) => {
                 e.stopPropagation();
                 const targetFolder = folderActionMenu ? folderActionMenu.dataset.targetFolder : "";
                 closeFolderContextMenu();
                 if (!targetFolder) return;
-
-                if (folderSelect.value !== targetFolder) {
-                    folderSelect.value = targetFolder;
-                    folderSelect.dispatchEvent(new Event("change"));
-                    updateFolderDisplay();
-                }
-                const btnDeleteFolder = document.getElementById("btnDeleteFolder");
-                if (btnDeleteFolder) btnDeleteFolder.click();
+                openDeleteFolderDialog(targetFolder);
             });
         }
 
@@ -4682,6 +4728,96 @@
             renameFolderModal.addEventListener("click", (e) => {
                 if (e.target === renameFolderModal) {
                     renameFolderModal.close();
+                }
+            });
+        }
+
+        // Unlink folder modal binding (참조 해제 - remove from this account only)
+        const unlinkFolderModal = document.getElementById("unlinkFolderModal");
+        const unlinkFolderText = document.getElementById("unlinkFolderText");
+        const btnCancelUnlinkFolder = document.getElementById("btnCancelUnlinkFolder");
+        const btnConfirmUnlinkFolder = document.getElementById("btnConfirmUnlinkFolder");
+        let folderBeingUnlinked = "";
+
+        function openUnlinkFolderDialog(folderName) {
+            if (typeof newDriveMenu !== "undefined" && newDriveMenu) newDriveMenu.classList.remove("open");
+            folderBeingUnlinked = folderName;
+            if (unlinkFolderText) {
+                unlinkFolderText.innerHTML = `Are you sure you want to remove folder "<strong>${folderName.replace(/</g, "&lt;")}</strong>" from your account?<br><br><span style="font-size: 13px; color: var(--g-text-secondary, #5f6368);">The folder and all files inside it will remain on the server and accessible to other users who share it.</span>`;
+            }
+            if (unlinkFolderModal) {
+                unlinkFolderModal.showModal();
+            }
+        }
+        window.openUnlinkFolderDialog = openUnlinkFolderDialog;
+
+        if (btnCancelUnlinkFolder) {
+            btnCancelUnlinkFolder.addEventListener("click", () => {
+                if (unlinkFolderModal) unlinkFolderModal.close();
+            });
+        }
+
+        if (btnConfirmUnlinkFolder) {
+            btnConfirmUnlinkFolder.addEventListener("click", async () => {
+                if (!folderBeingUnlinked) return;
+                const target = folderBeingUnlinked;
+                if (unlinkFolderModal) unlinkFolderModal.close();
+                allFoldersFilesCache = null;
+                if (window.unlinkFolder) {
+                    await window.unlinkFolder(target);
+                }
+            });
+        }
+
+        if (unlinkFolderModal) {
+            unlinkFolderModal.addEventListener("click", (e) => {
+                if (e.target === unlinkFolderModal) {
+                    unlinkFolderModal.close();
+                }
+            });
+        }
+
+        // Delete folder permanently modal binding (영구 삭제)
+        const deleteFolderModal = document.getElementById("deleteFolderModal");
+        const deleteFolderText = document.getElementById("deleteFolderText");
+        const btnCancelDeleteFolder = document.getElementById("btnCancelDeleteFolder");
+        const btnConfirmDeleteFolder = document.getElementById("btnConfirmDeleteFolder");
+        let folderBeingDeleted = "";
+
+        function openDeleteFolderDialog(folderName) {
+            if (typeof newDriveMenu !== "undefined" && newDriveMenu) newDriveMenu.classList.remove("open");
+            folderBeingDeleted = folderName;
+            if (deleteFolderText) {
+                deleteFolderText.innerHTML = `Are you sure you want to permanently delete folder "<strong>${folderName.replace(/</g, "&lt;")}</strong>"?<br><br><span style="font-size: 13px; color: var(--g-danger, #b3261e); font-weight: 500;">Warning: All files and encrypted metadata will be permanently deleted from the server for ALL users sharing this folder. This action cannot be undone.</span>`;
+            }
+            if (deleteFolderModal) {
+                deleteFolderModal.showModal();
+            }
+        }
+        window.openDeleteFolderDialog = openDeleteFolderDialog;
+
+        if (btnCancelDeleteFolder) {
+            btnCancelDeleteFolder.addEventListener("click", () => {
+                if (deleteFolderModal) deleteFolderModal.close();
+            });
+        }
+
+        if (btnConfirmDeleteFolder) {
+            btnConfirmDeleteFolder.addEventListener("click", async () => {
+                if (!folderBeingDeleted) return;
+                const target = folderBeingDeleted;
+                if (deleteFolderModal) deleteFolderModal.close();
+                allFoldersFilesCache = null;
+                if (window.deleteFolder) {
+                    await window.deleteFolder(target);
+                }
+            });
+        }
+
+        if (deleteFolderModal) {
+            deleteFolderModal.addEventListener("click", (e) => {
+                if (e.target === deleteFolderModal) {
+                    deleteFolderModal.close();
                 }
             });
         }
