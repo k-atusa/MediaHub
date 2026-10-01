@@ -12,6 +12,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@400;500&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <link rel="stylesheet" href="./viewerjs.min.css">
 
     <!-- Theme Initialization Script (Prevents FOUC) -->
     <script>
@@ -285,6 +286,88 @@
 
         #btnNextFile {
             right: 20px;
+        }
+
+        /* Viewer.js Material You & Google Drive Theme Integration */
+        #viewBody > img {
+            display: none !important;
+        }
+
+        .viewer-container {
+            background-color: transparent !important;
+        }
+
+        .viewer-backdrop {
+            background-color: transparent !important;
+        }
+
+        .viewer-canvas > img {
+            border-radius: 6px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+        }
+
+        .viewer-footer {
+            bottom: 24px;
+        }
+
+        .viewer-toolbar > ul {
+            background-color: var(--preview-nav-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--preview-outline);
+            border-radius: 28px;
+            padding: 6px 12px;
+            box-shadow: 0 4px 16px var(--preview-nav-shadow);
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+            margin: 0 auto;
+        }
+
+        .viewer-toolbar > ul > li {
+            background-color: transparent;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.15s ease, transform 0.1s ease;
+        }
+
+        .viewer-toolbar > ul > li:hover {
+            background-color: var(--preview-hover);
+            transform: scale(1.08);
+        }
+
+        .viewer-toolbar > ul > li:focus {
+            box-shadow: none;
+        }
+
+        /* In light mode, invert white icons so they are dark grey */
+        .viewer-toolbar > ul > li::before {
+            filter: invert(0.8);
+            margin: 0 !important;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) .viewer-toolbar > ul > li::before {
+                filter: none;
+            }
+        }
+
+        [data-theme="dark"] .viewer-toolbar > ul > li::before {
+            filter: none;
+        }
+
+        .viewer-tooltip {
+            background-color: var(--preview-nav-bg);
+            color: var(--preview-text);
+            border: 1px solid var(--preview-outline);
+            border-radius: 12px;
+            backdrop-filter: blur(8px);
+            font-weight: 500;
+            box-shadow: 0 4px 12px var(--preview-nav-shadow);
         }
 
         /* Mobile (<600px) */
@@ -589,6 +672,7 @@
         });
     </script>
 
+    <script src="./viewerjs.min.js"></script>
     <script type="module" src="./viewer.js"></script>
 </body>
 
