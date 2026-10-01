@@ -124,6 +124,8 @@ async function start() {
             body.innerHTML = '';
             const v = document.createElement('video');
             v.controls = true;
+            v.playsInline = true;
+            v.preload = 'metadata';
             v.style.width = '100%';
             v.src = `/sw-stream/${fldId}/${flPid}`;
             body.appendChild(v);

@@ -99,100 +99,129 @@ async function getInfo(flPid) {
 
 // Fetch interceptor.
 self.addEventListener('fetch', (e) => {
-    const url = new URL(e.request.url);
+    let url;
+    try {
+        url = new URL(e.request.url);
+    } catch {
+        return;
+    }
     const m = url.pathname.match(/^\/sw-stream\/([^/]+)\/([^/]+)$/);
     if (!m) return;
-    e.respondWith(hndlStrm(e.request, m[1], m[2]));
+    e.respondWith(
+        hndlStrm(e.request, m[1], m[2]).catch(err => {
+            console.warn('SW stream response error:', err);
+            return new Response('Stream error', { status: 500 });
+        })
+    );
 });
 
 async function hndlStrm(req, fldId, flPid) {
-    const info = await getInfo(flPid);
-    if (!info) return new Response('Not registered', { status: 404 });
+    try {
+        const info = await getInfo(flPid);
+        if (!info) return new Response('Not registered', { status: 404 });
 
-    const { origSize, mime } = info;
+        const { origSize, mime } = info;
 
-    // Parse Range header.
-    let rStart = 0, rEnd = origSize - 1;
-    let openEnd = true;
-    const rh = req.headers.get('Range');
-    if (rh) {
-        const p = rh.match(/bytes=(\d+)-(\d*)/);
-        if (p) {
-            rStart = parseInt(p[1], 10);
-            if (p[2]) { rEnd = parseInt(p[2], 10); openEnd = false; }
+        // Parse Range header.
+        let rStart = 0, rEnd = origSize - 1;
+        let openEnd = true;
+        const rh = req.headers.get('Range');
+        if (rh) {
+            const p = rh.match(/bytes=(\d+)-(\d*)/);
+            if (p) {
+                rStart = parseInt(p[1], 10);
+                if (p[2]) { rEnd = parseInt(p[2], 10); openEnd = false; }
+            }
         }
-    }
-    // Cap open-ended requests.
-    if (openEnd && rEnd - rStart + 1 > MAX_RESPONSE) rEnd = rStart + MAX_RESPONSE - 1;
-    rEnd = Math.min(rEnd, origSize - 1);
-    if (rStart > rEnd || rStart >= origSize) {
-        return new Response(null, {
-            status: 416,
-            headers: { 'Content-Range': `bytes */${origSize}` }
+        // Cap open-ended requests.
+        if (openEnd && rEnd - rStart + 1 > MAX_RESPONSE) rEnd = rStart + MAX_RESPONSE - 1;
+        rEnd = Math.min(rEnd, origSize - 1);
+        if (rStart > rEnd || rStart >= origSize) {
+            return new Response(new Uint8Array(0), {
+                status: 416,
+                headers: { 'Content-Range': `bytes */${origSize}` }
+            });
+        }
+
+        // Get chunk indices.
+        const firstIdx = Math.floor(rStart / PLAIN_CHUNK);
+        const lastIdx = Math.floor(rEnd / PLAIN_CHUNK);
+
+        const len = rEnd - rStart + 1;
+
+        // Stream bytes with backpressure.
+        let curIdx = firstIdx;
+        let isCancelled = false;
+        const stream = new ReadableStream({
+            async pull(ctrl) {
+                if (isCancelled) {
+                    try { ctrl.close(); } catch (_) {}
+                    return;
+                }
+                if (curIdx > lastIdx) {
+                    try { ctrl.close(); } catch (_) {}
+                    return;
+                }
+                try {
+                    let plnProm = cchGet(flPid, curIdx);
+                    if (!plnProm) {
+                        // Cache promise to avoid dupes.
+                        plnProm = fetchChk(info, fldId, flPid, curIdx).catch(err => {
+                            // Remove failed promise from cache.
+                            cchMap.delete(`${flPid}_${curIdx}`);
+                            throw err;
+                        });
+                        cchSet(flPid, curIdx, plnProm);
+                    }
+                    const plain = await plnProm;
+
+                    if (isCancelled) return;
+
+                    const chunkBase = curIdx * PLAIN_CHUNK;
+                    const from = Math.max(rStart, chunkBase) - chunkBase;
+                    const to = Math.min(rEnd, chunkBase + plain.length - 1) - chunkBase;
+
+                    if (from <= to) {
+                        try {
+                            ctrl.enqueue(plain.subarray(from, to + 1));
+                        } catch (_) {
+                            // Controller was closed or cancelled by browser.
+                            isCancelled = true;
+                            return;
+                        }
+                    }
+                    curIdx++;
+                } catch (err) {
+                    const isAborted = isCancelled || err.name === 'AbortError' ||
+                        (err.message && err.message.toLowerCase().includes('abort'));
+                    if (isAborted) {
+                        // Clean normal stream termination (e.g. player seeked, paused, or buffer satisfied)
+                        try { ctrl.close(); } catch (_) {}
+                    } else {
+                        console.error("Stream error:", err);
+                        try { ctrl.error(err); } catch (_) {}
+                    }
+                }
+            },
+            cancel(reason) {
+                isCancelled = true;
+            }
         });
+
+        return new Response(stream, {
+            status: 206,
+            headers: {
+                'Content-Type': mime,
+                'Content-Length': len.toString(),
+                'Content-Range': `bytes ${rStart}-${rEnd}/${origSize}`,
+                'Accept-Ranges': 'bytes',
+                'Cache-Control': 'no-store, no-cache, must-revalidate'
+            }
+        });
+    } catch (err) {
+        console.error("hndlStrm exception:", err);
+        return new Response('Streaming exception', { status: 500 });
     }
-
-    // Get chunk indices.
-    const firstIdx = Math.floor(rStart / PLAIN_CHUNK);
-    const lastIdx = Math.floor(rEnd / PLAIN_CHUNK);
-
-    const len = rEnd - rStart + 1;
-
-    // Stream bytes with backpressure.
-    let curIdx = firstIdx;
-    const abortCtrl = new AbortController();
-    const stream = new ReadableStream({
-        async pull(ctrl) {
-            if (curIdx > lastIdx) {
-                ctrl.close();
-                return;
-            }
-            try {
-                let plnProm = cchGet(flPid, curIdx);
-                if (!plnProm) {
-                    // Cache promise to avoid dupes.
-                    plnProm = fetchChk(info, fldId, flPid, curIdx, abortCtrl.signal).catch(err => {
-                        // Remove failed promise from cache.
-                        cchMap.delete(`${flPid}_${curIdx}`);
-                        throw err;
-                    });
-                    cchSet(flPid, curIdx, plnProm);
-                }
-                const plain = await plnProm;
-
-                const chunkBase = curIdx * PLAIN_CHUNK;
-                const from = Math.max(rStart, chunkBase) - chunkBase;
-                const to = Math.min(rEnd, chunkBase + plain.length - 1) - chunkBase;
-
-                if (from <= to) {
-                    ctrl.enqueue(plain.subarray(from, to + 1));
-                }
-                curIdx++;
-            } catch (err) {
-                if (err.name === 'AbortError') {
-                    console.log(`Stream cancelled, discarding chunk ${curIdx}`);
-                } else {
-                    console.error("Stream error:", err);
-                    ctrl.error(err);
-                }
-            }
-        },
-        cancel(reason) {
-            console.log(`Stream cancel requested: ${reason}`);
-            abortCtrl.abort();
-        }
-    });
-
-    return new Response(stream, {
-        status: 206,
-        headers: {
-            'Content-Type': mime,
-            'Content-Length': len.toString(),
-            'Content-Range': `bytes ${rStart}-${rEnd}/${origSize}`,
-            'Accept-Ranges': 'bytes',
-            'Cache-Control': 'no-store, no-cache, must-revalidate'
-        }
-    });
 }
 
 // Lazy-load globalIV from file header (first 12 bytes).
@@ -211,7 +240,7 @@ async function ensureGIV(info, fldId, flPid) {
 }
 
 // Fetch and decrypt chunk.
-async function fetchChk(info, fldId, flPid, chkIdx, signal) {
+async function fetchChk(info, fldId, flPid, chkIdx) {
     const { origSize, cryptoKey } = info;
 
     // Ensure globalIV is loaded from file header.
@@ -229,8 +258,7 @@ async function fetchChk(info, fldId, flPid, chkIdx, signal) {
     for (let attempt = 1; attempt <= 3; attempt++) {
         try {
             const res = await fetch(`/api/media/${fldId}/${flPid}/dat`, {
-                headers: { 'Range': `bytes=${cStart}-${cEnd}` },
-                signal
+                headers: { 'Range': `bytes=${cStart}-${cEnd}` }
             });
             if (!res.ok && res.status !== 206 && res.status !== 200) {
                 throw new Error(`HTTP ${res.status}`);
@@ -249,8 +277,6 @@ async function fetchChk(info, fldId, flPid, chkIdx, signal) {
             );
             return new Uint8Array(plain);
         } catch (err) {
-            // Abort instantly.
-            if (err.name === 'AbortError') throw err;
             lastErr = err;
             console.warn(`Chunk ${chkIdx} fetch attempt ${attempt} failed:`, err);
             if (attempt < 3) await new Promise(r => setTimeout(r, 1000 * attempt));
