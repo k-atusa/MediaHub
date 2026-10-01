@@ -39,7 +39,7 @@ jobs:
       - name: Compute Release Metadata
         id: meta
         run: |
-          VERSION="1.4.1"
+          VERSION="1.5.0"
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             TAG="${GITHUB_REF#refs/tags/}"
             TAG_VER="${TAG#v}"
