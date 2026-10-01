@@ -49,9 +49,113 @@ async function saveUsr() {
     const um = rawMap(state.fldMap);
     const encoded = EncodeCfg(um);
     wipeMap(um);
-    await fetch(`${SERVER}/api/userdata/${usrHsh}`, { method: "POST", body: await sm.EnBin(encoded) });
+    const res = await fetch(`${SERVER}/api/userdata/${usrHsh}`, { method: "POST", body: await sm.EnBin(encoded) });
     encoded.fill(0);
+    if (!res.ok) {
+        throw new Error(`Failed to save userdata to server (HTTP ${res.status})`);
+    }
 }
+
+// Canonical folder name E2EE helpers
+async function saveCanonicalFolderName(fldId, maskedKey, name) {
+    if (!fldId || !maskedKey || !name) return;
+    try {
+        const rawK = mask.XOR(maskedKey);
+        const sm = new SymMaster("gcm1", rawK.slice(0, 32));
+        rawK.fill(0);
+        const encBytes = new TextEncoder().encode(name.trim());
+        const cipherBin = await sm.EnBin(encBytes);
+        encBytes.fill(0);
+        await fetch(`${SERVER}/api/storage/${fldId}/name`, {
+            method: "POST",
+            headers: { "X-User-Hash": usrHsh },
+            body: cipherBin
+        });
+    } catch (e) {
+        console.warn(`Failed to save canonical folder name for ${fldId}:`, e);
+    }
+}
+
+async function fetchCanonicalFolderName(fldId, maskedKey) {
+    if (!fldId || !maskedKey) return null;
+    try {
+        const res = await fetch(`${SERVER}/api/storage/${fldId}/name`);
+        if (!res.ok) return null;
+        const rawK = mask.XOR(maskedKey);
+        const sm = new SymMaster("gcm1", rawK.slice(0, 32));
+        rawK.fill(0);
+        const cipherBin = new Uint8Array(await res.arrayBuffer());
+        const decBytes = await sm.DeBin(cipherBin);
+        const decName = new TextDecoder().decode(decBytes).trim();
+        decBytes.fill(0);
+        return decName || null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function resolveUniqueFolderName(targetName, fldId) {
+    if (!state.fldMap[targetName]) return targetName;
+
+    const existingRaw = mask.XOR(state.fldMap[targetName]);
+    const existingId = getObjPid(existingRaw);
+    existingRaw.fill(0);
+    if (existingId === fldId) {
+        return targetName;
+    }
+
+    let counter = 2;
+    while (state.fldMap[`${targetName} (${counter})`]) {
+        const cRaw = mask.XOR(state.fldMap[`${targetName} (${counter})`]);
+        const cId = getObjPid(cRaw);
+        cRaw.fill(0);
+        if (cId === fldId) return `${targetName} (${counter})`;
+        counter++;
+    }
+    return `${targetName} (${counter})`;
+}
+
+async function syncCanonicalFolderNames() {
+    let changed = false;
+    const entries = Object.entries(state.fldMap);
+    await Promise.all(entries.map(async ([currName, maskedKey]) => {
+        try {
+            const rawK = mask.XOR(maskedKey);
+            const fldId = getObjPid(rawK);
+            rawK.fill(0);
+
+            const canonicalName = await fetchCanonicalFolderName(fldId, maskedKey);
+            if (canonicalName) {
+                if (canonicalName !== currName) {
+                    const uniqueName = resolveUniqueFolderName(canonicalName, fldId);
+                    if (uniqueName !== currName) {
+                        delete state.fldMap[currName];
+                        state.fldMap[uniqueName] = maskedKey;
+                        if (state.name === currName) {
+                            state.name = uniqueName;
+                            sessionStorage.setItem("oldFold", uniqueName);
+                        }
+                        const oldFold = sessionStorage.getItem("oldFold");
+                        if (oldFold === currName) {
+                            sessionStorage.setItem("oldFold", uniqueName);
+                        }
+                        changed = true;
+                    }
+                }
+            } else {
+                saveCanonicalFolderName(fldId, maskedKey, currName);
+            }
+        } catch (e) {
+            console.warn(`Error syncing folder "${currName}":`, e);
+        }
+    }));
+
+    if (changed) {
+        await saveUsr();
+        showFld();
+    }
+}
+window.syncCanonicalFolderNames = syncCanonicalFolderNames;
 
 // Load map from server.
 async function loadUsr() {
@@ -65,6 +169,7 @@ async function loadUsr() {
     dec.fill(0);
     maskMap(state.fldMap);
     showFld();
+    await syncCanonicalFolderNames();
 }
 
 // Render folder list.
@@ -74,16 +179,123 @@ function showFld() {
     Object.keys(state.fldMap).forEach(name => {
         const opt = document.createElement("option"); opt.value = name; opt.textContent = name; select.appendChild(opt);
     });
+    if (state.name && state.fldMap[state.name]) {
+        select.value = state.name;
+    }
+    if (window.syncSidebarFolderList) window.syncSidebarFolderList();
+    if (window.syncRootFolderGrid) window.syncRootFolderGrid();
+    if (window.updateFolderDisplay) window.updateFolderDisplay();
 }
 
 // Create new folder.
 document.getElementById("btnCreateFolder").addEventListener("click", async () => {
     const name = document.getElementById("newFolderName").value.trim();
     if (!name || state.fldMap[name]) return alert("⚠️ Invalid name");
-    const rk = new Uint8Array(44); rk.set(Random(32), 0); rk.set(Random(12), 32); state.fldMap[name] = mask.XOR(rk); rk.fill(0);
+    const rk = new Uint8Array(44); rk.set(Random(32), 0); rk.set(Random(12), 32);
+    const fldId = getObjPid(rk);
+    const maskedKey = mask.XOR(rk);
+    rk.fill(0);
+    state.fldMap[name] = maskedKey;
+    await saveCanonicalFolderName(fldId, maskedKey, name);
     await saveUsr(); showFld();
     document.getElementById("newFolderName").value = "";
 });
+
+// Rename folder implementation
+async function doRenameFolder(rawOldName, rawNewName) {
+    const oldName = (rawOldName || "").trim();
+    const newName = (rawNewName || "").trim();
+
+    if (!oldName || !newName) {
+        throw new Error("Folder name cannot be empty.");
+    }
+    if (oldName.normalize('NFC') === newName.normalize('NFC')) {
+        return;
+    }
+
+    // Match original folder in state.fldMap using exact or NFC-normalized comparison
+    let actualOldKey = oldName;
+    if (!state.fldMap[actualOldKey]) {
+        const found = Object.keys(state.fldMap).find(k => k.normalize('NFC') === oldName.normalize('NFC'));
+        if (found) {
+            actualOldKey = found;
+        } else {
+            throw new Error(`Original folder "${oldName}" not found.`);
+        }
+    }
+
+    // Check if new name already exists
+    const duplicate = Object.keys(state.fldMap).find(k => k.normalize('NFC') === newName.normalize('NFC') && k !== actualOldKey);
+    if (duplicate) {
+        throw new Error(`A folder named "${newName}" already exists.`);
+    }
+
+    const origFldMap = { ...state.fldMap };
+    const origStateName = state.name;
+
+    try {
+        const maskedKey = state.fldMap[actualOldKey];
+        const rawK = mask.XOR(maskedKey);
+        const fldId = getObjPid(rawK);
+        rawK.fill(0);
+
+        // Update canonical folder name on server first
+        await saveCanonicalFolderName(fldId, maskedKey, newName);
+
+        state.fldMap[newName] = maskedKey;
+        delete state.fldMap[actualOldKey];
+
+        const isActiveFolder = (state.name === actualOldKey || (state.name && state.name.normalize('NFC') === actualOldKey.normalize('NFC')));
+        if (isActiveFolder) {
+            state.name = newName;
+            sessionStorage.setItem("oldFold", newName);
+        }
+
+        await saveUsr();
+        showFld();
+
+        if (isActiveFolder) {
+            const select = document.getElementById("folderSelect");
+            if (select) select.value = newName;
+        } else if (state.name && state.fldMap[state.name]) {
+            const select = document.getElementById("folderSelect");
+            if (select) select.value = state.name;
+        }
+
+        if (window.syncSidebarFolderList) window.syncSidebarFolderList();
+        if (window.syncRootFolderGrid) window.syncRootFolderGrid();
+        if (window.updateFolderDisplay) window.updateFolderDisplay();
+
+        if (window.showNotice) {
+            window.showNotice(`✅ Folder renamed to "${newName}"`, "Success", "check_circle");
+        }
+    } catch (err) {
+        console.error("Failed to rename folder:", err);
+        state.fldMap = origFldMap;
+        state.name = origStateName;
+        if (state.name === actualOldKey) {
+            sessionStorage.setItem("oldFold", actualOldKey);
+        }
+        showFld();
+        throw err;
+    }
+}
+window.renameFolder = doRenameFolder;
+
+// Rename folder button listener (compatibility)
+const btnRenameFolder = document.getElementById("btnRenameFolder");
+if (btnRenameFolder) {
+    btnRenameFolder.addEventListener("click", async () => {
+        const oldName = (document.getElementById("renameOldFolderName").value || "").trim();
+        const newName = (document.getElementById("renameNewFolderName").value || "").trim();
+        try {
+            await doRenameFolder(oldName, newName);
+        } catch (err) {
+            if (window.showNotice) window.showNotice("❌ " + err.message, "Error", "error");
+            else alert("❌ " + err.message);
+        }
+    });
+}
 
 function promptSharePassword() {
     return new Promise((resolve) => {
@@ -243,13 +455,16 @@ document.getElementById("btnExport").addEventListener("click", () => {
         cleanup();
         modal.close();
 
-        const token = await makeToken(state.name, state.key, pw);
+        const canonicalName = await fetchCanonicalFolderName(state.id, state.key);
+        const shareName = canonicalName || state.name;
+
+        const token = await makeToken(shareName, state.key, pw);
         if (!token) return;
         const blob = new Blob([token], { type: "text/plain" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        const safeName = state.name.replace(/[\\/:*?"<>|]/g, "_");
+        const safeName = shareName.replace(/[\\/:*?"<>|]/g, "_");
         a.download = `${safeName}_share.txt`;
         a.click();
         URL.revokeObjectURL(url);
@@ -283,27 +498,44 @@ document.getElementById("btnImport").addEventListener("click", () => {
             else alert("❌ Invalid token");
             return;
         }
-        if (state.fldMap[info.name]) {
+
+        const rawK = mask.XOR(info.key);
+        const fldId = getObjPid(rawK);
+        rawK.fill(0);
+
+        // Fetch latest canonical name from server if available
+        const canonicalName = await fetchCanonicalFolderName(fldId, info.key);
+        const effectiveName = canonicalName || info.name;
+
+        // If server had no canonical name yet, register it
+        if (!canonicalName) {
+            await saveCanonicalFolderName(fldId, info.key, effectiveName);
+        }
+
+        if (state.fldMap[effectiveName]) {
             const shouldOverwrite = await showConfirmModal(
-                `A folder named "${info.name}" already exists. Overwrite?`,
+                `A folder named "${effectiveName}" already exists. Overwrite?`,
                 "Overwrite Folder?",
                 "warning",
                 "Overwrite",
                 true
             );
             if (!shouldOverwrite) return;
-            const oldRaw = mask.XOR(state.fldMap[info.name]);
+            const oldRaw = mask.XOR(state.fldMap[effectiveName]);
             const oldFldId = getObjPid(oldRaw);
             oldRaw.fill(0);
-            try {
-                await fetch(`${SERVER}/api/storage/${oldFldId}/names`, { method: "DELETE", headers: { "X-User-Hash": usrHsh } });
-            } catch (e) {
-                console.warn("Failed to delete old folder storage", e);
+            if (oldFldId !== fldId) {
+                try {
+                    await fetch(`${SERVER}/api/storage/${oldFldId}/names`, { method: "DELETE", headers: { "X-User-Hash": usrHsh } });
+                } catch (e) {
+                    console.warn("Failed to delete old folder storage", e);
+                }
             }
         }
-        state.fldMap[info.name] = info.key;
-        await saveUsr(); loadUsr();
-        if (window.showNotice) window.showNotice(`✅ Folder "${info.name}" imported successfully.`, "Success", "check_circle");
+        state.fldMap[effectiveName] = info.key;
+        await saveUsr();
+        await loadUsr();
+        if (window.showNotice) window.showNotice(`✅ Folder "${effectiveName}" imported successfully.`, "Success", "check_circle");
     };
     input.click();
 });
@@ -324,6 +556,25 @@ async function loadFld() {
     selectKeywords.clear();
     document.getElementById("uploadContainer").classList.remove("hidden");
     document.getElementById("mediaContainer").classList.remove("hidden");
+
+    // Sync canonical folder name if changed remotely
+    try {
+        const canonicalName = await fetchCanonicalFolderName(state.id, state.key);
+        if (canonicalName && canonicalName !== state.name) {
+            const uniqueName = resolveUniqueFolderName(canonicalName, state.id);
+            if (uniqueName !== state.name) {
+                delete state.fldMap[state.name];
+                state.fldMap[uniqueName] = state.key;
+                state.name = uniqueName;
+                sessionStorage.setItem("oldFold", uniqueName);
+                await saveUsr();
+                showFld();
+            }
+        }
+    } catch (e) {
+        console.warn("Folder name sync on loadFld failed:", e);
+    }
+
     const res = await fetch(`${SERVER}/api/storage/${state.id}/names`);
     if (res.status === 404) state.flsMap = {};
     else {
@@ -999,3 +1250,10 @@ async function boot() {
     }
 }
 boot();
+
+// Sync canonical names on tab focus
+window.addEventListener("focus", () => {
+    if (usrHsh && usrKey) {
+        syncCanonicalFolderNames();
+    }
+});

@@ -153,7 +153,7 @@ func serveUser(w http.ResponseWriter, r *http.Request) {
 
 // handles folder metadata
 func serveMeta(w http.ResponseWriter, r *http.Request) {
-	// URL: /api/storage/{folder_pid}/names
+	// URL: /api/storage/{folder_pid}/{names|name}
 	target := strings.TrimPrefix(r.URL.Path, "/api/storage/")
 	parts := strings.Split(target, "/")
 	if len(parts) < 2 {
@@ -161,12 +161,12 @@ func serveMeta(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	folderID, metaType := parts[0], parts[1]
-	if metaType != "names" {
+	if metaType != "names" && metaType != "name" {
 		postError(w, "Invalid Metadata Type", http.StatusBadRequest)
 		return
 	}
 
-	path := filepath.Join(cfg.StorageDir, "data", filepath.Clean(folderID), "names")
+	path := filepath.Join(cfg.StorageDir, "data", filepath.Clean(folderID), filepath.Clean(metaType))
 	isCreation := false
 	if r.Method == http.MethodPost {
 		if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -195,7 +195,11 @@ func serveMeta(w http.ResponseWriter, r *http.Request) {
 		os.MkdirAll(filepath.Dir(path), 0755)
 		save(w, r, path)
 	case http.MethodDelete: // delete metadata
-		os.RemoveAll(filepath.Dir(path))
+		if metaType == "name" {
+			os.Remove(path)
+		} else {
+			os.RemoveAll(filepath.Dir(path))
+		}
 		w.WriteHeader(http.StatusOK)
 	default:
 		postError(w, "Method Not Allowed", http.StatusMethodNotAllowed)
@@ -391,6 +395,11 @@ func cors(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "*")
 		w.Header().Set("Access-Control-Expose-Headers", "Content-Range, Accept-Ranges, Content-Length")
+
+		// Prevent browser from aggressively caching HTML and JS assets
+		if !strings.HasPrefix(r.URL.Path, "/api/media/") {
+			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		}
 
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)

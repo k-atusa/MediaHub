@@ -781,6 +781,7 @@
 
         .nav-folder-item:hover .folder-more-btn,
         .nav-folder-item.active .folder-more-btn,
+        .root-folder-card:hover .folder-more-btn,
         .folder-more-btn.open {
             opacity: 1;
         }
@@ -1080,6 +1081,23 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .root-folder-card .folder-more-btn {
+            margin-left: auto;
+            color: var(--g-text-muted);
+        }
+
+        .root-folder-card .folder-more-btn .material-symbols-outlined {
+            font-size: 18px !important;
+            color: var(--g-text-muted);
+        }
+
+        .root-folder-card .folder-more-btn:hover .material-symbols-outlined,
+        .root-folder-card .folder-more-btn.open .material-symbols-outlined {
+            color: var(--g-text-main);
         }
 
         /* 5. Empty State Area */
@@ -2916,6 +2934,9 @@
         <button id="btnTrim">Trim</button>
         <input type="text" id="newFolderName">
         <button id="btnCreateFolder">Create</button>
+        <input type="text" id="renameOldFolderName" style="display: none;">
+        <input type="text" id="renameNewFolderName" style="display: none;">
+        <button id="btnRenameFolder" style="display: none;"></button>
         <button id="btnExport" style="display: none;"></button>
         <button id="btnDeleteFolder" style="display: none;"></button>
         <button id="btnChangePassword" style="display: none;"></button>
@@ -2924,6 +2945,10 @@
 
     <!-- Folder Item Context Menu (Same UI styling as New Button Dropdown) -->
     <div class="new-drive-menu folder-action-menu" id="folderActionMenu">
+        <div class="drive-menu-item" id="folderMenuRename">
+            <span class="material-symbols-outlined menu-icon">drive_file_rename_outline</span>
+            <span class="menu-label">Rename</span>
+        </div>
         <div class="drive-menu-item" id="folderMenuShare">
             <span class="material-symbols-outlined menu-icon">share</span>
             <span class="menu-label">Share folder</span>
@@ -2944,6 +2969,20 @@
         <div class="dialog-btn-group">
             <button class="btn-dialog-cancel" id="btnCancelNewFolder" type="button">Cancel</button>
             <button class="btn-dialog-confirm" id="btnConfirmNewFolder" type="button">Create</button>
+        </div>
+    </dialog>
+
+    <!-- Rename Folder Dialog (Material You M3 Dialog) -->
+    <dialog id="renameFolderModal">
+        <div class="dialog-m3-icon">
+            <span class="material-symbols-outlined">drive_file_rename_outline</span>
+        </div>
+        <div class="dialog-title">Rename</div>
+        <input type="text" id="modalRenameFolderNameInput" class="dialog-input" placeholder="Folder name" autocomplete="off" spellcheck="false">
+        <div id="renameFolderErrorText" style="color: var(--g-danger, #b3261e); font-size: 13px; margin-top: -12px; margin-bottom: 16px; display: none;"></div>
+        <div class="dialog-btn-group">
+            <button class="btn-dialog-cancel" id="btnCancelRenameFolder" type="button">Cancel</button>
+            <button class="btn-dialog-confirm" id="btnConfirmRenameFolder" type="button">OK</button>
         </div>
     </dialog>
 
@@ -3667,6 +3706,7 @@
                 syncRootFolderGrid();
             }
         }
+        window.updateFolderDisplay = updateFolderDisplay;
 
         let rootSearchCounter = 0;
 
@@ -3695,12 +3735,22 @@
                     card.innerHTML = `
                         <span class="material-symbols-outlined">folder</span>
                         <span class="root-folder-card-name">${opt.textContent}</span>
+                        <button type="button" class="folder-more-btn" title="More options" aria-label="More options">
+                            <span class="material-symbols-outlined">more_vert</span>
+                        </button>
                     `;
                     card.addEventListener("click", () => {
                         folderSelect.value = opt.value;
                         folderSelect.dispatchEvent(new Event("change"));
                         updateFolderDisplay();
                     });
+                    const moreBtn = card.querySelector(".folder-more-btn");
+                    if (moreBtn) {
+                        moreBtn.addEventListener("click", (e) => {
+                            e.stopPropagation();
+                            openFolderContextMenu(e, opt.value, moreBtn);
+                        });
+                    }
                     rootFolderGrid.appendChild(card);
                 });
                 return;
@@ -3750,12 +3800,22 @@
                     card.innerHTML = `
                         <span class="material-symbols-outlined">folder</span>
                         <span class="root-folder-card-name">${opt.textContent}</span>
+                        <button type="button" class="folder-more-btn" title="More options" aria-label="More options">
+                            <span class="material-symbols-outlined">more_vert</span>
+                        </button>
                     `;
                     card.addEventListener("click", () => {
                         folderSelect.value = opt.value;
                         folderSelect.dispatchEvent(new Event("change"));
                         updateFolderDisplay();
                     });
+                    const moreBtn = card.querySelector(".folder-more-btn");
+                    if (moreBtn) {
+                        moreBtn.addEventListener("click", (e) => {
+                            e.stopPropagation();
+                            openFolderContextMenu(e, opt.value, moreBtn);
+                        });
+                    }
                     rootFolderGrid.appendChild(card);
                 });
             }
@@ -3820,8 +3880,10 @@
                 rootFolderGrid.appendChild(filesGridContainer);
             }
         }
+        window.syncRootFolderGrid = syncRootFolderGrid;
 
         const folderActionMenu = document.getElementById("folderActionMenu");
+        const folderMenuRename = document.getElementById("folderMenuRename");
         const folderMenuShare = document.getElementById("folderMenuShare");
         const folderMenuDelete = document.getElementById("folderMenuDelete");
         let activeFolderMoreBtn = null;
@@ -3862,7 +3924,7 @@
 
             const btnRect = btn.getBoundingClientRect();
             const menuWidth = folderActionMenu.offsetWidth || 190;
-            const menuHeight = folderActionMenu.offsetHeight || 96;
+            const menuHeight = folderActionMenu.offsetHeight || 140;
 
             let left = btnRect.right + 6;
             let top = btnRect.top - 4;
@@ -3881,6 +3943,16 @@
             folderActionMenu.style.top = `${top}px`;
             folderActionMenu.style.visibility = "";
             folderActionMenu.classList.add("open");
+        }
+
+        if (folderMenuRename) {
+            folderMenuRename.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const targetFolder = folderActionMenu ? folderActionMenu.dataset.targetFolder : "";
+                closeFolderContextMenu();
+                if (!targetFolder) return;
+                openRenameFolderDialog(targetFolder);
+            });
         }
 
         if (folderMenuShare) {
@@ -3974,6 +4046,7 @@
                 sidebarFolderList.appendChild(item);
             });
         }
+        window.syncSidebarFolderList = syncSidebarFolderList;
 
         // 4. Enhance Cards to support Name, File Size, and More in List View
         async function enhanceCardsForListView() {
@@ -4165,6 +4238,117 @@
                 btnConfirmNewFolder.click();
             }
         });
+
+        // Rename folder modal binding
+        const renameFolderModal = document.getElementById("renameFolderModal");
+        const modalRenameInput = document.getElementById("modalRenameFolderNameInput");
+        const renameOldFolderName = document.getElementById("renameOldFolderName");
+        const renameNewFolderName = document.getElementById("renameNewFolderName");
+        const btnRenameFolder = document.getElementById("btnRenameFolder");
+        const btnCancelRenameFolder = document.getElementById("btnCancelRenameFolder");
+        const btnConfirmRenameFolder = document.getElementById("btnConfirmRenameFolder");
+        const renameFolderErrorText = document.getElementById("renameFolderErrorText");
+        let folderBeingRenamed = "";
+
+        function openRenameFolderDialog(folderName) {
+            if (typeof newDriveMenu !== "undefined" && newDriveMenu) newDriveMenu.classList.remove("open");
+            folderBeingRenamed = folderName;
+            if (renameFolderErrorText) {
+                renameFolderErrorText.style.display = "none";
+                renameFolderErrorText.textContent = "";
+            }
+            if (modalRenameInput) {
+                modalRenameInput.value = folderName;
+            }
+            if (renameFolderModal) {
+                renameFolderModal.showModal();
+                if (modalRenameInput) {
+                    modalRenameInput.focus();
+                    modalRenameInput.select();
+                }
+            }
+        }
+        window.openRenameFolderDialog = openRenameFolderDialog;
+
+        if (btnCancelRenameFolder) {
+            btnCancelRenameFolder.addEventListener("click", () => {
+                if (renameFolderModal) renameFolderModal.close();
+            });
+        }
+
+        async function handleRenameFolderConfirm() {
+            if (!folderBeingRenamed) return;
+            const newName = (modalRenameInput ? modalRenameInput.value : "").trim();
+            if (!newName) {
+                if (renameFolderErrorText) {
+                    renameFolderErrorText.textContent = "Please enter a folder name.";
+                    renameFolderErrorText.style.display = "block";
+                }
+                if (modalRenameInput) modalRenameInput.focus();
+                return;
+            }
+            if (newName.normalize('NFC') === folderBeingRenamed.normalize('NFC')) {
+                if (renameFolderModal) renameFolderModal.close();
+                return;
+            }
+            const existingNames = Array.from(folderSelect.options)
+                .filter(opt => opt.value !== "")
+                .map(opt => opt.value.normalize('NFC'));
+            if (existingNames.includes(newName.normalize('NFC')) && newName.normalize('NFC') !== folderBeingRenamed.normalize('NFC')) {
+                if (renameFolderErrorText) {
+                    renameFolderErrorText.textContent = `A folder named "${newName}" already exists.`;
+                    renameFolderErrorText.style.display = "block";
+                }
+                if (modalRenameInput) modalRenameInput.focus();
+                return;
+            }
+
+            allFoldersFilesCache = null;
+
+            try {
+                if (window.renameFolder) {
+                    await window.renameFolder(folderBeingRenamed, newName);
+                } else if (renameOldFolderName && renameNewFolderName && btnRenameFolder) {
+                    renameOldFolderName.value = folderBeingRenamed;
+                    renameNewFolderName.value = newName;
+                    btnRenameFolder.click();
+                }
+                if (renameFolderModal) renameFolderModal.close();
+            } catch (err) {
+                if (renameFolderErrorText) {
+                    renameFolderErrorText.textContent = err.message || "Failed to rename folder.";
+                    renameFolderErrorText.style.display = "block";
+                }
+                if (modalRenameInput) modalRenameInput.focus();
+            }
+        }
+
+        if (btnConfirmRenameFolder) {
+            btnConfirmRenameFolder.addEventListener("click", handleRenameFolderConfirm);
+        }
+
+        if (modalRenameInput) {
+            modalRenameInput.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleRenameFolderConfirm();
+                }
+            });
+            modalRenameInput.addEventListener("input", () => {
+                if (renameFolderErrorText) {
+                    renameFolderErrorText.style.display = "none";
+                    renameFolderErrorText.textContent = "";
+                }
+            });
+        }
+
+        if (renameFolderModal) {
+            renameFolderModal.addEventListener("click", (e) => {
+                if (e.target === renameFolderModal) {
+                    renameFolderModal.close();
+                }
+            });
+        }
 
         // Upload Button & Directory Upload Bindings
         const fileInput = document.getElementById("fileInput");
