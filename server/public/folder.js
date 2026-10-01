@@ -62,106 +62,8 @@ async function saveUsr() {
     }
 }
 
-// Canonical folder name E2EE helpers
-async function saveCanonicalFolderName(fldId, maskedKey, name) {
-    if (!fldId || !maskedKey || !name) return;
-    try {
-        const rawK = mask.XOR(maskedKey);
-        const sm = new SymMaster("gcm1", rawK.slice(0, 32));
-        rawK.fill(0);
-        const encBytes = new TextEncoder().encode(name.trim());
-        const cipherBin = await sm.EnBin(encBytes);
-        encBytes.fill(0);
-        await fetch(`${SERVER}/api/storage/${fldId}/name`, {
-            method: "POST",
-            headers: { "X-User-Hash": usrHsh },
-            body: cipherBin
-        });
-    } catch (e) {
-        console.warn(`Failed to save canonical folder name for ${fldId}:`, e);
-    }
-}
-
-async function fetchCanonicalFolderName(fldId, maskedKey) {
-    if (!fldId || !maskedKey) return null;
-    try {
-        const res = await fetch(`${SERVER}/api/storage/${fldId}/name`);
-        if (!res.ok) return null;
-        const rawK = mask.XOR(maskedKey);
-        const sm = new SymMaster("gcm1", rawK.slice(0, 32));
-        rawK.fill(0);
-        const cipherBin = new Uint8Array(await res.arrayBuffer());
-        const decBytes = await sm.DeBin(cipherBin);
-        const decName = new TextDecoder().decode(decBytes).trim();
-        decBytes.fill(0);
-        return decName || null;
-    } catch (e) {
-        return null;
-    }
-}
-
-function resolveUniqueFolderName(targetName, fldId) {
-    if (!state.fldMap[targetName]) return targetName;
-
-    const existingRaw = mask.XOR(state.fldMap[targetName]);
-    const existingId = getObjPid(existingRaw);
-    existingRaw.fill(0);
-    if (existingId === fldId) {
-        return targetName;
-    }
-
-    let counter = 2;
-    while (state.fldMap[`${targetName} (${counter})`]) {
-        const cRaw = mask.XOR(state.fldMap[`${targetName} (${counter})`]);
-        const cId = getObjPid(cRaw);
-        cRaw.fill(0);
-        if (cId === fldId) return `${targetName} (${counter})`;
-        counter++;
-    }
-    return `${targetName} (${counter})`;
-}
-
-async function syncCanonicalFolderNames() {
-    let changed = false;
-    const entries = Object.entries(state.fldMap);
-    await Promise.all(entries.map(async ([currName, maskedKey]) => {
-        try {
-            const rawK = mask.XOR(maskedKey);
-            const fldId = getObjPid(rawK);
-            rawK.fill(0);
-
-            const canonicalName = await fetchCanonicalFolderName(fldId, maskedKey);
-            if (canonicalName) {
-                if (canonicalName !== currName) {
-                    const uniqueName = resolveUniqueFolderName(canonicalName, fldId);
-                    if (uniqueName !== currName) {
-                        delete state.fldMap[currName];
-                        state.fldMap[uniqueName] = maskedKey;
-                        if (state.name === currName) {
-                            state.name = uniqueName;
-                            sessionStorage.setItem("oldFold", uniqueName);
-                        }
-                        const oldFold = sessionStorage.getItem("oldFold");
-                        if (oldFold === currName) {
-                            sessionStorage.setItem("oldFold", uniqueName);
-                        }
-                        changed = true;
-                    }
-                }
-            } else {
-                saveCanonicalFolderName(fldId, maskedKey, currName);
-            }
-        } catch (e) {
-            console.warn(`Error syncing folder "${currName}":`, e);
-        }
-    }));
-
-    if (changed) {
-        await saveUsr();
-        showFld();
-    }
-}
-window.syncCanonicalFolderNames = syncCanonicalFolderNames;
+// No-op for backward compatibility
+window.syncCanonicalFolderNames = () => {};
 
 // Load map from server.
 async function loadUsr() {
@@ -175,7 +77,6 @@ async function loadUsr() {
     dec.fill(0);
     maskMap(state.fldMap);
     showFld();
-    await syncCanonicalFolderNames();
 }
 
 // Render folder list.
@@ -198,11 +99,9 @@ document.getElementById("btnCreateFolder").addEventListener("click", async () =>
     const name = document.getElementById("newFolderName").value.trim();
     if (!name || state.fldMap[name]) return alert("⚠️ Invalid name");
     const rk = new Uint8Array(44); rk.set(Random(32), 0); rk.set(Random(12), 32);
-    const fldId = getObjPid(rk);
     const maskedKey = mask.XOR(rk);
     rk.fill(0);
     state.fldMap[name] = maskedKey;
-    await saveCanonicalFolderName(fldId, maskedKey, name);
     await saveUsr(); showFld();
     document.getElementById("newFolderName").value = "";
 });
@@ -241,13 +140,8 @@ async function doRenameFolder(rawOldName, rawNewName) {
 
     try {
         const maskedKey = state.fldMap[actualOldKey];
-        const rawK = mask.XOR(maskedKey);
-        const fldId = getObjPid(rawK);
-        rawK.fill(0);
 
-        // Update canonical folder name on server first
-        await saveCanonicalFolderName(fldId, maskedKey, newName);
-
+        // Folder rename operates locally in user's userdata map
         state.fldMap[newName] = maskedKey;
         delete state.fldMap[actualOldKey];
 
@@ -461,8 +355,7 @@ document.getElementById("btnExport").addEventListener("click", () => {
         cleanup();
         modal.close();
 
-        const canonicalName = await fetchCanonicalFolderName(state.id, state.key);
-        const shareName = canonicalName || state.name;
+        const shareName = state.name;
 
         const token = await makeToken(shareName, state.key, pw);
         if (!token) return;
@@ -509,14 +402,7 @@ document.getElementById("btnImport").addEventListener("click", () => {
         const fldId = getObjPid(rawK);
         rawK.fill(0);
 
-        // Fetch latest canonical name from server if available
-        const canonicalName = await fetchCanonicalFolderName(fldId, info.key);
-        const effectiveName = canonicalName || info.name;
-
-        // If server had no canonical name yet, register it
-        if (!canonicalName) {
-            await saveCanonicalFolderName(fldId, info.key, effectiveName);
-        }
+        const effectiveName = info.name;
 
         if (state.fldMap[effectiveName]) {
             const shouldOverwrite = await showConfirmModal(
@@ -562,24 +448,6 @@ async function loadFld() {
     selectKeywords.clear();
     document.getElementById("uploadContainer").classList.remove("hidden");
     document.getElementById("mediaContainer").classList.remove("hidden");
-
-    // Sync canonical folder name if changed remotely
-    try {
-        const canonicalName = await fetchCanonicalFolderName(state.id, state.key);
-        if (canonicalName && canonicalName !== state.name) {
-            const uniqueName = resolveUniqueFolderName(canonicalName, state.id);
-            if (uniqueName !== state.name) {
-                delete state.fldMap[state.name];
-                state.fldMap[uniqueName] = state.key;
-                state.name = uniqueName;
-                sessionStorage.setItem("oldFold", uniqueName);
-                await saveUsr();
-                showFld();
-            }
-        }
-    } catch (e) {
-        console.warn("Folder name sync on loadFld failed:", e);
-    }
 
     const res = await fetch(`${SERVER}/api/storage/${state.id}/names`);
     if (res.status === 404) state.flsMap = {};
@@ -1606,10 +1474,3 @@ async function boot() {
     }
 }
 boot();
-
-// Sync canonical names on tab focus
-window.addEventListener("focus", () => {
-    if (usrHsh && usrKey) {
-        syncCanonicalFolderNames();
-    }
-});
