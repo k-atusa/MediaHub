@@ -32,6 +32,16 @@ let origSize = 0;
 let flName = sessionStorage.getItem("currentFileName");
 let rawBuf = null;
 
+// Check URL parameters for direct link
+const urlParams = new URLSearchParams(window.location.search);
+const paramFld = urlParams.get("folder") || urlParams.get("fld");
+const paramFile = urlParams.get("file");
+if (paramFld && paramFile) {
+    if (!flKey || !flName || !fldId || !fldKey || fldId !== paramFld || flName !== paramFile) {
+        window.location.href = `./folder.html?folder=${encodeURIComponent(paramFld)}&file=${encodeURIComponent(paramFile)}`;
+    }
+}
+
 if (!flKey || !flName || !fldId || !fldKey) window.location.href = "./folder.html";
 document.getElementById("txName").value = flName;
 
@@ -573,6 +583,39 @@ function render(buf, body) {
     }
 }
 
+async function shareFl() {
+    if (!fldId || !flName) return;
+    const shareUrl = `${window.location.origin}/folder.html?folder=${encodeURIComponent(fldId)}&file=${encodeURIComponent(flName)}`;
+    try {
+        await navigator.clipboard.writeText(shareUrl);
+        if (window.showNotice) {
+            window.showNotice("Link copied to clipboard", "Share", "check_circle");
+        } else {
+            alert("🔗 Link copied to clipboard");
+        }
+    } catch (e) {
+        try {
+            const input = document.createElement("input");
+            input.value = shareUrl;
+            document.body.appendChild(input);
+            input.select();
+            document.execCommand("copy");
+            document.body.removeChild(input);
+            if (window.showNotice) {
+                window.showNotice("Link copied to clipboard", "Share", "check_circle");
+            } else {
+                alert("🔗 Link copied to clipboard");
+            }
+        } catch (_) {
+            prompt("Copy this share link:", shareUrl);
+        }
+    }
+}
+
+const btnShare = document.getElementById("btnShare");
+if (btnShare) {
+    btnShare.addEventListener("click", shareFl);
+}
 document.getElementById("btnEdit").addEventListener("click", editNm);
 document.getElementById("btnDown").addEventListener("click", downFl);
 document.getElementById("btnDelete").addEventListener("click", delFl);

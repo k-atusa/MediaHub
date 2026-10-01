@@ -3120,6 +3120,10 @@
 
     <!-- File Item Context Menu -->
     <div class="new-drive-menu file-action-menu" id="fileActionMenu">
+        <div class="drive-menu-item" id="fileMenuShare">
+            <span class="material-symbols-outlined menu-icon">share</span>
+            <span class="menu-label">Share</span>
+        </div>
         <div class="drive-menu-item" id="fileMenuRename">
             <span class="material-symbols-outlined menu-icon">drive_file_rename_outline</span>
             <span class="menu-label">Rename</span>
@@ -4180,6 +4184,7 @@
 
         // File Action Menu
         const fileActionMenu = document.getElementById("fileActionMenu");
+        const fileMenuShare = document.getElementById("fileMenuShare");
         const fileMenuRename = document.getElementById("fileMenuRename");
         const fileMenuDownload = document.getElementById("fileMenuDownload");
         const fileMenuDelete = document.getElementById("fileMenuDelete");
@@ -4244,6 +4249,18 @@
             fileActionMenu.classList.add("open");
         }
         window.openFileContextMenu = openFileContextMenu;
+
+        if (fileMenuShare) {
+            fileMenuShare.addEventListener("click", async (e) => {
+                e.stopPropagation();
+                const targetFile = fileActionMenu ? fileActionMenu.dataset.targetFile : "";
+                closeFileContextMenu();
+                if (!targetFile) return;
+                if (window.shareFile) {
+                    await window.shareFile(targetFile);
+                }
+            });
+        }
 
         if (fileMenuRename) {
             fileMenuRename.addEventListener("click", (e) => {

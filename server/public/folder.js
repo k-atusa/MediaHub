@@ -28,7 +28,13 @@ let usrKey = null;
     if (raw) { usrKey = mask.XOR(raw); raw.fill(0); }
 }
 let state = { fldMap: {}, name: "", key: null, id: "", flsMap: {}, page: 1, limit: 30, sort: localStorage.getItem("mediahub_sort") || "name-asc" };
-if (!usrHsh || !usrKey) window.location.href = "./index.html";
+if (!usrHsh || !usrKey) {
+    const query = window.location.search || window.location.hash;
+    if (query) {
+        sessionStorage.setItem("redirectAfterLogin", window.location.href);
+    }
+    window.location.href = "./index.html";
+}
 
 // Read file chunks.
 class FileSrc {
@@ -884,7 +890,38 @@ async function renameFile(rawOldName, rawNewName) {
         throw err;
     }
 }
-window.renameFile = renameFile;
+// Share file link
+async function shareFile(fileName) {
+    const targetFile = (fileName || "").trim();
+    if (!state.id || !targetFile) return;
+
+    const shareUrl = `${window.location.origin}/folder.html?folder=${encodeURIComponent(state.id)}&file=${encodeURIComponent(targetFile)}`;
+    try {
+        await navigator.clipboard.writeText(shareUrl);
+        if (window.showNotice) {
+            window.showNotice("Link copied to clipboard", "Share", "check_circle");
+        } else {
+            alert("🔗 Link copied to clipboard");
+        }
+    } catch (err) {
+        try {
+            const input = document.createElement("input");
+            input.value = shareUrl;
+            document.body.appendChild(input);
+            input.select();
+            document.execCommand("copy");
+            document.body.removeChild(input);
+            if (window.showNotice) {
+                window.showNotice("Link copied to clipboard", "Share", "check_circle");
+            } else {
+                alert("🔗 Link copied to clipboard");
+            }
+        } catch (_) {
+            prompt("Copy this share link:", shareUrl);
+        }
+    }
+}
+window.shareFile = shareFile;
 
 // Download decrypted file directly from folder list
 async function downloadFileDirectly(fileName) {
@@ -1502,9 +1539,61 @@ document.getElementById("btnChangePassword").addEventListener("click", () => {
     document.getElementById("pwModal").showModal();
 });
 
-// Restore session.
+// Restore session or open shared link.
 async function boot() {
     await loadUsr();
+
+    // Check URL parameters for direct file or folder link
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetFolderId = urlParams.get("folder") || urlParams.get("fld");
+    const targetFileName = urlParams.get("file");
+
+    if (targetFolderId) {
+        let matchingFolderName = null;
+        let matchingFolderKey = null;
+
+        for (const [fName, maskedKey] of Object.entries(state.fldMap)) {
+            const rawK = mask.XOR(maskedKey);
+            const id = getObjPid(rawK);
+            rawK.fill(0);
+            if (id === targetFolderId) {
+                matchingFolderName = fName;
+                matchingFolderKey = maskedKey;
+                break;
+            }
+        }
+
+        if (matchingFolderName) {
+            document.getElementById("folderSelect").value = matchingFolderName;
+            state.name = matchingFolderName;
+            state.key = matchingFolderKey;
+            state.id = targetFolderId;
+            state.page = 1;
+            sessionStorage.setItem("oldFold", matchingFolderName);
+            sessionStorage.setItem("oldPage", "1");
+            document.getElementById("btnDeleteFolder").classList.remove("hidden");
+            await loadFld();
+
+            if (targetFileName) {
+                // Remove query parameters from URL to keep address bar clean
+                window.history.replaceState({}, document.title, window.location.pathname);
+
+                const opened = openFileByName(targetFileName);
+                if (!opened) {
+                    if (window.showNotice) {
+                        window.showNotice(`⚠️ File "${targetFileName}" was not found in this folder.`, "Notice", "warning");
+                    }
+                }
+            }
+            return;
+        } else {
+            // Target folder not found in user's fldMap
+            if (window.showNotice) {
+                window.showNotice("⚠️ You do not have access to this folder. Please make sure the folder has been shared with and imported to your account.", "Folder Not Found", "warning");
+            }
+        }
+    }
+
     const oldFold = sessionStorage.getItem("oldFold");
     const oldPage = sessionStorage.getItem("oldPage");
     if (oldFold && state.fldMap[oldFold]) {

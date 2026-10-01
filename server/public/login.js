@@ -25,12 +25,17 @@ async function makeKeys() {
 // Store session and redirect
 function setSess(hash, maskedKey, username) {
     const raw = mask.XOR(maskedKey);
+    const redirectUrl = sessionStorage.getItem("redirectAfterLogin");
     sessionStorage.clear();
     sessionStorage.setItem("userHash", hash);
     sessionStorage.setItem("userKey", toHex(raw));
     sessionStorage.setItem("username", username);
     raw.fill(0);
-    window.location.href = "./folder.html";
+    if (redirectUrl) {
+        window.location.href = redirectUrl;
+    } else {
+        window.location.href = "./folder.html";
+    }
 }
 
 // Register
