@@ -39,8 +39,8 @@ MediaHub는 별도의 `feature` 브랜치를 생성하지 않는 간소화된 Gi
 
 - **워크플로우 파일**: [`.github/workflows/release.yml`](.github/workflows/release.yml)
 - **트리거**:
-  - `main` 브랜치로 코드가 `push`될 때
-  - 버전 태그(`v*`)가 `push`될 때
+  - GitHub에서 `vX.X.X` 형식의 태그/이름으로 릴리즈가 수동 발행(`release: published`)될 때
+  - `main` 브랜치의 최신 코드를 체크아웃하여 5대 플랫폼 바이너리를 빌드한 뒤 해당 릴리즈에 자동 첨부
 
 ### 자동 빌드 및 배포 대상 (5대 플랫폼)
 Vanilla Web 클라이언트(`server/public`)가 임베딩(`//go:embed all:public`)된 단일 실행 Go 바이너리를 크로스 컴파일하여 GitHub Release에 자동 첨부합니다.
