@@ -1,0 +1,865 @@
+// MediaHub Viewer Module
+import { SymMaster, Masker, HashMaster } from './Bencrypt.js';
+import { EncodeCfg, DecodeCfg, DecodeInt, EncodeInt } from './Opsec.js';
+import { NetSrc } from './media.js';
+const mask = new Masker();
+
+// Option: Disable ServiceWorker for WebKit (Safari).
+const OPT_NOSW_WEBKIT = true;
+
+const SERVER = window.location.origin;
+const fromHex = (hex) => new Uint8Array(hex.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+const toHex = (buf) => Array.from(buf).map(b => b.toString(16).padStart(2, '0')).join('');
+const getObjPid = (key) => toHex(key.slice(32, 44));
+
+// Get folder and file keys from session storage.
+let fldId = sessionStorage.getItem("currentFolderId");
+let fldKey = null;
+let flKey = null;
+let origSize = 0;
+{
+    const rawFK = sessionStorage.getItem("currentFolderKey") ? fromHex(sessionStorage.getItem("currentFolderKey")) : null;
+    const rawFlK = sessionStorage.getItem("currentFileKey") ? fromHex(sessionStorage.getItem("currentFileKey")) : null;
+    if (rawFK) { fldKey = mask.XOR(rawFK); rawFK.fill(0); }
+    if (rawFlK) {
+        origSize = DecodeInt(rawFlK.slice(44, 52));
+        const keyPrt = rawFlK.slice(0, 44);
+        flKey = mask.XOR(keyPrt);
+        keyPrt.fill(0);
+        rawFlK.fill(0);
+    }
+}
+let flName = sessionStorage.getItem("currentFileName");
+let rawBuf = null;
+
+// Check URL parameters for direct link
+const urlParams = new URLSearchParams(window.location.search);
+const paramFld = urlParams.get("folder") || urlParams.get("fld");
+const paramFile = urlParams.get("file");
+if (paramFld && paramFile) {
+    if (!flKey || !flName || !fldId || !fldKey || fldId !== paramFld || flName !== paramFile) {
+        window.location.href = `./folder.html?folder=${encodeURIComponent(paramFld)}&file=${encodeURIComponent(paramFile)}`;
+    }
+}
+
+if (!flKey || !flName || !fldId || !fldKey) window.location.href = "./folder.html";
+const tx = document.getElementById("txName");
+if (tx) {
+    tx.textContent = flName;
+    tx.title = flName;
+}
+
+// Supported media extension categories
+const VIDEO_EXTS = ['mp4', 'webm', 'mov', 'mkv'];
+const AUDIO_EXTS = ['mp3', 'ogg', 'wav', 'm4a', 'aac', 'flac', 'opus', 'wma'];
+const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico'];
+const PDF_EXTS = ['pdf'];
+const TEXT_EXTS = [
+    'txt', 'log', 'md', 'json', 'csv', 'xml', 'html', 'css', 'js', 'ts', 'jsx', 'tsx',
+    'yaml', 'yml', 'sh', 'py', 'sql', 'ini', 'conf', 'c', 'cpp', 'h', 'hpp', 'go', 'rs',
+    'java', 'kt', 'kts', 'swift', 'rb', 'php', 'cs', 'scala', 'dart', 'lua', 'r',
+    'bat', 'cmd', 'ps1', 'zsh', 'bash', 'toml', 'env', 'properties', 'graphql', 'gql',
+    'proto', 'diff', 'patch', 'vue', 'svelte', 'lock', 'json5',
+    'readme', 'license', 'makefile', 'dockerfile'
+];
+
+function formatBytes(bytes) {
+    if (bytes === undefined || bytes === null || isNaN(bytes) || bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB", "TB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return (bytes / Math.pow(k, i)).toFixed(i === 0 ? 0 : 1) + " " + sizes[i];
+}
+
+function escapeHtml(str) {
+    return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+
+
+function renderAudioPlayer(srcUrl, body) {
+    body.innerHTML = `
+        <div class="audio-player-card">
+            <div class="audio-hero-icon-box">
+                <span class="material-symbols-outlined audio-hero-icon">graphic_eq</span>
+            </div>
+            <div class="audio-title" title="${flName.replace(/"/g, '&quot;')}">${flName}</div>
+            <div class="audio-meta">${origSize > 0 ? formatBytes(origSize) : ''}</div>
+            <audio controls autoplay class="audio-element" id="audioPlayer" src="${srcUrl}"></audio>
+        </div>
+    `;
+}
+
+function getUnsupportedIcon(filename) {
+    const ext = ((filename || '').split('.').pop() || '').toLowerCase();
+    if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz'].includes(ext)) return 'folder_zip';
+    if (['exe', 'dmg', 'iso', 'bin', 'apk', 'app', 'msi', 'deb', 'rpm'].includes(ext)) return 'deployed_code';
+    if (['doc', 'docx', 'odt', 'rtf'].includes(ext)) return 'description';
+    if (['xls', 'xlsx', 'ods'].includes(ext)) return 'table_chart';
+    if (['ppt', 'pptx', 'odp'].includes(ext)) return 'slideshow';
+    if (['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac', 'wma'].includes(ext)) return 'audiotrack';
+    return 'draft';
+}
+
+// Get media type by ext.
+function getKind(name) {
+    const ext = ((name || '').split('.').pop() || '').toLowerCase();
+    if (VIDEO_EXTS.includes(ext)) return 'video';
+    if (AUDIO_EXTS.includes(ext)) return 'audio';
+    if (IMAGE_EXTS.includes(ext)) return 'image';
+    if (PDF_EXTS.includes(ext)) return 'pdf';
+    if (TEXT_EXTS.includes(ext)) return 'text';
+    return 'unsupported';
+}
+
+function getMime(name) {
+    const ext = ((name || '').split('.').pop() || '').toLowerCase();
+    const mimeMap = {
+        'pdf': 'application/pdf',
+        'txt': 'text/plain;charset=utf-8',
+        'log': 'text/plain;charset=utf-8',
+        'md': 'text/markdown;charset=utf-8',
+        'json': 'application/json',
+        'csv': 'text/csv;charset=utf-8',
+        'xml': 'application/xml',
+        'html': 'text/html;charset=utf-8',
+        'css': 'text/css;charset=utf-8',
+        'js': 'text/javascript;charset=utf-8',
+        'ts': 'text/plain;charset=utf-8',
+        'yaml': 'text/yaml;charset=utf-8',
+        'yml': 'text/yaml;charset=utf-8',
+        'sh': 'text/plain;charset=utf-8',
+        'py': 'text/plain;charset=utf-8',
+        'sql': 'text/plain;charset=utf-8',
+        'ini': 'text/plain;charset=utf-8',
+        'conf': 'text/plain;charset=utf-8',
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'gif': 'image/gif',
+        'webp': 'image/webp',
+        'svg': 'image/svg+xml',
+        'bmp': 'image/bmp',
+        'ico': 'image/x-icon',
+        'mp4': 'video/mp4',
+        'webm': 'video/webm',
+        'mov': 'video/quicktime',
+        'mkv': 'video/x-matroska',
+        'mp3': 'audio/mpeg',
+        'ogg': 'audio/ogg',
+        'wav': 'audio/wav',
+        'm4a': 'audio/mp4',
+        'aac': 'audio/aac',
+        'flac': 'audio/flac',
+        'opus': 'audio/opus',
+        'wma': 'audio/x-ms-wma',
+        'zip': 'application/zip',
+        'tar': 'application/x-tar',
+        'gz': 'application/gzip',
+        '7z': 'application/x-7z-compressed',
+        'rar': 'application/vnd.rar',
+        'doc': 'application/msword',
+        'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'xls': 'application/vnd.ms-excel',
+        'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'ppt': 'application/vnd.ms-powerpoint',
+        'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    };
+    return mimeMap[ext] || 'application/octet-stream';
+}
+
+function renderUnsupported(body) {
+    const icon = getUnsupportedIcon(flName);
+    const sizeStr = origSize > 0 ? formatBytes(origSize) : '';
+    body.innerHTML = `
+        <div class="unsupported-preview-card">
+            <div class="unsupported-icon-box">
+                <span class="material-symbols-outlined unsupported-icon">${icon}</span>
+            </div>
+            <h2 class="unsupported-title">No preview available</h2>
+            <p class="unsupported-msg">Preview is not supported for this file.</p>
+            <div class="unsupported-meta">
+                <span class="unsupported-filename" title="${flName.replace(/"/g, '&quot;')}">${flName}</span>
+                ${sizeStr ? `<span class="unsupported-filesize">${sizeStr}</span>` : ''}
+            </div>
+            <button type="button" class="btn-unsupported-download" id="btnUnsupportedDownload">
+                <span class="material-symbols-outlined">download</span>
+                <span>Download</span>
+            </button>
+        </div>
+    `;
+
+    const btn = document.getElementById("btnUnsupportedDownload");
+    if (btn) {
+        btn.addEventListener("click", downFl);
+    }
+}
+
+// Load and render file.
+async function start() {
+    const rawFK = mask.XOR(flKey);
+    const flPid = getObjPid(rawFK);
+    rawFK.fill(0);
+    const body = document.getElementById("viewBody");
+    const kind = getKind(flName);
+
+    // Unsupported: If size > 4KB (4096 bytes), show preview not supported card immediately.
+    // If size <= 4KB, proceed to fullDown to display raw data in textarea.
+    if (kind === 'unsupported' && origSize > 4096) {
+        renderUnsupported(body);
+        return;
+    }
+
+    // Video & Audio: Stream via SW.
+    if (kind === 'video' || kind === 'audio') {
+        const isWebkit = /AppleWebKit/i.test(navigator.userAgent) && (!/Chrome/i.test(navigator.userAgent) || /CriOS/i.test(navigator.userAgent));
+        if (OPT_NOSW_WEBKIT && isWebkit) {
+            console.log("WebKit detected. Fallback to full down.");
+            await fullDown(flPid, body);
+            return;
+        }
+
+        body.innerHTML = `<p style="color:var(--preview-subtext);font-size:13px;margin:20px 0">Preparing ${kind} stream…</p>`;
+        try {
+            const reg = await navigator.serviceWorker.register('./sw.js?v=2.3', { updateViaCache: 'none' });
+            try { await reg.update(); } catch (_) {}
+            await navigator.serviceWorker.ready;
+
+            const rawKey = mask.XOR(flKey);
+            const keyHex = toHex(rawKey);
+            rawKey.fill(0);
+
+            // Wait for SW ready ACK.
+            const ack = new Promise(resolve => {
+                const h = (e) => {
+                    if (e.data?.action === 'REGISTERED' && e.data.filePid === flPid) {
+                        navigator.serviceWorker.removeEventListener('message', h);
+                        resolve();
+                    }
+                };
+                navigator.serviceWorker.addEventListener('message', h);
+            });
+
+            // Handle SW key request.
+            navigator.serviceWorker.addEventListener('message', (e) => {
+                if (e.data?.action === 'REQUEST_KEY' && e.data.filePid === flPid) {
+                    const rk = mask.XOR(flKey);
+                    reg.active.postMessage({
+                        action: 'REGISTER', folderId: fldId, filePid: flPid, fileKey: toHex(rk), originalSize: origSize, fileName: flName
+                    });
+                    rk.fill(0);
+                }
+            });
+
+            reg.active.postMessage({
+                action: 'REGISTER',
+                folderId: fldId,
+                filePid: flPid,
+                fileKey: keyHex,
+                originalSize: origSize,
+                fileName: flName
+            });
+            await ack;
+
+            // Set media player source.
+            body.innerHTML = '';
+            if (kind === 'audio') {
+                renderAudioPlayer(`/sw-stream/${fldId}/${flPid}`, body);
+            } else {
+                const v = document.createElement('video');
+                v.controls = true;
+                v.crossOrigin = 'anonymous';
+                v.playsInline = true;
+                v.preload = 'metadata';
+                v.style.width = '100%';
+                v.src = `/sw-stream/${fldId}/${flPid}`;
+                body.appendChild(v);
+            }
+        } catch (err) {
+            console.warn('SW streaming failed', err);
+            await fullDown(flPid, body);
+        }
+        return;
+    }
+
+    // Non-video/audio: Download and decrypt.
+    await fullDown(flPid, body);
+}
+
+// Download file directly.
+async function fullDown(flPid, body) {
+    // Get total file size.
+    const head = await fetch(`${SERVER}/api/media/${fldId}/${flPid}/dat`, {
+        headers: { 'Range': 'bytes=0-0' }
+    });
+    const contentRange = head.headers.get("Content-Range");
+    if (!head.ok || !contentRange) {
+        body.innerHTML = `
+            <div style="text-align: center; padding: 40px 20px; color: var(--preview-subtext);">
+                <span class="material-symbols-outlined" style="font-size: 48px; color: var(--preview-danger, #b3261e); margin-bottom: 12px; display: block;">error_outline</span>
+                <h3 style="margin: 0 0 8px 0; color: var(--preview-text);">Unable to load file</h3>
+                <p style="margin: 0 0 20px 0; font-size: 14px;">The requested file binary was not found or is corrupted (HTTP ${head.status}).</p>
+                <button onclick="window.location.href='./folder.html'" class="btn-dialog-primary" style="padding: 0 20px; height: 36px; border-radius: 18px; cursor: pointer;">Back to Files</button>
+            </div>
+        `;
+        return;
+    }
+    const totSize = parseInt(contentRange.split('/')[1], 10);
+
+    let loaded = 0;
+    const chunks = [];
+    const prog = document.createElement("div");
+    prog.style.position = "fixed"; prog.style.top = "50%"; prog.style.width = "100%"; prog.style.textAlign = "center";
+    body.appendChild(prog);
+
+    // Download loop.
+    while (loaded < totSize) {
+        try {
+            const res = await fetch(`${SERVER}/api/media/${fldId}/${flPid}/dat`, {
+                headers: { 'Range': `bytes=${loaded}-${totSize - 1}` }
+            });
+            const reader = res.body.getReader();
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                chunks.push(value);
+                loaded += value.length;
+                prog.textContent = `📥 ${Math.round((loaded / totSize) * 100)}%`;
+            }
+        } catch (e) {
+            await new Promise(r => setTimeout(r, 1000));
+        }
+    }
+
+    // Decrypt chunks.
+    prog.textContent = "🔒 Decrypting...";
+    const fullBuf = new Uint8Array(loaded);
+    let offset = 0;
+    for (const c of chunks) { fullBuf.set(c, offset); offset += c.length; }
+
+    // Get exact cipher size.
+    const rawFK2 = mask.XOR(flKey);
+    const smx = new SymMaster("gcmx1", rawFK2.slice(0, 32));
+    rawFK2.fill(0);
+    const ciphSize = smx.AfterSize(origSize);
+
+    // Extract cipher without padding.
+    const encBuf = fullBuf.slice(0, ciphSize);
+
+    const plnChks = [];
+    await smx.DeFile(new NetSrc(encBuf), encBuf.length, { write: async (c) => plnChks.push(c) });
+    rawBuf = new Uint8Array(plnChks.reduce((a, c) => a + c.length, 0));
+    let fOff = 0;
+    for (const c of plnChks) { rawBuf.set(c, fOff); fOff += c.length; }
+
+    body.removeChild(prog);
+    render(rawBuf, body);
+}
+
+// Rename current file.
+async function performRename(newNm) {
+    const rawNewNm = (newNm || "").trim();
+    if (!rawNewNm) {
+        if (window.showNotice) window.showNotice("⚠️ File name cannot be empty", "Notice", "warning");
+        else alert("⚠️ File name cannot be empty");
+        return false;
+    }
+    if (rawNewNm.normalize('NFC') === flName.normalize('NFC')) {
+        return true;
+    }
+    try {
+        const res = await fetch(`${SERVER}/api/storage/${fldId}/names`);
+        if (!res.ok) throw new Error("Failed to load names map");
+        const rawSK = mask.XOR(fldKey);
+        const sm = new SymMaster("gcm1", rawSK.slice(0, 32));
+        rawSK.fill(0);
+        const dec = await sm.DeBin(new Uint8Array(await res.arrayBuffer()));
+        const flsMap = DecodeCfg(dec);
+        dec.fill(0);
+
+        const duplicate = Object.keys(flsMap).find(k => k.normalize('NFC') === rawNewNm.normalize('NFC') && k !== flName);
+        if (duplicate) {
+            for (const v of Object.values(flsMap)) if (v?.fill) v.fill(0);
+            throw new Error(`A file named "${rawNewNm}" already exists.`);
+        }
+
+        const rawFK = mask.XOR(flKey);
+        const flInfo = new Uint8Array(52);
+        flInfo.set(rawFK, 0);
+        flInfo.set(EncodeInt(origSize, 8), 44);
+        rawFK.fill(0);
+
+        flsMap[rawNewNm] = flInfo;
+        delete flsMap[flName];
+
+        const encoded = EncodeCfg(flsMap);
+        for (const v of Object.values(flsMap)) if (v?.fill) v.fill(0);
+        await fetch(`${SERVER}/api/storage/${fldId}/names`, { method: "POST", body: await sm.EnBin(encoded) });
+        encoded.fill(0);
+
+        sessionStorage.setItem("currentFileName", rawNewNm);
+        flName = rawNewNm;
+        const tx = document.getElementById("txName");
+        if (tx) {
+            tx.textContent = rawNewNm;
+            tx.title = rawNewNm;
+        }
+        if (window.showNotice) {
+            window.showNotice(`✅ Renamed to "${rawNewNm}"`, "Success", "check_circle");
+        } else {
+            alert("✅ Renamed");
+        }
+        return true;
+    } catch (e) {
+        if (window.showNotice) {
+            window.showNotice(`❌ Rename failed: ${e.message}`, "Error", "error");
+        } else {
+            alert(`❌ Rename failed: ${e.message}`);
+        }
+        return false;
+    }
+}
+
+function openRenameModal() {
+    const modal = document.getElementById("renameFileModal");
+    const input = document.getElementById("modalRenameFileInput");
+    const errText = document.getElementById("renameFileErrorText");
+    if (!modal || !input) {
+        const promptVal = prompt("Enter new file name:", flName);
+        if (promptVal) performRename(promptVal);
+        return;
+    }
+    if (errText) {
+        errText.style.display = "none";
+        errText.textContent = "";
+    }
+    input.value = flName;
+    input.setAttribute("autocomplete", "off");
+    input.setAttribute("autocorrect", "off");
+    input.setAttribute("autocapitalize", "off");
+    input.setAttribute("spellcheck", "false");
+    input.setAttribute("data-lpignore", "true");
+    modal.showModal();
+    input.focus();
+    const lastDot = flName.lastIndexOf('.');
+    if (lastDot > 0) {
+        input.setSelectionRange(0, lastDot);
+    } else {
+        input.select();
+    }
+}
+
+// Save decrypted file.
+async function downFl() {
+    // If not decrypted into rawBuf yet (e.g. video streaming or unsupported preview):
+    if (!rawBuf) {
+        const rawFK = mask.XOR(flKey);
+        const flPid = getObjPid(rawFK);
+        rawFK.fill(0);
+        const prog = document.createElement('div');
+        prog.id = "downloadProgressToast";
+        prog.className = "download-progress-toast";
+        prog.innerHTML = `
+            <span class="material-symbols-outlined spin-icon">sync</span>
+            <span id="downloadProgressText">Downloading… 0%</span>
+        `;
+        document.body.appendChild(prog);
+        const progText = document.getElementById("downloadProgressText");
+
+        try {
+            // Download inline.
+            const head = await fetch(`${SERVER}/api/media/${fldId}/${flPid}/dat`, { headers: { 'Range': 'bytes=0-0' } });
+            const contentRange = head.headers.get('Content-Range');
+            if (!head.ok || !contentRange) {
+                prog.remove();
+                return alert('❌ Download failed: File not found or corrupted');
+            }
+            const totSize = parseInt(contentRange.split('/')[1], 10);
+            let loaded = 0; const chunks = [];
+            while (loaded < totSize) {
+                const res = await fetch(`${SERVER}/api/media/${fldId}/${flPid}/dat`, { headers: { 'Range': `bytes=${loaded}-${totSize - 1}` } });
+                const reader = res.body.getReader();
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    chunks.push(value);
+                    loaded += value.length;
+                    if (progText) progText.textContent = `Downloading… ${Math.round((loaded / totSize) * 100)}%`;
+                }
+            }
+            if (progText) progText.textContent = 'Decrypting…';
+            const fullBuf = new Uint8Array(loaded); let off = 0;
+            for (const c of chunks) { fullBuf.set(c, off); off += c.length; }
+            const rawFK2 = mask.XOR(flKey);
+            const smx = new SymMaster('gcmx1', rawFK2.slice(0, 32)); rawFK2.fill(0);
+            const ciphSize = smx.AfterSize(origSize);
+            const encBuf = fullBuf.slice(0, ciphSize);
+            const plain = []; await smx.DeFile(new NetSrc(encBuf), encBuf.length, { write: async (c) => plain.push(c) });
+            rawBuf = new Uint8Array(plain.reduce((a, c) => a + c.length, 0)); let fo = 0;
+            for (const c of plain) { rawBuf.set(c, fo); fo += c.length; }
+        } catch (e) {
+            prog.remove();
+            return alert('❌ Download failed: ' + (e.message || 'Unknown error'));
+        }
+        prog.remove();
+    }
+    if (!rawBuf) return alert('⚠️ Wait for decryption');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([rawBuf], { type: getMime(flName) }));
+    a.download = flName; a.click();
+}
+
+// Delete file and metadata.
+function delFl() {
+    const modal = document.getElementById("deleteFileModal");
+    if (!modal) {
+        if (!confirm("Delete this file?")) return;
+        return executeDelete();
+    }
+    const textEl = document.getElementById("deleteFileText");
+    const btnCancel = document.getElementById("btnCancelDeleteFile");
+    const btnConfirm = document.getElementById("btnConfirmDeleteFile");
+
+    if (textEl) {
+        textEl.innerHTML = `Are you sure you want to delete "<strong>${flName.replace(/</g, "&lt;")}</strong>"? This action cannot be undone.`;
+    }
+
+    modal.showModal();
+
+    const cleanup = () => {
+        btnConfirm.removeEventListener("click", onConfirm);
+        btnCancel.removeEventListener("click", onCancel);
+    };
+
+    const onCancel = () => {
+        cleanup();
+        modal.close();
+    };
+
+    const onConfirm = async () => {
+        cleanup();
+        modal.close();
+        await executeDelete();
+    };
+
+    modal.addEventListener("close", cleanup, { once: true });
+    btnConfirm.addEventListener("click", onConfirm);
+    btnCancel.addEventListener("click", onCancel);
+}
+
+async function executeDelete() {
+    try {
+        const rawFK = mask.XOR(flKey);
+        const flPid = getObjPid(rawFK);
+        rawFK.fill(0);
+        await fetch(`${SERVER}/api/media/${fldId}/${flPid}/dat`, { method: "DELETE" });
+        await fetch(`${SERVER}/api/media/${fldId}/${flPid}/thumb`, { method: "DELETE" });
+        const res = await fetch(`${SERVER}/api/storage/${fldId}/names`);
+        const rawSK = mask.XOR(fldKey);
+        const sm = new SymMaster("gcm1", rawSK.slice(0, 32));
+        rawSK.fill(0);
+        const dec = await sm.DeBin(new Uint8Array(await res.arrayBuffer()));
+        const flsMap = DecodeCfg(dec);
+        dec.fill(0);
+        if (flsMap[flName]?.fill) flsMap[flName].fill(0);
+        delete flsMap[flName];
+        const encoded = EncodeCfg(flsMap);
+        for (const v of Object.values(flsMap)) if (v?.fill) v.fill(0);
+        await fetch(`${SERVER}/api/storage/${fldId}/names`, { method: "POST", body: await sm.EnBin(encoded) });
+        encoded.fill(0);
+        window.location.href = "./folder.html";
+    } catch (e) {
+        if (window.showNotice) window.showNotice("❌ Delete failed", "Error", "error");
+        else alert("❌ Delete failed");
+    }
+}
+
+// Render decrypted content.
+function render(buf, body) {
+    const url = URL.createObjectURL(new Blob([buf], { type: getMime(flName) }));
+    const kind = getKind(flName);
+    body.innerHTML = "";
+
+    // Clean up any existing Viewer.js instance
+    if (window.currentViewer) {
+        try { window.currentViewer.destroy(); } catch (e) {}
+        window.currentViewer = null;
+    }
+
+    if (kind === 'video') {
+        const v = document.createElement("video");
+        v.controls = true;
+        v.src = url;
+        v.style.width = "100%";
+        body.appendChild(v);
+    }
+    else if (kind === 'image') {
+        const img = document.createElement("img");
+        img.src = url;
+        img.alt = flName;
+        img.style.display = "none";
+        body.appendChild(img);
+
+        window.currentViewer = new window.Viewer(img, {
+            inline: true,
+            button: false,
+            navbar: false,
+            title: false,
+            toolbar: {
+                zoomIn: 1,
+                zoomOut: 1,
+                oneToOne: 1,
+                reset: 1,
+                prev: 0,
+                play: 0,
+                next: 0,
+                rotateLeft: 1,
+                rotateRight: 1,
+                flipHorizontal: 1,
+                flipVertical: 1,
+            },
+            tooltip: true,
+            movable: true,
+            zoomable: true,
+            rotatable: true,
+            scalable: true,
+            transition: true,
+            backdrop: false,
+            minZoomRatio: 0.05,
+            maxZoomRatio: 50,
+            zoomRatio: 0.15,
+        });
+    }
+    else if (kind === 'audio') {
+        renderAudioPlayer(url, body);
+    }
+    else if (kind === 'pdf') {
+        const f = document.createElement("iframe");
+        f.src = url;
+        f.style.width = "100%";
+        f.style.height = "90vh";
+        body.appendChild(f);
+    }
+    else if (kind === 'text' || buf.length <= 4096) {
+        const t = document.createElement("textarea");
+        t.value = new TextDecoder().decode(buf);
+        t.style.width = "100%";
+        t.style.height = "90vh";
+        t.readOnly = true;
+        t.spellcheck = false;
+        body.appendChild(t);
+    }
+    else {
+        renderUnsupported(body);
+    }
+}
+
+async function shareFl() {
+    if (!fldId || !flName) return;
+    const shareUrl = `${window.location.origin}/folder.html?folder=${encodeURIComponent(fldId)}&file=${encodeURIComponent(flName)}`;
+    try {
+        await navigator.clipboard.writeText(shareUrl);
+        if (window.showNotice) {
+            window.showNotice("Link copied to clipboard", "Share", "check_circle");
+        } else {
+            alert("🔗 Link copied to clipboard");
+        }
+    } catch (e) {
+        try {
+            const input = document.createElement("input");
+            input.value = shareUrl;
+            document.body.appendChild(input);
+            input.select();
+            document.execCommand("copy");
+            document.body.removeChild(input);
+            if (window.showNotice) {
+                window.showNotice("Link copied to clipboard", "Share", "check_circle");
+            } else {
+                alert("🔗 Link copied to clipboard");
+            }
+        } catch (_) {
+            prompt("Copy this share link:", shareUrl);
+        }
+    }
+}
+
+// Mobile 3-dots Action Menu
+const btnViewerMore = document.getElementById("btnViewerMore");
+const viewerActionMenu = document.getElementById("viewerActionMenu");
+
+function openViewerMenu(e) {
+    if (!viewerActionMenu || !btnViewerMore) return;
+    if (viewerActionMenu.classList.contains("open")) {
+        closeViewerMenu();
+        return;
+    }
+    btnViewerMore.classList.add("open");
+    viewerActionMenu.style.visibility = "hidden";
+    viewerActionMenu.style.display = "block";
+
+    const rect = btnViewerMore.getBoundingClientRect();
+    const menuWidth = viewerActionMenu.offsetWidth || 190;
+    const menuHeight = viewerActionMenu.offsetHeight || 190;
+
+    let left = rect.right - menuWidth;
+    let top = rect.bottom + 6;
+
+    if (left < 10) left = 10;
+    if (left + menuWidth > window.innerWidth - 10) {
+        left = window.innerWidth - menuWidth - 10;
+    }
+    if (top + menuHeight > window.innerHeight - 10) {
+        top = rect.top - menuHeight - 6;
+    }
+
+    viewerActionMenu.style.left = `${left}px`;
+    viewerActionMenu.style.top = `${top}px`;
+    viewerActionMenu.style.visibility = "";
+    viewerActionMenu.classList.add("open");
+}
+
+function closeViewerMenu() {
+    if (!viewerActionMenu) return;
+    viewerActionMenu.classList.remove("open");
+    viewerActionMenu.style.display = "none";
+    if (btnViewerMore) {
+        btnViewerMore.classList.remove("open");
+    }
+}
+
+if (btnViewerMore) {
+    btnViewerMore.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openViewerMenu(e);
+    });
+}
+
+document.addEventListener("click", (e) => {
+    if (viewerActionMenu && viewerActionMenu.classList.contains("open")) {
+        if (!viewerActionMenu.contains(e.target) && (!btnViewerMore || !btnViewerMore.contains(e.target))) {
+            closeViewerMenu();
+        }
+    }
+});
+
+// Menu items
+document.getElementById("viewerMenuShare")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    closeViewerMenu();
+    shareFl();
+});
+
+document.getElementById("viewerMenuRename")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    closeViewerMenu();
+    openRenameModal();
+});
+
+document.getElementById("viewerMenuDownload")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    closeViewerMenu();
+    downFl();
+});
+
+document.getElementById("viewerMenuDelete")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    closeViewerMenu();
+    delFl();
+});
+
+// Rename modal buttons
+document.getElementById("btnCancelRenameFile")?.addEventListener("click", () => {
+    document.getElementById("renameFileModal")?.close();
+});
+
+document.getElementById("btnConfirmRenameFile")?.addEventListener("click", async () => {
+    const input = document.getElementById("modalRenameFileInput");
+    const errText = document.getElementById("renameFileErrorText");
+    const val = input ? input.value.trim() : "";
+    if (!val) {
+        if (errText) {
+            errText.textContent = "Please enter a file name.";
+            errText.style.display = "block";
+        }
+        input?.focus();
+        return;
+    }
+    if (val.normalize('NFC') === flName.normalize('NFC')) {
+        document.getElementById("renameFileModal")?.close();
+        return;
+    }
+    const success = await performRename(val);
+    if (success) {
+        document.getElementById("renameFileModal")?.close();
+    } else {
+        if (errText) {
+            errText.textContent = "Rename failed. A file with this name might already exist.";
+            errText.style.display = "block";
+        }
+    }
+});
+
+document.getElementById("modalRenameFileInput")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+        e.preventDefault();
+        document.getElementById("btnConfirmRenameFile")?.click();
+    }
+});
+
+// Top bar action buttons
+const btnShare = document.getElementById("btnShare");
+if (btnShare) {
+    btnShare.addEventListener("click", shareFl);
+}
+document.getElementById("btnEdit")?.addEventListener("click", () => {
+    openRenameModal();
+});
+document.getElementById("btnDown")?.addEventListener("click", downFl);
+document.getElementById("btnDelete")?.addEventListener("click", delFl);
+
+// Setup prev/next navigation.
+async function setNav() {
+    try {
+        const res = await fetch(`${SERVER}/api/storage/${fldId}/names`);
+        if (res.status === 404) return;
+        const rawSK = mask.XOR(fldKey);
+        const sm = new SymMaster("gcm1", rawSK.slice(0, 32));
+        rawSK.fill(0);
+        const dec = await sm.DeBin(new Uint8Array(await res.arrayBuffer()));
+        const flsMap = DecodeCfg(dec);
+        dec.fill(0);
+        const entries = Object.entries(flsMap).sort((a, b) => a[0].localeCompare(b[0]));
+        const idx = entries.findIndex(([name]) => name === flName);
+        if (idx === -1) { for (const [, v] of entries) if (v?.fill) v.fill(0); return; }
+
+        if (idx > 0) {
+            const [prevNm, prevKy] = entries[idx - 1];
+            const prevHx = toHex(prevKy);
+            const btnPrv = document.getElementById("btnPrevFile");
+            btnPrv.classList.remove("hidden");
+            btnPrv.onclick = () => {
+                sessionStorage.setItem("currentFileName", prevNm);
+                sessionStorage.setItem("currentFileKey", prevHx);
+                window.location.reload();
+            };
+        }
+        if (idx < entries.length - 1) {
+            const [nxtNm, nxtKy] = entries[idx + 1];
+            const nxtHx = toHex(nxtKy);
+            const btnNxt = document.getElementById("btnNextFile");
+            btnNxt.classList.remove("hidden");
+            btnNxt.onclick = () => {
+                sessionStorage.setItem("currentFileName", nxtNm);
+                sessionStorage.setItem("currentFileKey", nxtHx);
+                window.location.reload();
+            };
+        }
+        // Wipe keys from memory.
+        for (const [, v] of entries) if (v?.fill) v.fill(0);
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+start();
+setNav();

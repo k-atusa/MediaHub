@@ -1,4 +1,4 @@
-# MediaHub v1.4.1
+# MediaHub v1.5.0
 
 project WHY(Web Hub Yard): Media Hub
 
@@ -18,23 +18,19 @@ project WHY(Web Hub Yard): Media Hub
 - userdata is Map[folderName]folderKey, and filenames is Map[fileName]fileKey.
 - userdata is encrypted with userKey. filenames is encrypted with folderKey. Thumbnails and media are encrypted with fileKey.
 
-```
-mediahub/
-├── frontend/               # Next.js 14 + Material You 웹 프론트엔드
-│   ├── src/
-│   ├── public/
-│   └── package.json
-├── backend/                # Go 백엔드 서버 (프론트엔드 내장 단일 바이너리)
-│   ├── server.go
-│   ├── go.mod
-│   ├── dist/               # 프론트엔드 정적 빌드 산출물 (embed.FS 내장)
-│   ├── config/
-│   │   └── config.json
-│   ├── certs/
-│   ├── users/
-│   └── data/
-├── build.sh                # 프론트엔드 빌드 + 백엔드 바이너리 단일 패키징 스크립트
-└── icons/
+```python
+server
+config/
+  config.json
+certs/
+  cert.pem
+  key.pem
+users/
+  ...
+data/
+  ...
+public/
+  ...
 ```
 
 | Option | Type | Info | 정보 |
@@ -46,34 +42,62 @@ mediahub/
 | invite | string | invitation auth code | 가입 권한 코드 |
 | notice | string | public notification | 접속 시 보이는 공지 |
 
+## Limitation
+
+- It takes time to download and decrypt whole file and show. (Except for videos)
+- For video, it uses real-time streaming. Still, buffering can take time up to 1 minute.
+- With private TLS certificate, you cannot use streaming in Chrome. Streaming is disabled for all WebKit browsers due to its limitation.
+- Uploading with browser limits file size to 2GiB. Use python client to large-scale upload.
+- Python client requires USAG-Lib and OpenCV dependency.
+
 ## Build & Run
 
-### 1. 원클릭 빌드 (프론트엔드 HTML 빌드 + 바이너리 내장)
+### Prerequisites
+- [Go](https://go.dev/) 1.22 or higher
+
+### Quick Build (Recommended)
+Run the root build script. It automatically detects your current operating system and CPU architecture, compiling a single standalone Go binary with the embedded Web client (`server/public`):
 
 ```bash
 ./build.sh
 ```
 
-### 2. 단계별 빌드
+- The compiled binary is saved to `server/mediahub-server-{version}-{os}-{arch}` and copied to `server/server`.
 
-**프론트엔드 빌드 (Next.js export -> backend/dist):**
-```bash
-cd frontend
-npm install
-npm run build
-```
+### Manual Build
+You can also compile directly within the `server` directory using the standard Go toolchain:
 
-**백엔드 바이너리 빌드 (Go 단일 바이너리):**
 ```bash
-cd backend
+cd server
 go build -ldflags="-s -w" -trimpath -o server server.go
 ```
 
-### 3. 서버 실행
-
-`server` 바이너리 단일 파일만으로 프론트엔드 HTML 웹 UI와 백엔드 API가 동시에 실행됩니다.
+### Cross-Compilation (Multi-Platform)
+Cross-compile for any target platform without external C dependencies:
 
 ```bash
-cd backend
+cd server
+
+# Windows (x86_64)
+CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -trimpath -o mediahub-server-windows-amd64.exe server.go
+
+# Windows (ARM64)
+CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -ldflags="-s -w" -trimpath -o mediahub-server-windows-arm64.exe server.go
+
+# macOS (Apple Silicon ARM64)
+CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -trimpath -o mediahub-server-darwin-arm64 server.go
+
+# Linux (x86_64)
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -trimpath -o mediahub-server-linux-amd64 server.go
+
+# Linux (ARM64)
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -trimpath -o mediahub-server-linux-arm64 server.go
+```
+
+### Running the Server
+Place your TLS certificates (`certs/cert.pem`, `certs/key.pem`) and configuration (`config/config.json`) in the `server` directory, then start the server:
+
+```bash
+cd server
 ./server
 ```
