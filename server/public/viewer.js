@@ -353,29 +353,88 @@ async function fullDown(flPid, body) {
 }
 
 // Rename current file.
-async function editNm() {
-    const newNm = document.getElementById("txName").value.trim();
-    if (!newNm || newNm === flName) return;
+async function performRename(newNm) {
+    const rawNewNm = (newNm || "").trim();
+    if (!rawNewNm) {
+        if (window.showNotice) window.showNotice("⚠️ File name cannot be empty", "Notice", "warning");
+        else alert("⚠️ File name cannot be empty");
+        return false;
+    }
+    if (rawNewNm.normalize('NFC') === flName.normalize('NFC')) {
+        return true;
+    }
     try {
         const res = await fetch(`${SERVER}/api/storage/${fldId}/names`);
+        if (!res.ok) throw new Error("Failed to load names map");
         const rawSK = mask.XOR(fldKey);
         const sm = new SymMaster("gcm1", rawSK.slice(0, 32));
         rawSK.fill(0);
         const dec = await sm.DeBin(new Uint8Array(await res.arrayBuffer()));
         const flsMap = DecodeCfg(dec);
         dec.fill(0);
+
+        const duplicate = Object.keys(flsMap).find(k => k.normalize('NFC') === rawNewNm.normalize('NFC') && k !== flName);
+        if (duplicate) {
+            for (const v of Object.values(flsMap)) if (v?.fill) v.fill(0);
+            throw new Error(`A file named "${rawNewNm}" already exists.`);
+        }
+
         const rawFK = mask.XOR(flKey);
-        // Build new map info.
         const flInfo = new Uint8Array(52);
         flInfo.set(rawFK, 0);
         flInfo.set(EncodeInt(origSize, 8), 44);
-        flsMap[newNm] = flInfo; delete flsMap[flName];
+        rawFK.fill(0);
+
+        flsMap[rawNewNm] = flInfo;
+        delete flsMap[flName];
+
         const encoded = EncodeCfg(flsMap);
         for (const v of Object.values(flsMap)) if (v?.fill) v.fill(0);
         await fetch(`${SERVER}/api/storage/${fldId}/names`, { method: "POST", body: await sm.EnBin(encoded) });
         encoded.fill(0);
-        sessionStorage.setItem("currentFileName", newNm); flName = newNm; alert("✅ Renamed");
-    } catch (e) { alert("❌ Rename failed"); }
+
+        sessionStorage.setItem("currentFileName", rawNewNm);
+        flName = rawNewNm;
+        const tx = document.getElementById("txName");
+        if (tx) tx.value = rawNewNm;
+        if (window.showNotice) {
+            window.showNotice(`✅ Renamed to "${rawNewNm}"`, "Success", "check_circle");
+        } else {
+            alert("✅ Renamed");
+        }
+        return true;
+    } catch (e) {
+        if (window.showNotice) {
+            window.showNotice(`❌ Rename failed: ${e.message}`, "Error", "error");
+        } else {
+            alert(`❌ Rename failed: ${e.message}`);
+        }
+        return false;
+    }
+}
+
+function openRenameModal() {
+    const modal = document.getElementById("renameFileModal");
+    const input = document.getElementById("modalRenameFileInput");
+    const errText = document.getElementById("renameFileErrorText");
+    if (!modal || !input) {
+        const promptVal = prompt("Enter new file name:", flName);
+        if (promptVal) performRename(promptVal);
+        return;
+    }
+    if (errText) {
+        errText.style.display = "none";
+        errText.textContent = "";
+    }
+    input.value = flName;
+    modal.showModal();
+    input.focus();
+    const lastDot = flName.lastIndexOf('.');
+    if (lastDot > 0) {
+        input.setSelectionRange(0, lastDot);
+    } else {
+        input.select();
+    }
 }
 
 // Save decrypted file.
@@ -612,13 +671,144 @@ async function shareFl() {
     }
 }
 
+// Mobile 3-dots Action Menu
+const btnViewerMore = document.getElementById("btnViewerMore");
+const viewerActionMenu = document.getElementById("viewerActionMenu");
+
+function openViewerMenu(e) {
+    if (!viewerActionMenu || !btnViewerMore) return;
+    if (viewerActionMenu.classList.contains("open")) {
+        closeViewerMenu();
+        return;
+    }
+    btnViewerMore.classList.add("open");
+    viewerActionMenu.style.visibility = "hidden";
+    viewerActionMenu.style.display = "block";
+
+    const rect = btnViewerMore.getBoundingClientRect();
+    const menuWidth = viewerActionMenu.offsetWidth || 190;
+    const menuHeight = viewerActionMenu.offsetHeight || 190;
+
+    let left = rect.right - menuWidth;
+    let top = rect.bottom + 6;
+
+    if (left < 10) left = 10;
+    if (left + menuWidth > window.innerWidth - 10) {
+        left = window.innerWidth - menuWidth - 10;
+    }
+    if (top + menuHeight > window.innerHeight - 10) {
+        top = rect.top - menuHeight - 6;
+    }
+
+    viewerActionMenu.style.left = `${left}px`;
+    viewerActionMenu.style.top = `${top}px`;
+    viewerActionMenu.style.visibility = "";
+    viewerActionMenu.classList.add("open");
+}
+
+function closeViewerMenu() {
+    if (!viewerActionMenu) return;
+    viewerActionMenu.classList.remove("open");
+    viewerActionMenu.style.display = "none";
+    if (btnViewerMore) {
+        btnViewerMore.classList.remove("open");
+    }
+}
+
+if (btnViewerMore) {
+    btnViewerMore.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openViewerMenu(e);
+    });
+}
+
+document.addEventListener("click", (e) => {
+    if (viewerActionMenu && viewerActionMenu.classList.contains("open")) {
+        if (!viewerActionMenu.contains(e.target) && (!btnViewerMore || !btnViewerMore.contains(e.target))) {
+            closeViewerMenu();
+        }
+    }
+});
+
+// Menu items
+document.getElementById("viewerMenuShare")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    closeViewerMenu();
+    shareFl();
+});
+
+document.getElementById("viewerMenuRename")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    closeViewerMenu();
+    openRenameModal();
+});
+
+document.getElementById("viewerMenuDownload")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    closeViewerMenu();
+    downFl();
+});
+
+document.getElementById("viewerMenuDelete")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    closeViewerMenu();
+    delFl();
+});
+
+// Rename modal buttons
+document.getElementById("btnCancelRenameFile")?.addEventListener("click", () => {
+    document.getElementById("renameFileModal")?.close();
+});
+
+document.getElementById("btnConfirmRenameFile")?.addEventListener("click", async () => {
+    const input = document.getElementById("modalRenameFileInput");
+    const errText = document.getElementById("renameFileErrorText");
+    const val = input ? input.value.trim() : "";
+    if (!val) {
+        if (errText) {
+            errText.textContent = "Please enter a file name.";
+            errText.style.display = "block";
+        }
+        input?.focus();
+        return;
+    }
+    if (val.normalize('NFC') === flName.normalize('NFC')) {
+        document.getElementById("renameFileModal")?.close();
+        return;
+    }
+    const success = await performRename(val);
+    if (success) {
+        document.getElementById("renameFileModal")?.close();
+    } else {
+        if (errText) {
+            errText.textContent = "Rename failed. A file with this name might already exist.";
+            errText.style.display = "block";
+        }
+    }
+});
+
+document.getElementById("modalRenameFileInput")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+        e.preventDefault();
+        document.getElementById("btnConfirmRenameFile")?.click();
+    }
+});
+
+// Top bar action buttons
 const btnShare = document.getElementById("btnShare");
 if (btnShare) {
     btnShare.addEventListener("click", shareFl);
 }
-document.getElementById("btnEdit").addEventListener("click", editNm);
-document.getElementById("btnDown").addEventListener("click", downFl);
-document.getElementById("btnDelete").addEventListener("click", delFl);
+document.getElementById("btnEdit")?.addEventListener("click", () => {
+    const currentVal = document.getElementById("txName")?.value.trim();
+    if (currentVal && currentVal !== flName) {
+        performRename(currentVal);
+    } else {
+        openRenameModal();
+    }
+});
+document.getElementById("btnDown")?.addEventListener("click", downFl);
+document.getElementById("btnDelete")?.addEventListener("click", delFl);
 
 // Setup prev/next navigation.
 async function setNav() {

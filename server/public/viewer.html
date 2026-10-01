@@ -582,11 +582,116 @@
             box-shadow: 0 4px 12px var(--preview-nav-shadow);
         }
 
+        /* Viewer Topbar 3-dots Menu Button */
+        .viewer-more-btn {
+            display: none;
+        }
+
         /* Mobile / Tablet (<768px) */
         @media (max-width: 768px) {
-            #btnEdit {
+            .topbar-actions {
                 display: none !important;
             }
+
+            .viewer-more-btn {
+                display: flex !important;
+            }
+
+            #txName {
+                max-width: none !important;
+            }
+        }
+
+        /* Viewer Mobile Action Menu (Popup) */
+        .viewer-action-menu {
+            position: fixed;
+            min-width: 180px;
+            max-width: 240px;
+            background-color: var(--preview-surface);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
+            border: 1px solid var(--preview-outline);
+            padding: 8px;
+            display: none;
+            z-index: 3000;
+            animation: viewerMenuFadeIn 0.15s cubic-bezier(0.2, 0, 0, 1);
+            box-sizing: border-box;
+        }
+
+        .viewer-action-menu.open {
+            display: block;
+        }
+
+        @keyframes viewerMenuFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-6px) scale(0.96);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .viewer-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            height: 44px;
+            padding: 0 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            user-select: none;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--preview-text);
+            transition: background-color 0.15s, color 0.15s;
+        }
+
+        .viewer-menu-item:hover,
+        .viewer-menu-item:active {
+            background-color: var(--preview-hover);
+            color: var(--preview-primary);
+        }
+
+        .viewer-menu-item.danger-item {
+            color: var(--preview-danger, #b3261e);
+        }
+
+        .viewer-menu-item.danger-item:hover,
+        .viewer-menu-item.danger-item:active {
+            background-color: rgba(179, 38, 30, 0.12);
+            color: var(--preview-danger, #b3261e);
+        }
+
+        .viewer-menu-item .menu-icon {
+            font-size: 20px;
+            color: inherit;
+        }
+
+        .viewer-menu-item .menu-label {
+            flex: 1;
+            font-weight: 500;
+        }
+
+        .dialog-input {
+            width: 100%;
+            height: 48px;
+            background-color: var(--preview-topbar);
+            border: 1px solid var(--preview-outline);
+            border-radius: 14px;
+            color: var(--preview-text);
+            font-family: inherit;
+            font-size: 15px;
+            padding: 0 16px;
+            box-sizing: border-box;
+            outline: none;
+            margin-bottom: 16px;
+            transition: border-color 0.15s;
+        }
+
+        .dialog-input:focus {
+            border-color: var(--preview-primary);
         }
 
         /* Mobile (<600px) */
@@ -783,6 +888,9 @@
                 <span class="material-symbols-outlined">arrow_back</span>
             </button>
             <input type="text" id="txName" placeholder="File name">
+            <button id="btnViewerMore" class="icon-btn viewer-more-btn" title="More options" aria-label="More options">
+                <span class="material-symbols-outlined">more_vert</span>
+            </button>
         </div>
 
         <div class="topbar-actions">
@@ -801,6 +909,26 @@
         </div>
     </header>
 
+    <!-- Viewer Mobile Action Menu (Material You / Google Drive Popup) -->
+    <div class="viewer-action-menu" id="viewerActionMenu">
+        <div class="viewer-menu-item" id="viewerMenuShare">
+            <span class="material-symbols-outlined menu-icon">share</span>
+            <span class="menu-label">Share</span>
+        </div>
+        <div class="viewer-menu-item" id="viewerMenuRename">
+            <span class="material-symbols-outlined menu-icon">drive_file_rename_outline</span>
+            <span class="menu-label">Rename</span>
+        </div>
+        <div class="viewer-menu-item" id="viewerMenuDownload">
+            <span class="material-symbols-outlined menu-icon">download</span>
+            <span class="menu-label">Download</span>
+        </div>
+        <div class="viewer-menu-item danger-item" id="viewerMenuDelete">
+            <span class="material-symbols-outlined menu-icon">delete_outline</span>
+            <span class="menu-label">Delete</span>
+        </div>
+    </div>
+
     <!-- 2. Google Drive Media Canvas -->
     <main class="preview-canvas">
         <div id="viewBody" class="body-box">
@@ -815,6 +943,20 @@
     <button id="btnNextFile" class="btn-floating-nav hidden" title="Next file">
         <span class="material-symbols-outlined" style="font-size: 28px;">chevron_right</span>
     </button>
+
+    <!-- Rename File Dialog (Material You Dialog) -->
+    <dialog id="renameFileModal">
+        <div class="dialog-title">
+            <span class="material-symbols-outlined" style="color: var(--preview-primary, #0b57d0);">drive_file_rename_outline</span>
+            <span>Rename</span>
+        </div>
+        <input type="text" id="modalRenameFileInput" class="dialog-input" placeholder="File name" autocomplete="off" spellcheck="false">
+        <div id="renameFileErrorText" style="color: var(--preview-danger); font-size: 13px; margin-top: -10px; margin-bottom: 16px; display: none;"></div>
+        <div class="dialog-actions">
+            <button id="btnCancelRenameFile" class="btn-dialog-text" type="button">Cancel</button>
+            <button id="btnConfirmRenameFile" class="btn-dialog-primary" type="button">OK</button>
+        </div>
+    </dialog>
 
     <!-- Delete File Dialog (Material You Dialog) -->
     <dialog id="deleteFileModal">
