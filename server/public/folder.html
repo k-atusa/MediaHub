@@ -815,6 +815,87 @@
             left: 0;
         }
 
+        .file-action-menu {
+            position: fixed;
+            min-width: 180px;
+            max-width: 240px;
+            width: max-content;
+            right: auto;
+            z-index: 3000;
+            top: 0;
+            left: 0;
+        }
+
+        .file-more-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            min-width: 32px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            color: var(--g-text-muted);
+            cursor: pointer;
+            opacity: 0.7;
+            flex-shrink: 0;
+            transition: opacity 0.15s, background-color 0.15s, color 0.15s;
+            padding: 0;
+        }
+
+        .file-more-btn .material-symbols-outlined {
+            font-size: 20px !important;
+            color: inherit;
+        }
+
+        .media-card:hover .file-more-btn,
+        .file-more-btn:hover,
+        .file-more-btn.open {
+            opacity: 1;
+            color: var(--g-text-main);
+        }
+
+        .file-more-btn:hover,
+        .file-more-btn.open {
+            background-color: rgba(0, 0, 0, 0.08);
+        }
+
+        [data-theme="dark"] .file-more-btn:hover,
+        [data-theme="dark"] .file-more-btn.open,
+        :root:not([data-theme="light"]) .file-more-btn:hover,
+        :root:not([data-theme="light"]) .file-more-btn.open {
+            background-color: rgba(255, 255, 255, 0.12);
+        }
+
+        @media (hover: none), (max-width: 768px) {
+            .file-more-btn {
+                opacity: 1;
+            }
+        }
+
+        /* In Grid View, position file-more-btn and make room in file-title */
+        .media-grid:not(.view-details):not(.list-view) .media-card {
+            position: relative;
+        }
+
+        .media-grid:not(.view-details):not(.list-view) .file-more-btn {
+            position: absolute;
+            right: 4px;
+            bottom: 4px;
+            z-index: 2;
+        }
+
+        .media-grid:not(.view-details):not(.list-view) .file-title {
+            padding: 10px 38px 10px 12px;
+        }
+
+        /* In List View */
+        .media-grid.view-details .file-more-btn,
+        .media-grid.list-view .file-more-btn {
+            position: static;
+        }
+
 
 
         /* 3. Main Workspace */
@@ -1417,13 +1498,16 @@
             color: var(--g-text-main);
         }
 
-        /* In Grid View, hide the extra list columns */
-        .media-grid:not(.view-details):not(.list-view) .list-col-size,
-        .media-grid:not(.view-details):not(.list-view) .list-col-more {
+        /* In Grid View, hide the extra size column, keep more button via display: contents */
+        .media-grid:not(.view-details):not(.list-view) .list-col-size {
             display: none !important;
         }
 
         .media-grid:not(.view-details):not(.list-view) .list-col-name {
+            display: contents;
+        }
+
+        .media-grid:not(.view-details):not(.list-view) .list-col-more {
             display: contents;
         }
 
@@ -2959,6 +3043,22 @@
         </div>
     </div>
 
+    <!-- File Item Context Menu -->
+    <div class="new-drive-menu file-action-menu" id="fileActionMenu">
+        <div class="drive-menu-item" id="fileMenuRename">
+            <span class="material-symbols-outlined menu-icon">drive_file_rename_outline</span>
+            <span class="menu-label">Rename</span>
+        </div>
+        <div class="drive-menu-item" id="fileMenuDownload">
+            <span class="material-symbols-outlined menu-icon">download</span>
+            <span class="menu-label">Download</span>
+        </div>
+        <div class="drive-menu-item" id="fileMenuDelete" style="color: var(--g-danger, #b3261e);">
+            <span class="material-symbols-outlined menu-icon" style="color: var(--g-danger, #b3261e);">delete_outline</span>
+            <span class="menu-label" style="color: var(--g-danger, #b3261e);">Delete</span>
+        </div>
+    </div>
+
     <!-- New Folder Dialog (Material You M3 Dialog) -->
     <dialog id="newFolderModal">
         <div class="dialog-m3-icon">
@@ -2983,6 +3083,20 @@
         <div class="dialog-btn-group">
             <button class="btn-dialog-cancel" id="btnCancelRenameFolder" type="button">Cancel</button>
             <button class="btn-dialog-confirm" id="btnConfirmRenameFolder" type="button">OK</button>
+        </div>
+    </dialog>
+
+    <!-- Rename File Dialog (Material You M3 Dialog) -->
+    <dialog id="renameFileModal">
+        <div class="dialog-m3-icon">
+            <span class="material-symbols-outlined">drive_file_rename_outline</span>
+        </div>
+        <div class="dialog-title">Rename</div>
+        <input type="text" id="modalRenameFileNameInput" class="dialog-input" placeholder="File name" autocomplete="off" spellcheck="false">
+        <div id="renameFileErrorText" style="color: var(--g-danger, #b3261e); font-size: 13px; margin-top: -12px; margin-bottom: 16px; display: none;"></div>
+        <div class="dialog-btn-group">
+            <button class="btn-dialog-cancel" id="btnCancelRenameFile" type="button">Cancel</button>
+            <button class="btn-dialog-confirm" id="btnConfirmRenameFile" type="button">OK</button>
         </div>
     </dialog>
 
@@ -3989,10 +4103,116 @@
             });
         }
 
+        // File Action Menu
+        const fileActionMenu = document.getElementById("fileActionMenu");
+        const fileMenuRename = document.getElementById("fileMenuRename");
+        const fileMenuDownload = document.getElementById("fileMenuDownload");
+        const fileMenuDelete = document.getElementById("fileMenuDelete");
+        let activeFileMoreBtn = null;
+
+        function closeFileContextMenu() {
+            if (!fileActionMenu) return;
+            fileActionMenu.classList.remove("open");
+            fileActionMenu.style.display = "none";
+            if (activeFileMoreBtn) {
+                activeFileMoreBtn.classList.remove("open");
+                activeFileMoreBtn = null;
+            }
+        }
+        window.closeFileContextMenu = closeFileContextMenu;
+
+        function openFileContextMenu(e, fileName, btn) {
+            if (!fileActionMenu) return;
+            if (fileActionMenu.classList.contains("open") && activeFileMoreBtn === btn) {
+                closeFileContextMenu();
+                return;
+            }
+
+            closeFolderContextMenu();
+            if (typeof newDriveMenu !== "undefined" && newDriveMenu) newDriveMenu.classList.remove("open");
+            const accountMenu = document.getElementById("accountDropdownMenu");
+            if (accountMenu) accountMenu.classList.remove("open");
+            if (typeof sortDropdownMenu !== "undefined" && sortDropdownMenu) sortDropdownMenu.classList.remove("open");
+            if (typeof viewDropdownMenu !== "undefined" && viewDropdownMenu) viewDropdownMenu.classList.remove("open");
+
+            if (activeFileMoreBtn) {
+                activeFileMoreBtn.classList.remove("open");
+            }
+            activeFileMoreBtn = btn;
+            btn.classList.add("open");
+
+            fileActionMenu.dataset.targetFile = fileName;
+
+            fileActionMenu.style.visibility = "hidden";
+            fileActionMenu.style.display = "block";
+
+            const btnRect = btn.getBoundingClientRect();
+            const menuWidth = fileActionMenu.offsetWidth || 190;
+            const menuHeight = fileActionMenu.offsetHeight || 140;
+
+            let left = btnRect.right + 6;
+            let top = btnRect.top - 4;
+
+            if (left + menuWidth > window.innerWidth - 10) {
+                left = btnRect.left - menuWidth - 6;
+                if (left < 10) left = window.innerWidth - menuWidth - 10;
+            }
+
+            if (top + menuHeight > window.innerHeight - 10) {
+                top = window.innerHeight - menuHeight - 10;
+            }
+            if (top < 10) top = 10;
+
+            fileActionMenu.style.left = `${left}px`;
+            fileActionMenu.style.top = `${top}px`;
+            fileActionMenu.style.visibility = "";
+            fileActionMenu.classList.add("open");
+        }
+        window.openFileContextMenu = openFileContextMenu;
+
+        if (fileMenuRename) {
+            fileMenuRename.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const targetFile = fileActionMenu ? fileActionMenu.dataset.targetFile : "";
+                closeFileContextMenu();
+                if (!targetFile) return;
+                openRenameFileDialog(targetFile);
+            });
+        }
+
+        if (fileMenuDownload) {
+            fileMenuDownload.addEventListener("click", async (e) => {
+                e.stopPropagation();
+                const targetFile = fileActionMenu ? fileActionMenu.dataset.targetFile : "";
+                closeFileContextMenu();
+                if (!targetFile) return;
+                if (window.downloadFile) {
+                    await window.downloadFile(targetFile);
+                }
+            });
+        }
+
+        if (fileMenuDelete) {
+            fileMenuDelete.addEventListener("click", async (e) => {
+                e.stopPropagation();
+                const targetFile = fileActionMenu ? fileActionMenu.dataset.targetFile : "";
+                closeFileContextMenu();
+                if (!targetFile) return;
+                if (window.deleteFile) {
+                    await window.deleteFile(targetFile);
+                }
+            });
+        }
+
         document.addEventListener("click", (e) => {
             if (folderActionMenu && folderActionMenu.classList.contains("open")) {
                 if (!folderActionMenu.contains(e.target) && (!activeFolderMoreBtn || !activeFolderMoreBtn.contains(e.target))) {
                     closeFolderContextMenu();
+                }
+            }
+            if (fileActionMenu && fileActionMenu.classList.contains("open")) {
+                if (!fileActionMenu.contains(e.target) && (!activeFileMoreBtn || !activeFileMoreBtn.contains(e.target))) {
+                    closeFileContextMenu();
                 }
             }
         });
@@ -4000,7 +4220,16 @@
         if (sidebarFolderList) {
             sidebarFolderList.addEventListener("scroll", closeFolderContextMenu);
         }
-        window.addEventListener("resize", closeFolderContextMenu);
+        if (mediaContainer) {
+            mediaContainer.addEventListener("scroll", () => {
+                closeFolderContextMenu();
+                closeFileContextMenu();
+            });
+        }
+        window.addEventListener("resize", () => {
+            closeFolderContextMenu();
+            closeFileContextMenu();
+        });
 
         function syncSidebarFolderList() {
             if (!sidebarFolderList) return;
@@ -4061,6 +4290,7 @@
 
                     const img = card.querySelector(".thumb-img");
                     const title = card.querySelector(".file-title");
+                    const fileName = card.dataset.fileName || (title ? title.textContent : "");
 
                     // Wrapper for name column
                     const nameCol = document.createElement("div");
@@ -4078,7 +4308,21 @@
                     // More column
                     const moreCol = document.createElement("div");
                     moreCol.className = "list-col-more";
-                    moreCol.innerHTML = `<span class="material-symbols-outlined">more_vert</span>`;
+
+                    let moreBtn = card.querySelector(".file-more-btn");
+                    if (!moreBtn) {
+                        moreBtn = document.createElement("button");
+                        moreBtn.type = "button";
+                        moreBtn.className = "file-more-btn";
+                        moreBtn.title = "More options";
+                        moreBtn.setAttribute("aria-label", "More options");
+                        moreBtn.innerHTML = `<span class="material-symbols-outlined">more_vert</span>`;
+                        moreBtn.addEventListener("click", (e) => {
+                            e.stopPropagation();
+                            if (window.openFileContextMenu) window.openFileContextMenu(e, fileName, moreBtn);
+                        });
+                    }
+                    moreCol.appendChild(moreBtn);
                     card.appendChild(moreCol);
                 }
             });
@@ -4346,6 +4590,102 @@
             renameFolderModal.addEventListener("click", (e) => {
                 if (e.target === renameFolderModal) {
                     renameFolderModal.close();
+                }
+            });
+        }
+
+        // Rename file modal binding
+        const renameFileModal = document.getElementById("renameFileModal");
+        const modalRenameFileInput = document.getElementById("modalRenameFileNameInput");
+        const btnCancelRenameFile = document.getElementById("btnCancelRenameFile");
+        const btnConfirmRenameFile = document.getElementById("btnConfirmRenameFile");
+        const renameFileErrorText = document.getElementById("renameFileErrorText");
+        let fileBeingRenamed = "";
+
+        function openRenameFileDialog(fileName) {
+            if (typeof newDriveMenu !== "undefined" && newDriveMenu) newDriveMenu.classList.remove("open");
+            fileBeingRenamed = fileName;
+            if (renameFileErrorText) {
+                renameFileErrorText.style.display = "none";
+                renameFileErrorText.textContent = "";
+            }
+            if (modalRenameFileInput) {
+                modalRenameFileInput.value = fileName;
+            }
+            if (renameFileModal) {
+                renameFileModal.showModal();
+                if (modalRenameFileInput) {
+                    modalRenameFileInput.focus();
+                    const lastDot = fileName.lastIndexOf(".");
+                    if (lastDot > 0) {
+                        modalRenameFileInput.setSelectionRange(0, lastDot);
+                    } else {
+                        modalRenameFileInput.select();
+                    }
+                }
+            }
+        }
+        window.openRenameFileDialog = openRenameFileDialog;
+
+        if (btnCancelRenameFile) {
+            btnCancelRenameFile.addEventListener("click", () => {
+                if (renameFileModal) renameFileModal.close();
+            });
+        }
+
+        async function handleRenameFileConfirm() {
+            if (!fileBeingRenamed) return;
+            const newName = (modalRenameFileInput ? modalRenameFileInput.value : "").trim();
+            if (!newName) {
+                if (renameFileErrorText) {
+                    renameFileErrorText.textContent = "Please enter a file name.";
+                    renameFileErrorText.style.display = "block";
+                }
+                if (modalRenameFileInput) modalRenameFileInput.focus();
+                return;
+            }
+            if (newName.normalize('NFC') === fileBeingRenamed.normalize('NFC')) {
+                if (renameFileModal) renameFileModal.close();
+                return;
+            }
+
+            try {
+                if (window.renameFile) {
+                    await window.renameFile(fileBeingRenamed, newName);
+                }
+                if (renameFileModal) renameFileModal.close();
+            } catch (err) {
+                if (renameFileErrorText) {
+                    renameFileErrorText.textContent = err.message || "Failed to rename file.";
+                    renameFileErrorText.style.display = "block";
+                }
+                if (modalRenameFileInput) modalRenameFileInput.focus();
+            }
+        }
+
+        if (btnConfirmRenameFile) {
+            btnConfirmRenameFile.addEventListener("click", handleRenameFileConfirm);
+        }
+
+        if (modalRenameFileInput) {
+            modalRenameFileInput.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleRenameFileConfirm();
+                }
+            });
+            modalRenameFileInput.addEventListener("input", () => {
+                if (renameFileErrorText) {
+                    renameFileErrorText.style.display = "none";
+                    renameFileErrorText.textContent = "";
+                }
+            });
+        }
+
+        if (renameFileModal) {
+            renameFileModal.addEventListener("click", (e) => {
+                if (e.target === renameFileModal) {
+                    renameFileModal.close();
                 }
             });
         }

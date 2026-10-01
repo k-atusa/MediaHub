@@ -2,7 +2,7 @@
 import { SHA3256, SymMaster, Random, Masker, HashMaster } from './Bencrypt.js';
 import { EncodeCfg, DecodeCfg, EncodeInt, DecodeInt, PadLen } from './Opsec.js';
 import { NormPW } from './Bencode.js';
-import { makeImg, makeVid } from './media.js';
+import { makeImg, makeVid, NetSrc } from './media.js';
 import { makeToken, loadToken } from './storage.js';
 
 const SERVER = window.location.origin;
@@ -743,6 +743,7 @@ async function showFls() {
     const start = (state.page - 1) * state.limit;
     for (const [name, fileKey] of entries.slice(start, start + state.limit)) {
         const card = document.createElement("div"); card.className = "media-card";
+        card.dataset.fileName = name;
         const img = document.createElement("img"); img.className = "thumb-img"; img.alt = "Loading...";
         const rawFK = mask.XOR(fileKey);
         const fkSlice = rawFK.slice(0, 44);
@@ -750,7 +751,22 @@ async function showFls() {
         rawFK.fill(0);
 
         const title = document.createElement("div"); title.className = "file-title"; title.textContent = name;
+        title.title = name;
         card.appendChild(img); card.appendChild(title);
+
+        const moreBtn = document.createElement("button");
+        moreBtn.type = "button";
+        moreBtn.className = "file-more-btn";
+        moreBtn.title = "More options";
+        moreBtn.setAttribute("aria-label", "More options");
+        moreBtn.innerHTML = '<span class="material-symbols-outlined">more_vert</span>';
+        moreBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (window.openFileContextMenu) {
+                window.openFileContextMenu(e, name, moreBtn);
+            }
+        });
+        card.appendChild(moreBtn);
 
         card.addEventListener("click", () => {
             const rFK = mask.XOR(fileKey);
@@ -770,6 +786,212 @@ async function showFls() {
         window.updateKeywordFilterUI();
     }
 }
+
+// Rename file implementation
+async function renameFile(rawOldName, rawNewName) {
+    const oldName = (rawOldName || "").trim();
+    const newName = (rawNewName || "").trim();
+
+    if (!oldName || !newName) {
+        throw new Error("File name cannot be empty.");
+    }
+    if (oldName.normalize('NFC') === newName.normalize('NFC')) {
+        return;
+    }
+
+    if (!state.flsMap[oldName]) {
+        throw new Error(`Original file "${oldName}" not found.`);
+    }
+
+    const duplicate = Object.keys(state.flsMap).find(k => k.normalize('NFC') === newName.normalize('NFC') && k !== oldName);
+    if (duplicate) {
+        throw new Error(`A file named "${newName}" already exists in this folder.`);
+    }
+
+    const origFlsMap = { ...state.flsMap };
+
+    try {
+        state.flsMap[newName] = state.flsMap[oldName];
+        delete state.flsMap[oldName];
+
+        const rawSK = mask.XOR(state.key);
+        const sm = new SymMaster("gcm1", rawSK.slice(0, 32));
+        rawSK.fill(0);
+
+        const encoded = EncodeCfg(state.flsMap);
+        const cipherBin = await sm.EnBin(encoded);
+        encoded.fill(0);
+
+        const res = await fetch(`${SERVER}/api/storage/${state.id}/names`, {
+            method: "POST",
+            headers: { "X-User-Hash": usrHsh },
+            body: cipherBin
+        });
+        if (!res.ok) {
+            throw new Error(`Server returned HTTP ${res.status}`);
+        }
+
+        keywordsBuilt = false;
+        selectKeywords.clear();
+        buildKeywords();
+        await showFls();
+
+        if (window.showNotice) {
+            window.showNotice(`✅ Renamed to "${newName}"`, "Success", "check_circle");
+        }
+    } catch (err) {
+        console.error("Failed to rename file:", err);
+        state.flsMap = origFlsMap;
+        throw err;
+    }
+}
+window.renameFile = renameFile;
+
+// Download decrypted file directly from folder list
+async function downloadFileDirectly(fileName) {
+    const targetFile = (fileName || "").trim();
+    const fileKey = state.flsMap[targetFile];
+    if (!fileKey) return;
+
+    if (window.showNotice) {
+        window.showNotice(`📥 Preparing download: "${targetFile}"...`, "Downloading", "download");
+    }
+
+    try {
+        const rawFK = mask.XOR(fileKey);
+        const flPid = getObjPid(rawFK.slice(0, 44));
+        const origSize = rawFK.length >= 52 ? DecodeInt(rawFK.slice(44, 52)) : 0;
+        const keySlice = rawFK.slice(0, 32);
+        rawFK.fill(0);
+
+        const head = await fetch(`${SERVER}/api/media/${state.id}/${flPid}/dat`, {
+            headers: { 'Range': 'bytes=0-0' }
+        });
+        const contentRange = head.headers.get("Content-Range");
+        const totSize = contentRange ? parseInt(contentRange.split('/')[1], 10) : 0;
+
+        let loaded = 0;
+        const chunks = [];
+        while (loaded < totSize) {
+            const res = await fetch(`${SERVER}/api/media/${state.id}/${flPid}/dat`, {
+                headers: { 'Range': `bytes=${loaded}-${totSize - 1}` }
+            });
+            const reader = res.body.getReader();
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                chunks.push(value);
+                loaded += value.length;
+            }
+        }
+
+        const fullBuf = new Uint8Array(loaded);
+        let offset = 0;
+        for (const c of chunks) { fullBuf.set(c, offset); offset += c.length; }
+
+        const smx = new SymMaster("gcmx1", keySlice);
+        keySlice.fill(0);
+        const ciphSize = origSize > 0 ? smx.AfterSize(origSize) : fullBuf.length;
+        const encBuf = fullBuf.slice(0, ciphSize);
+
+        const plnChks = [];
+        await smx.DeFile(new NetSrc(encBuf), encBuf.length, { write: async (c) => plnChks.push(c) });
+        const rawBuf = new Uint8Array(plnChks.reduce((a, c) => a + c.length, 0));
+        let fOff = 0;
+        for (const c of plnChks) { rawBuf.set(c, fOff); fOff += c.length; }
+
+        const ext = targetFile.split('.').pop().toLowerCase();
+        const mimeMap = {
+            'pdf': 'application/pdf', 'txt': 'text/plain', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
+            'png': 'image/png', 'gif': 'image/gif', 'webp': 'image/webp', 'mp4': 'video/mp4',
+            'webm': 'video/webm', 'mov': 'video/quicktime', 'mkv': 'video/x-matroska'
+        };
+        const mime = mimeMap[ext] || 'application/octet-stream';
+
+        const a = document.createElement('a');
+        const blobUrl = URL.createObjectURL(new Blob([rawBuf], { type: mime }));
+        a.href = blobUrl;
+        a.download = targetFile;
+        a.click();
+        URL.revokeObjectURL(blobUrl);
+
+        if (window.showNotice) {
+            window.showNotice(`✅ Download complete: "${targetFile}"`, "Success", "check_circle");
+        }
+    } catch (e) {
+        console.error("Direct download failed:", e);
+        if (window.showNotice) {
+            window.showNotice(`❌ Download failed: ${e.message}`, "Error", "error");
+        } else {
+            alert("❌ Download failed: " + e.message);
+        }
+    }
+}
+window.downloadFile = downloadFileDirectly;
+
+// Delete file implementation
+async function deleteFile(fileName) {
+    const targetFile = (fileName || "").trim();
+    if (!targetFile || !state.flsMap[targetFile]) return;
+
+    const ok = await showConfirmModal(
+        `Are you sure you want to delete "<strong>${targetFile.replace(/</g, "&lt;")}</strong>"? This action cannot be undone.`,
+        "Delete file?",
+        "delete",
+        "Delete",
+        true
+    );
+    if (!ok) return;
+
+    try {
+        const rawFK = mask.XOR(state.flsMap[targetFile]);
+        const flPid = getObjPid(rawFK.slice(0, 44));
+        rawFK.fill(0);
+
+        try {
+            await fetch(`${SERVER}/api/media/${state.id}/${flPid}/dat`, { method: "DELETE" });
+            await fetch(`${SERVER}/api/media/${state.id}/${flPid}/thumb`, { method: "DELETE" });
+        } catch (e) {
+            console.warn("Error deleting media binaries:", e);
+        }
+
+        delete state.flsMap[targetFile];
+
+        const rawSK = mask.XOR(state.key);
+        const sm = new SymMaster("gcm1", rawSK.slice(0, 32));
+        rawSK.fill(0);
+
+        const encoded = EncodeCfg(state.flsMap);
+        const cipherBin = await sm.EnBin(encoded);
+        encoded.fill(0);
+
+        const res = await fetch(`${SERVER}/api/storage/${state.id}/names`, {
+            method: "POST",
+            headers: { "X-User-Hash": usrHsh },
+            body: cipherBin
+        });
+        if (!res.ok) {
+            throw new Error(`Server returned HTTP ${res.status}`);
+        }
+
+        keywordsBuilt = false;
+        selectKeywords.clear();
+        buildKeywords();
+        await showFls();
+
+        if (window.showNotice) {
+            window.showNotice(`🗑️ Deleted "${targetFile}"`, "Success", "check_circle");
+        }
+    } catch (err) {
+        console.error("Delete file failed:", err);
+        if (window.showNotice) {
+            window.showNotice(`❌ Delete failed: ${err.message}`, "Error", "error");
+        } else {
+            alert("❌ Delete failed: " + err.message);
+        }
+    }
+}
+window.deleteFile = deleteFile;
 
 window.setFileSort = async (mode) => {
     state.sort = mode;
