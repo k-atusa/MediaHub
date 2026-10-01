@@ -81,8 +81,9 @@ async function start() {
 
         body.innerHTML = '<p style="color:#666;font-size:12px;margin:20px 0">Preparing stream…</p>';
         try {
-            await navigator.serviceWorker.register('./sw.js');
-            const reg = await navigator.serviceWorker.ready;
+            const reg = await navigator.serviceWorker.register('./sw.js?v=2.2', { updateViaCache: 'none' });
+            try { await reg.update(); } catch (_) {}
+            await navigator.serviceWorker.ready;
 
             const rawKey = mask.XOR(flKey);
             const keyHex = toHex(rawKey);
@@ -124,6 +125,7 @@ async function start() {
             body.innerHTML = '';
             const v = document.createElement('video');
             v.controls = true;
+            v.crossOrigin = 'anonymous';
             v.playsInline = true;
             v.preload = 'metadata';
             v.style.width = '100%';
