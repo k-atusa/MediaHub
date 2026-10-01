@@ -144,7 +144,19 @@ async function fullDown(flPid, body) {
     const head = await fetch(`${SERVER}/api/media/${fldId}/${flPid}/dat`, {
         headers: { 'Range': 'bytes=0-0' }
     });
-    const totSize = parseInt(head.headers.get("Content-Range").split('/')[1], 10);
+    const contentRange = head.headers.get("Content-Range");
+    if (!head.ok || !contentRange) {
+        body.innerHTML = `
+            <div style="text-align: center; padding: 40px 20px; color: var(--preview-subtext);">
+                <span class="material-symbols-outlined" style="font-size: 48px; color: var(--preview-danger, #b3261e); margin-bottom: 12px; display: block;">error_outline</span>
+                <h3 style="margin: 0 0 8px 0; color: var(--preview-text);">Unable to load file</h3>
+                <p style="margin: 0 0 20px 0; font-size: 14px;">The requested file binary was not found or is corrupted (HTTP ${head.status}).</p>
+                <button onclick="window.location.href='./folder.html'" class="btn-dialog-primary" style="padding: 0 20px; height: 36px; border-radius: 18px; cursor: pointer;">Back to Files</button>
+            </div>
+        `;
+        return;
+    }
+    const totSize = parseInt(contentRange.split('/')[1], 10);
 
     let loaded = 0;
     const chunks = [];
@@ -238,7 +250,12 @@ async function downFl() {
         try {
             // Download inline.
             const head = await fetch(`${SERVER}/api/media/${fldId}/${flPid}/dat`, { headers: { 'Range': 'bytes=0-0' } });
-            const totSize = parseInt(head.headers.get('Content-Range').split('/')[1], 10);
+            const contentRange = head.headers.get('Content-Range');
+            if (!head.ok || !contentRange) {
+                body.removeChild(prog);
+                return alert('❌ Download failed: File not found or corrupted');
+            }
+            const totSize = parseInt(contentRange.split('/')[1], 10);
             let loaded = 0; const chunks = [];
             while (loaded < totSize) {
                 const res = await fetch(`${SERVER}/api/media/${fldId}/${flPid}/dat`, { headers: { 'Range': `bytes=${loaded}-${totSize - 1}` } });

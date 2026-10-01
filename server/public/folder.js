@@ -818,7 +818,10 @@ async function renameFile(rawOldName, rawNewName) {
         const sm = new SymMaster("gcm1", rawSK.slice(0, 32));
         rawSK.fill(0);
 
-        const encoded = EncodeCfg(state.flsMap);
+        const um = rawMap(state.flsMap);
+        const encoded = EncodeCfg(um);
+        wipeMap(um);
+
         const cipherBin = await sm.EnBin(encoded);
         encoded.fill(0);
 
@@ -868,7 +871,10 @@ async function downloadFileDirectly(fileName) {
             headers: { 'Range': 'bytes=0-0' }
         });
         const contentRange = head.headers.get("Content-Range");
-        const totSize = contentRange ? parseInt(contentRange.split('/')[1], 10) : 0;
+        if (!head.ok || !contentRange) {
+            throw new Error(`File binary not found on server (HTTP ${head.status})`);
+        }
+        const totSize = parseInt(contentRange.split('/')[1], 10);
 
         let loaded = 0;
         const chunks = [];
@@ -961,7 +967,10 @@ async function deleteFile(fileName) {
         const sm = new SymMaster("gcm1", rawSK.slice(0, 32));
         rawSK.fill(0);
 
-        const encoded = EncodeCfg(state.flsMap);
+        const um = rawMap(state.flsMap);
+        const encoded = EncodeCfg(um);
+        wipeMap(um);
+
         const cipherBin = await sm.EnBin(encoded);
         encoded.fill(0);
 
