@@ -688,6 +688,50 @@ function buildKeywords() {
     keywordsBuilt = true;
 }
 
+// Open file in viewer
+function openFileByName(name) {
+    if (!state.flsMap || !state.key) return false;
+    let targetKey = state.flsMap[name];
+    let actualName = name;
+    if (!targetKey) {
+        const found = Object.keys(state.flsMap).find(k => k.normalize('NFC') === (name || "").normalize('NFC'));
+        if (found) {
+            targetKey = state.flsMap[found];
+            actualName = found;
+        }
+    }
+    if (!targetKey) {
+        if (typeof loadFld === "function") {
+            loadFld().then(() => {
+                let retryKey = state.flsMap[actualName] || state.flsMap[Object.keys(state.flsMap).find(k => k.normalize('NFC') === (name || "").normalize('NFC'))];
+                if (retryKey) {
+                    const rFK = mask.XOR(retryKey);
+                    const rSK = mask.XOR(state.key);
+                    sessionStorage.setItem("currentFileKey", toHex(rFK));
+                    sessionStorage.setItem("currentFileName", actualName);
+                    sessionStorage.setItem("currentFolderId", state.id);
+                    sessionStorage.setItem("currentFolderKey", toHex(rSK));
+                    sessionStorage.setItem("oldFold", state.name);
+                    rFK.fill(0); rSK.fill(0);
+                    window.location.href = "./viewer.html";
+                }
+            });
+        }
+        return false;
+    }
+    const rFK = mask.XOR(targetKey);
+    const rSK = mask.XOR(state.key);
+    sessionStorage.setItem("currentFileKey", toHex(rFK));
+    sessionStorage.setItem("currentFileName", actualName);
+    sessionStorage.setItem("currentFolderId", state.id);
+    sessionStorage.setItem("currentFolderKey", toHex(rSK));
+    sessionStorage.setItem("oldFold", state.name);
+    rFK.fill(0); rSK.fill(0);
+    window.location.href = "./viewer.html";
+    return true;
+}
+window.openFileByName = openFileByName;
+
 // Render files grid.
 async function showFls() {
     const grid = document.getElementById("mediaGrid"); grid.innerHTML = "";
@@ -769,15 +813,7 @@ async function showFls() {
         card.appendChild(moreBtn);
 
         card.addEventListener("click", () => {
-            const rFK = mask.XOR(fileKey);
-            const rSK = mask.XOR(state.key);
-            sessionStorage.setItem("currentFileKey", toHex(rFK));
-            sessionStorage.setItem("currentFileName", name);
-            sessionStorage.setItem("currentFolderId", state.id);
-            sessionStorage.setItem("currentFolderKey", toHex(rSK));
-            sessionStorage.setItem("oldFold", state.name);
-            rFK.fill(0); rSK.fill(0);
-            window.location.href = "./viewer.html";
+            openFileByName(name);
         });
         grid.appendChild(card);
     }

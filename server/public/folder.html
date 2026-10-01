@@ -1747,6 +1747,25 @@
             background-color: var(--g-hover-bg);
         }
 
+        .upload-file-item.completed {
+            cursor: pointer;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .upload-file-item.completed:hover {
+            background-color: var(--g-hover-bg);
+        }
+
+        .upload-file-item.completed:active {
+            background-color: var(--g-active-bg, rgba(66, 133, 244, 0.12));
+        }
+
+        .upload-file-item.completed:focus-visible {
+            outline: 2px solid var(--g-primary);
+            outline-offset: -2px;
+        }
+
         .upload-item-type-icon {
             font-size: 20px;
             flex-shrink: 0;
@@ -1779,6 +1798,26 @@
             font-size: 20px;
             color: var(--m3-success, #1e8e3e);
             font-variation-settings: 'FILL' 1;
+        }
+
+        .upload-item-status .open-file-hint-icon {
+            display: none;
+            font-size: 20px;
+            color: var(--g-primary);
+        }
+
+        @media (hover: hover) and (pointer: fine) {
+            .upload-file-item.completed:hover .status-complete-icon {
+                display: none;
+            }
+
+            .upload-file-item.completed:hover .open-file-hint-icon {
+                display: flex;
+            }
+
+            .upload-file-item.completed:hover .upload-item-name {
+                color: var(--g-primary);
+            }
         }
 
         /* Circular Progress Button with Hover Cancel X */
@@ -4846,6 +4885,7 @@
         let activeUploadFiles = [];
         let uploadDismissTimer = null;
         let isUploadOngoing = false;
+        let isWidgetHovered = false;
 
         function getGoogleFileIcon(filename) {
             const ext = (filename.split('.').pop() || '').toLowerCase();
@@ -4901,6 +4941,29 @@
                     uploadProgressWidget.classList.add("hidden");
                 }
                 clearTimeout(uploadDismissTimer);
+                activeUploadFiles = [];
+            });
+        }
+
+        if (uploadProgressWidget) {
+            uploadProgressWidget.addEventListener("mouseenter", () => {
+                isWidgetHovered = true;
+                clearTimeout(uploadDismissTimer);
+            });
+            uploadProgressWidget.addEventListener("mouseleave", () => {
+                isWidgetHovered = false;
+                if (!isUploadOngoing && !uploadProgressWidget.classList.contains("hidden")) {
+                    clearTimeout(uploadDismissTimer);
+                    uploadDismissTimer = setTimeout(() => {
+                        if (!isWidgetHovered && uploadProgressWidget) {
+                            uploadProgressWidget.style.opacity = "0";
+                            uploadProgressWidget.style.transform = "translateY(100%)";
+                            setTimeout(() => {
+                                uploadProgressWidget.classList.add("hidden");
+                            }, 250);
+                        }
+                    }, 4000);
+                }
             });
         }
 
@@ -4909,7 +4972,7 @@
         function createProgressRingHtml(idx, percent = 0) {
             const offset = RING_CIRCUMFERENCE - (RING_CIRCUMFERENCE * Math.max(0, Math.min(100, percent)) / 100);
             return `
-                <button type="button" class="upload-progress-btn" id="uploadProgressBtn_${idx}" title="Cancel upload" onclick="if(window.cancelUpload) window.cancelUpload(${idx})">
+                <button type="button" class="upload-progress-btn" id="uploadProgressBtn_${idx}" title="Cancel upload" onclick="event.stopPropagation(); if(window.cancelUpload) window.cancelUpload(${idx})">
                     <svg class="progress-ring-svg" viewBox="0 0 24 24">
                         <circle class="progress-ring-bg" cx="12" cy="12" r="9"></circle>
                         <circle class="progress-ring-circle" cx="12" cy="12" r="9" style="stroke-dasharray: ${RING_CIRCUMFERENCE}; stroke-dashoffset: ${offset};"></circle>
@@ -4979,6 +5042,7 @@
                 const item = document.createElement("div");
                 item.className = "upload-file-item";
                 item.id = `uploadItem_${idx}`;
+                item.dataset.fileName = file.name;
                 item.innerHTML = `
                     <span class="material-symbols-outlined upload-item-type-icon" style="color: ${typeInfo.color};">${typeInfo.icon}</span>
                     <span class="upload-item-name" title="${file.name.replace(/"/g, '&quot;')}">${file.name}</span>
@@ -5042,30 +5106,57 @@
         window.setUploadSyncingState = setUploadSyncingState;
 
         function markUploadComplete() {
-            const totalCount = activeUploadFiles.length || 1;
+            const totalCount = (activeUploadFiles && activeUploadFiles.length) || (uploadFileList ? uploadFileList.children.length : 1);
 
             if (uploadWidgetTitle) {
                 uploadWidgetTitle.textContent = `${totalCount} ${totalCount === 1 ? 'upload' : 'uploads'} complete`;
             }
 
-            // Mark all items complete with Google Drive check_circle
-            activeUploadFiles.forEach((_, idx) => {
+            // Mark all items complete with Google Drive check_circle and make them clickable to open
+            const items = uploadFileList ? uploadFileList.querySelectorAll(".upload-file-item") : [];
+            items.forEach((itemEl, idx) => {
+                const fileName = itemEl.dataset.fileName || (activeUploadFiles[idx] && activeUploadFiles[idx].name);
                 const statusEl = document.getElementById(`uploadItemStatus_${idx}`);
                 if (statusEl) {
-                    statusEl.innerHTML = `<span class="material-symbols-outlined status-complete-icon">check_circle</span>`;
+                    statusEl.innerHTML = `
+                        <span class="material-symbols-outlined status-complete-icon">check_circle</span>
+                        <span class="material-symbols-outlined open-file-hint-icon">open_in_new</span>
+                    `;
+                }
+                itemEl.classList.add("completed");
+                itemEl.setAttribute("role", "button");
+                itemEl.setAttribute("tabindex", "0");
+                if (fileName) {
+                    itemEl.title = `${fileName} 열기`;
+                    itemEl.onclick = (e) => {
+                        e.stopPropagation();
+                        if (window.openFileByName) {
+                            window.openFileByName(fileName);
+                        }
+                    };
+                    itemEl.onkeydown = (e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            if (window.openFileByName) {
+                                window.openFileByName(fileName);
+                            }
+                        }
+                    };
                 }
             });
 
             clearTimeout(uploadDismissTimer);
-            uploadDismissTimer = setTimeout(() => {
-                if (uploadProgressWidget) {
-                    uploadProgressWidget.style.opacity = "0";
-                    uploadProgressWidget.style.transform = "translateY(100%)";
-                    setTimeout(() => {
-                        uploadProgressWidget.classList.add("hidden");
-                    }, 250);
-                }
-            }, 6000);
+            if (!isWidgetHovered) {
+                uploadDismissTimer = setTimeout(() => {
+                    if (!isWidgetHovered && uploadProgressWidget) {
+                        uploadProgressWidget.style.opacity = "0";
+                        uploadProgressWidget.style.transform = "translateY(100%)";
+                        setTimeout(() => {
+                            uploadProgressWidget.classList.add("hidden");
+                        }, 250);
+                    }
+                }, 8000);
+            }
         }
         window.markUploadComplete = markUploadComplete;
 
@@ -5087,7 +5178,6 @@
             } else if (isUploadOngoing && !isDisabled && !txt.startsWith("🚀") && !txt.includes("Syncing")) {
                 isUploadOngoing = false;
                 markUploadComplete();
-                activeUploadFiles = [];
             }
         });
 
