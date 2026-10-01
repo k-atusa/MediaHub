@@ -153,12 +153,15 @@
         .drive-logo {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
         }
 
-        .cloud-icon {
-            font-size: 32px;
-            color: var(--g-primary-blue);
+        .drive-logo-img {
+            width: 36px;
+            height: 36px;
+            object-fit: contain;
+            border-radius: 6px;
+            display: block;
         }
 
         .drive-title {
@@ -396,7 +399,7 @@
     <main class="signin-card">
         <div class="header-section">
             <div class="drive-logo">
-                <span class="material-symbols-outlined cloud-icon">cloud</span>
+                <img src="icons/icon.png" alt="MediaHub Logo" class="drive-logo-img">
                 <span class="drive-title">MediaHub</span>
             </div>
             <div class="sub-header">

@@ -261,6 +261,14 @@
             color: var(--g-primary-blue);
         }
 
+        .nav-logo-img {
+            width: 32px;
+            height: 32px;
+            object-fit: contain;
+            border-radius: 6px;
+            display: block;
+        }
+
         .app-title {
             font-size: 22px;
             font-weight: 400;
@@ -2216,6 +2224,14 @@
                 color: var(--g-primary);
             }
 
+            .mobile-drawer-header .logo-wrap .nav-logo-img {
+                width: 28px;
+                height: 28px;
+                object-fit: contain;
+                border-radius: 5px;
+                display: block;
+            }
+
             .mobile-drawer-header .logo-wrap .app-title {
                 font-size: 19px;
                 font-weight: 500;
@@ -2706,7 +2722,7 @@
                 <span class="material-symbols-outlined">menu</span>
             </button>
             <div class="logo-wrap" onclick="navToRoot()">
-                <span class="material-symbols-outlined cloud-logo-icon">cloud</span>
+                <img src="icons/icon.png" alt="MediaHub Logo" class="nav-logo-img">
                 <span class="app-title">MediaHub</span>
             </div>
         </div>
@@ -2776,7 +2792,7 @@
             <!-- Mobile Drawer Top Header -->
             <div class="mobile-drawer-header" id="mobileDrawerHeader">
                 <div class="logo-wrap" onclick="navToRoot(); closeMobileSidebar();">
-                    <span class="material-symbols-outlined cloud-logo-icon">cloud</span>
+                    <img src="icons/icon.png" alt="MediaHub Logo" class="nav-logo-img">
                     <span class="app-title">MediaHub</span>
                 </div>
                 <button class="drawer-close-btn" id="btnCloseSidebarDrawer" type="button" title="Close menu">
