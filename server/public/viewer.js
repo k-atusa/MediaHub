@@ -37,11 +37,15 @@ document.getElementById("txName").value = flName;
 
 // Supported media extension categories
 const VIDEO_EXTS = ['mp4', 'webm', 'mov', 'mkv'];
+const AUDIO_EXTS = ['mp3', 'ogg', 'wav', 'm4a', 'aac', 'flac', 'opus', 'wma'];
 const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico'];
 const PDF_EXTS = ['pdf'];
 const TEXT_EXTS = [
-    'txt', 'log', 'md', 'json', 'csv', 'xml', 'html', 'css', 'js', 'ts',
-    'yaml', 'yml', 'sh', 'py', 'sql', 'ini', 'conf', 'c', 'cpp', 'h', 'go', 'rs',
+    'txt', 'log', 'md', 'json', 'csv', 'xml', 'html', 'css', 'js', 'ts', 'jsx', 'tsx',
+    'yaml', 'yml', 'sh', 'py', 'sql', 'ini', 'conf', 'c', 'cpp', 'h', 'hpp', 'go', 'rs',
+    'java', 'kt', 'kts', 'swift', 'rb', 'php', 'cs', 'scala', 'dart', 'lua', 'r',
+    'bat', 'cmd', 'ps1', 'zsh', 'bash', 'toml', 'env', 'properties', 'graphql', 'gql',
+    'proto', 'diff', 'patch', 'vue', 'svelte', 'lock', 'json5',
     'readme', 'license', 'makefile', 'dockerfile'
 ];
 
@@ -51,6 +55,25 @@ function formatBytes(bytes) {
     const sizes = ["B", "KB", "MB", "GB", "TB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return (bytes / Math.pow(k, i)).toFixed(i === 0 ? 0 : 1) + " " + sizes[i];
+}
+
+function escapeHtml(str) {
+    return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+
+
+function renderAudioPlayer(srcUrl, body) {
+    body.innerHTML = `
+        <div class="audio-player-card">
+            <div class="audio-hero-icon-box">
+                <span class="material-symbols-outlined audio-hero-icon">graphic_eq</span>
+            </div>
+            <div class="audio-title" title="${flName.replace(/"/g, '&quot;')}">${flName}</div>
+            <div class="audio-meta">${origSize > 0 ? formatBytes(origSize) : ''}</div>
+            <audio controls autoplay class="audio-element" id="audioPlayer" src="${srcUrl}"></audio>
+        </div>
+    `;
 }
 
 function getUnsupportedIcon(filename) {
@@ -68,6 +91,7 @@ function getUnsupportedIcon(filename) {
 function getKind(name) {
     const ext = ((name || '').split('.').pop() || '').toLowerCase();
     if (VIDEO_EXTS.includes(ext)) return 'video';
+    if (AUDIO_EXTS.includes(ext)) return 'audio';
     if (IMAGE_EXTS.includes(ext)) return 'image';
     if (PDF_EXTS.includes(ext)) return 'pdf';
     if (TEXT_EXTS.includes(ext)) return 'text';
@@ -107,6 +131,14 @@ function getMime(name) {
         'webm': 'video/webm',
         'mov': 'video/quicktime',
         'mkv': 'video/x-matroska',
+        'mp3': 'audio/mpeg',
+        'ogg': 'audio/ogg',
+        'wav': 'audio/wav',
+        'm4a': 'audio/mp4',
+        'aac': 'audio/aac',
+        'flac': 'audio/flac',
+        'opus': 'audio/opus',
+        'wma': 'audio/x-ms-wma',
         'zip': 'application/zip',
         'tar': 'application/x-tar',
         'gz': 'application/gzip',
@@ -157,14 +189,15 @@ async function start() {
     const body = document.getElementById("viewBody");
     const kind = getKind(flName);
 
-    // Unsupported: Show preview not supported card immediately
-    if (kind === 'unsupported') {
+    // Unsupported: If size > 4KB (4096 bytes), show preview not supported card immediately.
+    // If size <= 4KB, proceed to fullDown to display raw data in textarea.
+    if (kind === 'unsupported' && origSize > 4096) {
         renderUnsupported(body);
         return;
     }
 
-    // Video: Stream via SW.
-    if (kind === 'video') {
+    // Video & Audio: Stream via SW.
+    if (kind === 'video' || kind === 'audio') {
         const isWebkit = /AppleWebKit/i.test(navigator.userAgent) && (!/Chrome/i.test(navigator.userAgent) || /CriOS/i.test(navigator.userAgent));
         if (OPT_NOSW_WEBKIT && isWebkit) {
             console.log("WebKit detected. Fallback to full down.");
@@ -172,9 +205,9 @@ async function start() {
             return;
         }
 
-        body.innerHTML = '<p style="color:#666;font-size:12px;margin:20px 0">Preparing stream…</p>';
+        body.innerHTML = `<p style="color:var(--preview-subtext);font-size:13px;margin:20px 0">Preparing ${kind} stream…</p>`;
         try {
-            const reg = await navigator.serviceWorker.register('./sw.js?v=2.2', { updateViaCache: 'none' });
+            const reg = await navigator.serviceWorker.register('./sw.js?v=2.3', { updateViaCache: 'none' });
             try { await reg.update(); } catch (_) {}
             await navigator.serviceWorker.ready;
 
@@ -214,16 +247,20 @@ async function start() {
             });
             await ack;
 
-            // Set virtual video source.
+            // Set media player source.
             body.innerHTML = '';
-            const v = document.createElement('video');
-            v.controls = true;
-            v.crossOrigin = 'anonymous';
-            v.playsInline = true;
-            v.preload = 'metadata';
-            v.style.width = '100%';
-            v.src = `/sw-stream/${fldId}/${flPid}`;
-            body.appendChild(v);
+            if (kind === 'audio') {
+                renderAudioPlayer(`/sw-stream/${fldId}/${flPid}`, body);
+            } else {
+                const v = document.createElement('video');
+                v.controls = true;
+                v.crossOrigin = 'anonymous';
+                v.playsInline = true;
+                v.preload = 'metadata';
+                v.style.width = '100%';
+                v.src = `/sw-stream/${fldId}/${flPid}`;
+                body.appendChild(v);
+            }
         } catch (err) {
             console.warn('SW streaming failed', err);
             await fullDown(flPid, body);
@@ -231,7 +268,7 @@ async function start() {
         return;
     }
 
-    // Non-video: Download and decrypt.
+    // Non-video/audio: Download and decrypt.
     await fullDown(flPid, body);
 }
 
@@ -512,6 +549,9 @@ function render(buf, body) {
             zoomRatio: 0.15,
         });
     }
+    else if (kind === 'audio') {
+        renderAudioPlayer(url, body);
+    }
     else if (kind === 'pdf') {
         const f = document.createElement("iframe");
         f.src = url;
@@ -519,17 +559,14 @@ function render(buf, body) {
         f.style.height = "90vh";
         body.appendChild(f);
     }
-    else if (kind === 'text') {
-        try {
-            const t = document.createElement("textarea");
-            t.value = new TextDecoder("utf-8", { fatal: true }).decode(buf);
-            t.style.width = "100%";
-            t.style.height = "90vh";
-            t.readOnly = true;
-            body.appendChild(t);
-        } catch (e) {
-            renderUnsupported(body);
-        }
+    else if (kind === 'text' || buf.length <= 4096) {
+        const t = document.createElement("textarea");
+        t.value = new TextDecoder().decode(buf);
+        t.style.width = "100%";
+        t.style.height = "90vh";
+        t.readOnly = true;
+        t.spellcheck = false;
+        body.appendChild(t);
     }
     else {
         renderUnsupported(body);

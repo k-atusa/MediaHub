@@ -405,6 +405,67 @@
             to { transform: rotate(360deg); }
         }
 
+        /* 5. Google Drive Audio Player Card */
+        .audio-player-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            background-color: var(--preview-surface);
+            border: 1px solid var(--preview-outline);
+            border-radius: 28px;
+            padding: 44px 36px;
+            max-width: 480px;
+            width: 90%;
+            margin: auto;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+            animation: m3DialogPop 0.25s cubic-bezier(0.2, 0, 0, 1);
+            box-sizing: border-box;
+        }
+
+        .audio-hero-icon-box {
+            width: 88px;
+            height: 88px;
+            border-radius: 50%;
+            background-color: var(--preview-hover);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        }
+
+        .audio-hero-icon {
+            font-size: 44px;
+            color: var(--preview-primary);
+        }
+
+        .audio-title {
+            font-size: 18px;
+            font-weight: 500;
+            color: var(--preview-text);
+            margin-bottom: 6px;
+            max-width: 380px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .audio-meta {
+            font-size: 13px;
+            color: var(--preview-subtext);
+            margin-bottom: 24px;
+        }
+
+        .audio-element {
+            width: 100%;
+            max-width: 400px;
+            height: 48px;
+            border-radius: 24px;
+            outline: none;
+        }
+
         /* 3. Google Drive Floating Side Navigation Buttons */
         .btn-floating-nav {
             position: fixed;
@@ -557,6 +618,11 @@
             textarea {
                 max-width: 96vw;
                 max-height: 80vh;
+            }
+
+            .audio-player-card {
+                padding: 32px 20px;
+                width: 94%;
             }
         }
 

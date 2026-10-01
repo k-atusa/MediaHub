@@ -49,7 +49,11 @@ function mkiv(gIV, count) {
 
 function vidMime(name) {
     const ext = (name || '').split('.').pop().toLowerCase();
-    return { mp4: 'video/mp4', webm: 'video/webm', mov: 'video/mp4', mkv: 'video/x-matroska' }[ext] || 'video/mp4';
+    const map = {
+        mp4: 'video/mp4', webm: 'video/webm', mov: 'video/mp4', mkv: 'video/x-matroska',
+        mp3: 'audio/mpeg', ogg: 'audio/ogg', wav: 'audio/wav', m4a: 'audio/mp4', aac: 'audio/aac', flac: 'audio/flac', opus: 'audio/opus'
+    };
+    return map[ext] || 'video/mp4';
 }
 
 // Handle SW messages.
