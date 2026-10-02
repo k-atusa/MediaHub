@@ -770,7 +770,20 @@ async function shareFile(fileName) {
     const targetFile = (fileName || "").trim();
     if (!state.id || !targetFile) return;
 
-    const shareUrl = `${window.location.origin}/folder.html?folder=${encodeURIComponent(state.id)}&file=${encodeURIComponent(targetFile)}`;
+    let flPid = null;
+    let fileKey = state.flsMap[targetFile];
+    if (!fileKey) {
+        const found = Object.keys(state.flsMap).find(k => k.normalize('NFC') === targetFile.normalize('NFC'));
+        if (found) fileKey = state.flsMap[found];
+    }
+    if (fileKey) {
+        const rawFK = mask.XOR(fileKey);
+        flPid = getObjPid(rawFK.slice(0, 44));
+        rawFK.fill(0);
+    }
+
+    const fileParam = flPid || targetFile;
+    const shareUrl = `${window.location.origin}/folder.html?folder=${encodeURIComponent(state.id)}&file=${encodeURIComponent(fileParam)}`;
     try {
         await navigator.clipboard.writeText(shareUrl);
         if (window.showNotice) {
@@ -1568,13 +1581,38 @@ async function boot() {
             await loadFld();
 
             if (targetFileName) {
+                // targetFileName can be a file PID (24-hex) or legacy plaintext filename
+                let resolvedFileName = null;
+
+                // 1. Try matching by file PID
+                for (const [fName, fKey] of Object.entries(state.flsMap)) {
+                    const rawFK = mask.XOR(fKey);
+                    const pid = getObjPid(rawFK.slice(0, 44));
+                    rawFK.fill(0);
+                    if (pid === targetFileName) {
+                        resolvedFileName = fName;
+                        break;
+                    }
+                }
+
+                // 2. Fallback: match by plaintext filename (backward compatibility)
+                if (!resolvedFileName) {
+                    if (state.flsMap[targetFileName]) {
+                        resolvedFileName = targetFileName;
+                    } else {
+                        const found = Object.keys(state.flsMap).find(k => k.normalize('NFC') === targetFileName.normalize('NFC'));
+                        if (found) resolvedFileName = found;
+                    }
+                }
+
                 // Remove query parameters from URL to keep address bar clean
                 window.history.replaceState({}, document.title, window.location.pathname);
 
-                const opened = await openFileByName(targetFileName);
-                if (!opened) {
+                if (resolvedFileName) {
+                    await openFileByName(resolvedFileName);
+                } else {
                     if (window.showNotice) {
-                        window.showNotice(`⚠️ File "${targetFileName}" was not found in this folder.`, "Notice", "warning");
+                        window.showNotice("⚠️ Shared file was not found in this folder.", "Notice", "warning");
                     }
                 }
             }

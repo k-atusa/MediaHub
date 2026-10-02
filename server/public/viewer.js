@@ -40,7 +40,13 @@ const urlParams = new URLSearchParams(window.location.search);
 const paramFld = urlParams.get("folder") || urlParams.get("fld");
 const paramFile = urlParams.get("file");
 if (paramFld && paramFile) {
-    if (!flKey || !flName || !fldId || !fldKey || fldId !== paramFld || flName !== paramFile) {
+    let flPid = null;
+    if (flKey) {
+        const rawFK = mask.XOR(flKey);
+        flPid = getObjPid(rawFK);
+        rawFK.fill(0);
+    }
+    if (!flKey || !flName || !fldId || !fldKey || fldId !== paramFld || (paramFile !== flPid && paramFile !== flName)) {
         window.location.href = `./folder.html?folder=${encodeURIComponent(paramFld)}&file=${encodeURIComponent(paramFile)}`;
     }
 }
@@ -658,8 +664,14 @@ function render(buf, body) {
 }
 
 async function shareFl() {
-    if (!fldId || !flName) return;
-    const shareUrl = `${window.location.origin}/folder.html?folder=${encodeURIComponent(fldId)}&file=${encodeURIComponent(flName)}`;
+    if (!fldId || !flKey) return;
+    let fileParam = flName;
+    try {
+        const rawFK = mask.XOR(flKey);
+        fileParam = getObjPid(rawFK);
+        rawFK.fill(0);
+    } catch (_) {}
+    const shareUrl = `${window.location.origin}/folder.html?folder=${encodeURIComponent(fldId)}&file=${encodeURIComponent(fileParam)}`;
     try {
         await navigator.clipboard.writeText(shareUrl);
         if (window.showNotice) {
