@@ -712,11 +712,14 @@ async function renameFile(rawOldName, rawNewName) {
         return;
     }
 
-    if (!state.flsMap[oldName]) {
-        throw new Error(`Original file "${oldName}" not found.`);
+    let actualOldName = oldName;
+    if (!state.flsMap[actualOldName]) {
+        const found = Object.keys(state.flsMap).find(k => k.normalize('NFC') === oldName.normalize('NFC'));
+        if (found) actualOldName = found;
+        else throw new Error(`Original file "${oldName}" not found.`);
     }
 
-    const duplicate = Object.keys(state.flsMap).find(k => k.normalize('NFC') === newName.normalize('NFC') && k !== oldName);
+    const duplicate = Object.keys(state.flsMap).find(k => k.normalize('NFC') === newName.normalize('NFC') && k !== actualOldName);
     if (duplicate) {
         throw new Error(`A file named "${newName}" already exists in this folder.`);
     }
@@ -724,8 +727,8 @@ async function renameFile(rawOldName, rawNewName) {
     const origFlsMap = { ...state.flsMap };
 
     try {
-        state.flsMap[newName] = state.flsMap[oldName];
-        delete state.flsMap[oldName];
+        state.flsMap[newName] = state.flsMap[actualOldName];
+        delete state.flsMap[actualOldName];
 
         const rawSK = mask.XOR(state.key);
         const sm = new SymMaster("gcm1", rawSK.slice(0, 32));
@@ -761,6 +764,7 @@ async function renameFile(rawOldName, rawNewName) {
         throw err;
     }
 }
+window.renameFile = renameFile;
 // Share file link
 async function shareFile(fileName) {
     const targetFile = (fileName || "").trim();
