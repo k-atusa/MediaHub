@@ -4,6 +4,9 @@ import { EncodeCfg, DecodeCfg, EncodeInt, DecodeInt, PadLen } from './Opsec.js';
 import { NormPW } from './Bencode.js';
 import { makeImg, makeVid, NetSrc } from './media.js';
 import { makeToken, loadToken } from './storage.js';
+import { SafeSession } from './session.js';
+
+await SafeSession.init();
 
 const SERVER = window.location.origin;
 const fromHex = (hex) => new Uint8Array(hex.match(/.{1,2}/g).map(b => parseInt(b, 16)));
@@ -21,19 +24,19 @@ const wipeMap = (m) => { for (const v of Object.values(m)) if (v?.fill) v.fill(0
 const SECRET_PEPPER = "_PROJECT_WHY_MEDIAHUB_PEPPER_2026_!@#$";
 
 // Load session.
-let usrHsh = sessionStorage.getItem("userHash");
+let usrHsh = SafeSession.getItem("userHash");
 let usrKey = null;
 {
-    const raw = sessionStorage.getItem("userKey") ? fromHex(sessionStorage.getItem("userKey")) : null;
+    const raw = SafeSession.getItem("userKey") ? fromHex(SafeSession.getItem("userKey")) : null;
     if (raw) { usrKey = mask.XOR(raw); raw.fill(0); }
 }
 let state = { fldMap: {}, name: "", key: null, id: "", flsMap: {}, page: 1, limit: 30, sort: localStorage.getItem("mediahub_sort") || "name-asc" };
 if (!usrHsh || !usrKey) {
     const query = window.location.search || window.location.hash;
     if (query) {
-        sessionStorage.setItem("redirectAfterLogin", window.location.href);
+        SafeSession.setItem("redirectAfterLogin", window.location.href);
     }
-    window.location.href = "./index.html";
+    await SafeSession.navigate("./index.html");
 }
 
 // Read file chunks.
@@ -64,49 +67,6 @@ async function saveUsr() {
 
 // No-op for backward compatibility
 window.syncCanonicalFolderNames = () => { };
-
-// Local unlinked folder tracking for client-side orphan management
-function getUnlinkedFolderIds() {
-    try {
-        return JSON.parse(localStorage.getItem("mh_unlinked_folders") || "[]");
-    } catch (_) {
-        return [];
-    }
-}
-
-function trackFolderUnlinked(fldId) {
-    if (!fldId) return;
-    try {
-        const unlinked = getUnlinkedFolderIds();
-        if (!unlinked.includes(fldId)) {
-            unlinked.push(fldId);
-            localStorage.setItem("mh_unlinked_folders", JSON.stringify(unlinked));
-        }
-    } catch (_) {}
-}
-
-function trackFolderDeleted(fldId) {
-    if (!fldId) return;
-    try {
-        const unlinked = getUnlinkedFolderIds();
-        const filtered = unlinked.filter(id => id !== fldId);
-        localStorage.setItem("mh_unlinked_folders", JSON.stringify(filtered));
-    } catch (_) {}
-}
-
-function trackFolderRestored(fldId) {
-    if (!fldId) return;
-    try {
-        const unlinked = getUnlinkedFolderIds();
-        const filtered = unlinked.filter(id => id !== fldId);
-        localStorage.setItem("mh_unlinked_folders", JSON.stringify(filtered));
-    } catch (_) {}
-}
-
-window.getUnlinkedFolderIds = getUnlinkedFolderIds;
-window.trackFolderUnlinked = trackFolderUnlinked;
-window.trackFolderDeleted = trackFolderDeleted;
-window.trackFolderRestored = trackFolderRestored;
 
 // Load map from server.
 async function loadUsr() {
@@ -142,12 +102,10 @@ document.getElementById("btnCreateFolder").addEventListener("click", async () =>
     const name = document.getElementById("newFolderName").value.trim();
     if (!name || state.fldMap[name]) return alert("⚠️ Invalid name");
     const rk = new Uint8Array(44); rk.set(Random(32), 0); rk.set(Random(12), 32);
-    const fldId = getObjPid(rk);
     const maskedKey = mask.XOR(rk);
     rk.fill(0);
     state.fldMap[name] = maskedKey;
     await saveUsr(); showFld();
-    trackFolderRestored(fldId);
     document.getElementById("newFolderName").value = "";
 });
 
@@ -193,7 +151,7 @@ async function doRenameFolder(rawOldName, rawNewName) {
         const isActiveFolder = (state.name === actualOldKey || (state.name && state.name.normalize('NFC') === actualOldKey.normalize('NFC')));
         if (isActiveFolder) {
             state.name = newName;
-            sessionStorage.setItem("oldFold", newName);
+            SafeSession.setItem("oldFold", newName);
         }
 
         await saveUsr();
@@ -219,7 +177,7 @@ async function doRenameFolder(rawOldName, rawNewName) {
         state.fldMap = origFldMap;
         state.name = origStateName;
         if (state.name === actualOldKey) {
-            sessionStorage.setItem("oldFold", actualOldKey);
+            SafeSession.setItem("oldFold", actualOldKey);
         }
         showFld();
         throw err;
@@ -464,7 +422,6 @@ document.getElementById("btnImport").addEventListener("click", () => {
             if (oldFldId !== fldId) {
                 try {
                     await fetch(`${SERVER}/api/storage/${oldFldId}/names`, { method: "DELETE", headers: { "X-User-Hash": usrHsh } });
-                    await trackFolderDeleted(oldFldId);
                 } catch (e) {
                     console.warn("Failed to delete old folder storage", e);
                 }
@@ -472,7 +429,6 @@ document.getElementById("btnImport").addEventListener("click", () => {
         }
         state.fldMap[effectiveName] = info.key;
         await saveUsr();
-        trackFolderRestored(fldId);
         await loadUsr();
         if (window.showNotice) window.showNotice(`✅ Folder "${effectiveName}" imported successfully.`, "Success", "check_circle");
     };
@@ -610,7 +566,7 @@ function buildKeywords() {
 }
 
 // Open file in viewer
-function openFileByName(name) {
+async function openFileByName(name) {
     if (!state.flsMap || !state.key) return false;
     let targetKey = state.flsMap[name];
     let actualName = name;
@@ -623,18 +579,18 @@ function openFileByName(name) {
     }
     if (!targetKey) {
         if (typeof loadFld === "function") {
-            loadFld().then(() => {
+            loadFld().then(async () => {
                 let retryKey = state.flsMap[actualName] || state.flsMap[Object.keys(state.flsMap).find(k => k.normalize('NFC') === (name || "").normalize('NFC'))];
                 if (retryKey) {
                     const rFK = mask.XOR(retryKey);
                     const rSK = mask.XOR(state.key);
-                    sessionStorage.setItem("currentFileKey", toHex(rFK));
-                    sessionStorage.setItem("currentFileName", actualName);
-                    sessionStorage.setItem("currentFolderId", state.id);
-                    sessionStorage.setItem("currentFolderKey", toHex(rSK));
-                    sessionStorage.setItem("oldFold", state.name);
+                    SafeSession.setItem("currentFileKey", toHex(rFK));
+                    SafeSession.setItem("currentFileName", actualName);
+                    SafeSession.setItem("currentFolderId", state.id);
+                    SafeSession.setItem("currentFolderKey", toHex(rSK));
+                    SafeSession.setItem("oldFold", state.name);
                     rFK.fill(0); rSK.fill(0);
-                    window.location.href = "./viewer.html";
+                    await SafeSession.navigate("./viewer.html");
                 }
             });
         }
@@ -642,13 +598,13 @@ function openFileByName(name) {
     }
     const rFK = mask.XOR(targetKey);
     const rSK = mask.XOR(state.key);
-    sessionStorage.setItem("currentFileKey", toHex(rFK));
-    sessionStorage.setItem("currentFileName", actualName);
-    sessionStorage.setItem("currentFolderId", state.id);
-    sessionStorage.setItem("currentFolderKey", toHex(rSK));
-    sessionStorage.setItem("oldFold", state.name);
+    SafeSession.setItem("currentFileKey", toHex(rFK));
+    SafeSession.setItem("currentFileName", actualName);
+    SafeSession.setItem("currentFolderId", state.id);
+    SafeSession.setItem("currentFolderKey", toHex(rSK));
+    SafeSession.setItem("oldFold", state.name);
     rFK.fill(0); rSK.fill(0);
-    window.location.href = "./viewer.html";
+    await SafeSession.navigate("./viewer.html");
     return true;
 }
 window.openFileByName = openFileByName;
@@ -703,7 +659,7 @@ async function showFls() {
     document.getElementById("pageIndicator").textContent = `${state.page} / ${total}`;
 
     // Save page state.
-    sessionStorage.setItem("oldPage", state.page);
+    SafeSession.setItem("oldPage", state.page);
 
     const start = (state.page - 1) * state.limit;
     for (const [name, fileKey] of entries.slice(start, start + state.limit)) {
@@ -1305,20 +1261,14 @@ async function executeUnlinkFolder(rawFolderName) {
     }
 
     try {
-        const maskedKey = state.fldMap[actualKey];
-        const rawK = mask.XOR(maskedKey);
-        const fldId = getObjPid(rawK);
-        rawK.fill(0);
-
         delete state.fldMap[actualKey];
-        await trackFolderUnlinked(fldId);
 
         const isActive = (state.name === actualKey || (state.name && state.name.normalize('NFC') === actualKey.normalize('NFC')));
         if (isActive) {
             state.name = "";
             state.id = "";
             state.key = null;
-            sessionStorage.removeItem("oldFold");
+            SafeSession.removeItem("oldFold");
         }
 
         await saveUsr();
@@ -1361,7 +1311,6 @@ async function executeDeleteFolder(rawFolderName) {
         rawK.fill(0);
 
         await fetch(`${SERVER}/api/storage/${fldId}/names`, { method: "DELETE", headers: { "X-User-Hash": usrHsh } });
-        await trackFolderDeleted(fldId);
 
         delete state.fldMap[actualKey];
 
@@ -1370,7 +1319,7 @@ async function executeDeleteFolder(rawFolderName) {
             state.name = "";
             state.id = "";
             state.key = null;
-            sessionStorage.removeItem("oldFold");
+            SafeSession.removeItem("oldFold");
         }
 
         await saveUsr();
@@ -1422,37 +1371,95 @@ if (btnUnlinkFolder) {
 // Handle pagination.
 document.getElementById("btnPrevPage").addEventListener("click", async () => { if (state.page > 1) { state.page--; await showFls(); } });
 document.getElementById("btnNextPage").addEventListener("click", async () => { if (state.page < Math.ceil(Object.keys(state.flsMap).length / state.limit)) { state.page++; await showFls(); } });
-document.getElementById("btnTrim").addEventListener("click", async () => {
-    if (!state.name || !state.id) {
-        if (window.showNotice) window.showNotice("⚠️ Select a folder first", "Notice", "warning");
-        else alert("⚠️ Select a folder first");
-        return;
-    }
-    const ok = await showConfirmModal("⚠️ Trim will delete orphan files on the server. Continue?", "Trim Orphan Files", "warning", "Trim", true);
-    if (!ok) return;
-
-    // Collect all file PIDs from the current folder's file map.
-    const pids = [];
-    for (const [, fileKey] of Object.entries(state.flsMap)) {
-        const rawFK = mask.XOR(fileKey);
-        const pid = getObjPid(rawFK.slice(0, 44));
-        rawFK.fill(0);
-        pids.push(pid);
+// Trim orphan files in folder
+async function executeTrimFolder(rawFolderName) {
+    const target = (rawFolderName || state.name || "").trim();
+    if (!target) {
+        throw new Error("No folder specified");
     }
 
-    try {
-        const res = await fetch(`${SERVER}/api/trim/${state.id}`, {
-            method: "POST",
-            headers: { "X-User-Hash": usrHsh, "Content-Type": "application/json" },
-            body: JSON.stringify({ pids })
+    let actualKey = target;
+    if (!state.fldMap[actualKey]) {
+        const found = Object.keys(state.fldMap).find(k => k.normalize('NFC') === target.normalize('NFC'));
+        if (found) actualKey = found;
+        else throw new Error(`Folder "${target}" not found`);
+    }
+
+    const maskedKey = state.fldMap[actualKey];
+    const rawK = mask.XOR(maskedKey);
+    const fldId = getObjPid(rawK);
+
+    let pids = [];
+    if (state.name === actualKey && state.id === fldId && Object.keys(state.flsMap).length > 0) {
+        for (const [, fileKey] of Object.entries(state.flsMap)) {
+            const rawFK = mask.XOR(fileKey);
+            const pid = getObjPid(rawFK.slice(0, 44));
+            rawFK.fill(0);
+            pids.push(pid);
+        }
+    } else {
+        const fldSm = new SymMaster("gcm1", rawK.slice(0, 32));
+        const res = await fetch(`${SERVER}/api/storage/${fldId}/names`, {
+            headers: { "X-User-Hash": usrHsh }
         });
-        const text = await res.text();
-        if (res.ok) alert("✅ " + text);
-        else alert("❌ " + text);
-    } catch (e) {
-        alert("❌ Trim error: " + e.message);
+        if (res.ok) {
+            const encBytes = new Uint8Array(await res.arrayBuffer());
+            if (encBytes.length > 0) {
+                const dec = await fldSm.DeBin(encBytes);
+                const flsMap = DecodeCfg(dec);
+                dec.fill(0);
+                for (const [, fileKey] of Object.entries(flsMap)) {
+                    const rawFK = mask.XOR(fileKey);
+                    const pid = getObjPid(rawFK.slice(0, 44));
+                    rawFK.fill(0);
+                    pids.push(pid);
+                }
+            }
+        }
     }
-});
+    rawK.fill(0);
+
+    const res = await fetch(`${SERVER}/api/trim/${fldId}`, {
+        method: "POST",
+        headers: { "X-User-Hash": usrHsh, "Content-Type": "application/json" },
+        body: JSON.stringify({ pids })
+    });
+    const text = await res.text();
+    if (!res.ok) {
+        throw new Error(text || res.statusText);
+    }
+
+    if (state.name === actualKey) {
+        await loadFld();
+    }
+    if (window.syncRootFolderGrid) {
+        window.syncRootFolderGrid();
+    }
+
+    return { text, pidsCount: pids.length };
+}
+window.executeTrimFolder = executeTrimFolder;
+
+const btnTrim = document.getElementById("btnTrim");
+if (btnTrim) {
+    btnTrim.addEventListener("click", async () => {
+        if (!state.name || !state.id) {
+            if (window.showNotice) window.showNotice("⚠️ Select a folder first", "Notice", "warning");
+            else alert("⚠️ Select a folder first");
+            return;
+        }
+        if (window.openTrimFolderDialog) {
+            window.openTrimFolderDialog(state.name);
+        } else {
+            try {
+                const result = await executeTrimFolder(state.name);
+                alert("✅ " + result.text);
+            } catch (e) {
+                alert("❌ Trim error: " + e.message);
+            }
+        }
+    });
+}
 document.getElementById("lblUserHash").textContent = usrHsh;
 
 // Change Password
@@ -1462,7 +1469,7 @@ document.getElementById("btnConfirmPw").addEventListener("click", async () => {
     const confirmPw = document.getElementById("newPasswordConfirm").value;
     if (!newPw) return alert("⚠️ Enter new password");
     if (newPw !== confirmPw) return alert("⚠️ Passwords do not match");
-    const username = sessionStorage.getItem("username");
+    const username = SafeSession.getItem("username");
     if (!username) return alert("⚠️ Session invalid (no username). Please login again.");
 
     const pwBytes = NormPW(newPw);
@@ -1501,8 +1508,8 @@ document.getElementById("btnConfirmPw").addEventListener("click", async () => {
     await fetch(`${SERVER}/api/userdata/${usrHsh}`, { method: "DELETE" });
 
     // update session
-    sessionStorage.setItem("userHash", newHash);
-    sessionStorage.setItem("userKey", toHex(mask.XOR(maskedNewKey)));
+    SafeSession.setItem("userHash", newHash);
+    SafeSession.setItem("userKey", toHex(mask.XOR(maskedNewKey)));
     usrHsh = newHash;
     if (usrKey) mask.XOR(usrKey).fill(0);
     usrKey = maskedNewKey;
@@ -1551,8 +1558,8 @@ async function boot() {
             state.key = matchingFolderKey;
             state.id = targetFolderId;
             state.page = 1;
-            sessionStorage.setItem("oldFold", matchingFolderName);
-            sessionStorage.setItem("oldPage", "1");
+            SafeSession.setItem("oldFold", matchingFolderName);
+            SafeSession.setItem("oldPage", "1");
             document.getElementById("btnDeleteFolder").classList.remove("hidden");
             await loadFld();
 
@@ -1560,7 +1567,7 @@ async function boot() {
                 // Remove query parameters from URL to keep address bar clean
                 window.history.replaceState({}, document.title, window.location.pathname);
 
-                const opened = openFileByName(targetFileName);
+                const opened = await openFileByName(targetFileName);
                 if (!opened) {
                     if (window.showNotice) {
                         window.showNotice(`⚠️ File "${targetFileName}" was not found in this folder.`, "Notice", "warning");
@@ -1576,8 +1583,8 @@ async function boot() {
         }
     }
 
-    const oldFold = sessionStorage.getItem("oldFold");
-    const oldPage = sessionStorage.getItem("oldPage");
+    const oldFold = SafeSession.getItem("oldFold");
+    const oldPage = SafeSession.getItem("oldPage");
     if (oldFold && state.fldMap[oldFold]) {
         document.getElementById("folderSelect").value = oldFold;
         state.name = oldFold; state.key = state.fldMap[oldFold];
