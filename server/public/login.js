@@ -1,7 +1,10 @@
 // MediaHub Login Module
 import { NormPW } from './Bencode.js';
 import { HashMaster, SHA3256, Masker } from './Bencrypt.js';
+import { SafeSession } from './session.js';
 const mask = new Masker();
+
+await SafeSession.init();
 
 const SERVER_URL = window.location.origin;
 const SECRET_PEPPER = "_PROJECT_WHY_MEDIAHUB_PEPPER_2026_!@#$";
@@ -23,18 +26,18 @@ async function makeKeys() {
 }
 
 // Store session and redirect
-function setSess(hash, maskedKey, username) {
+async function setSess(hash, maskedKey, username) {
     const raw = mask.XOR(maskedKey);
-    const redirectUrl = sessionStorage.getItem("redirectAfterLogin");
-    sessionStorage.clear();
-    sessionStorage.setItem("userHash", hash);
-    sessionStorage.setItem("userKey", toHex(raw));
-    sessionStorage.setItem("username", username);
+    const redirectUrl = SafeSession.getItem("redirectAfterLogin");
+    SafeSession.clear();
+    SafeSession.setItem("userHash", hash);
+    SafeSession.setItem("userKey", toHex(raw));
+    SafeSession.setItem("username", username);
     raw.fill(0);
     if (redirectUrl) {
-        window.location.href = redirectUrl;
+        await SafeSession.navigate(redirectUrl);
     } else {
-        window.location.href = "./folder.html";
+        await SafeSession.navigate("./folder.html");
     }
 }
 
@@ -64,7 +67,7 @@ document.getElementById("btnRegister").addEventListener("click", async () => {
                     if (req.status === 403) return alert("❌ Invalid Invite Code");
                     return alert("❌ Register failed");
                 }
-                alert("✅ Registered"); setSess(res.userHash, res.userKey, username);
+                alert("✅ Registered"); await setSess(res.userHash, res.userKey, username);
             } catch (e) { alert("❌ Register failed"); }
         };
 
@@ -89,7 +92,7 @@ document.getElementById("btnLogin").addEventListener("click", async () => {
     try {
         const check = await fetch(`${SERVER_URL}/api/userdata/${res.userHash}`);
         if (check.status === 404) return alert("❌ Invalid credentials");
-        setSess(res.userHash, res.userKey, username);
+        await setSess(res.userHash, res.userKey, username);
     } catch (e) { alert("❌ Login failed"); }
 });
 
@@ -99,14 +102,14 @@ async function checkNotice() {
         const res = await fetch(`${SERVER_URL}/api/notice`);
         if (!res.ok) return;
         const data = await res.json();
-        if (data.notice && data.notice.trim() !== "" && !sessionStorage.getItem("noticeShown")) {
+        if (data.notice && data.notice.trim() !== "" && !SafeSession.getItem("noticeShown")) {
             const modal = document.getElementById("noticeModal");
             const text = document.getElementById("noticeText");
             const btnConfirm = document.getElementById("btnConfirmNotice");
 
             text.textContent = data.notice;
             modal.showModal();
-            sessionStorage.setItem("noticeShown", "true");
+            SafeSession.setItem("noticeShown", "true");
 
             btnConfirm.addEventListener("click", () => {
                 modal.close();

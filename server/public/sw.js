@@ -81,6 +81,12 @@ self.addEventListener('message', async (e) => {
         if (info) { if (info.gIV) info.gIV.fill(0); }
         regMap.delete(d.filePid);
         cchPurg(d.filePid);
+    } else if (d.action === 'CLEAR_CACHE') {
+        for (const [, info] of regMap) {
+            if (info && info.gIV) info.gIV.fill(0);
+        }
+        regMap.clear();
+        cchMap.clear();
     }
 });
 

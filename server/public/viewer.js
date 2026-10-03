@@ -2,7 +2,10 @@
 import { SymMaster, Masker, HashMaster } from './Bencrypt.js';
 import { EncodeCfg, DecodeCfg, DecodeInt, EncodeInt } from './Opsec.js';
 import { NetSrc } from './media.js';
+import { SafeSession } from './session.js';
 const mask = new Masker();
+
+await SafeSession.init();
 
 // Option: Disable ServiceWorker for WebKit (Safari).
 const OPT_NOSW_WEBKIT = true;
@@ -13,13 +16,13 @@ const toHex = (buf) => Array.from(buf).map(b => b.toString(16).padStart(2, '0'))
 const getObjPid = (key) => toHex(key.slice(32, 44));
 
 // Get folder and file keys from session storage.
-let fldId = sessionStorage.getItem("currentFolderId");
+let fldId = SafeSession.getItem("currentFolderId");
 let fldKey = null;
 let flKey = null;
 let origSize = 0;
 {
-    const rawFK = sessionStorage.getItem("currentFolderKey") ? fromHex(sessionStorage.getItem("currentFolderKey")) : null;
-    const rawFlK = sessionStorage.getItem("currentFileKey") ? fromHex(sessionStorage.getItem("currentFileKey")) : null;
+    const rawFK = SafeSession.getItem("currentFolderKey") ? fromHex(SafeSession.getItem("currentFolderKey")) : null;
+    const rawFlK = SafeSession.getItem("currentFileKey") ? fromHex(SafeSession.getItem("currentFileKey")) : null;
     if (rawFK) { fldKey = mask.XOR(rawFK); rawFK.fill(0); }
     if (rawFlK) {
         origSize = DecodeInt(rawFlK.slice(44, 52));
@@ -29,7 +32,7 @@ let origSize = 0;
         rawFlK.fill(0);
     }
 }
-let flName = sessionStorage.getItem("currentFileName");
+let flName = SafeSession.getItem("currentFileName");
 let rawBuf = null;
 
 // Check URL parameters for direct link
@@ -37,7 +40,13 @@ const urlParams = new URLSearchParams(window.location.search);
 const paramFld = urlParams.get("folder") || urlParams.get("fld");
 const paramFile = urlParams.get("file");
 if (paramFld && paramFile) {
-    if (!flKey || !flName || !fldId || !fldKey || fldId !== paramFld || flName !== paramFile) {
+    let flPid = null;
+    if (flKey) {
+        const rawFK = mask.XOR(flKey);
+        flPid = getObjPid(rawFK);
+        rawFK.fill(0);
+    }
+    if (!flKey || !flName || !fldId || !fldKey || fldId !== paramFld || (paramFile !== flPid && paramFile !== flName)) {
         window.location.href = `./folder.html?folder=${encodeURIComponent(paramFld)}&file=${encodeURIComponent(paramFile)}`;
     }
 }
@@ -397,7 +406,7 @@ async function performRename(newNm) {
         await fetch(`${SERVER}/api/storage/${fldId}/names`, { method: "POST", body: await sm.EnBin(encoded) });
         encoded.fill(0);
 
-        sessionStorage.setItem("currentFileName", rawNewNm);
+        SafeSession.setItem("currentFileName", rawNewNm);
         flName = rawNewNm;
         const tx = document.getElementById("txName");
         if (tx) {
@@ -655,8 +664,14 @@ function render(buf, body) {
 }
 
 async function shareFl() {
-    if (!fldId || !flName) return;
-    const shareUrl = `${window.location.origin}/folder.html?folder=${encodeURIComponent(fldId)}&file=${encodeURIComponent(flName)}`;
+    if (!fldId || !flKey) return;
+    let fileParam = flName;
+    try {
+        const rawFK = mask.XOR(flKey);
+        fileParam = getObjPid(rawFK);
+        rawFK.fill(0);
+    } catch (_) {}
+    const shareUrl = `${window.location.origin}/folder.html?folder=${encodeURIComponent(fldId)}&file=${encodeURIComponent(fileParam)}`;
     try {
         await navigator.clipboard.writeText(shareUrl);
         if (window.showNotice) {
@@ -837,9 +852,10 @@ async function setNav() {
             const prevHx = toHex(prevKy);
             const btnPrv = document.getElementById("btnPrevFile");
             btnPrv.classList.remove("hidden");
-            btnPrv.onclick = () => {
-                sessionStorage.setItem("currentFileName", prevNm);
-                sessionStorage.setItem("currentFileKey", prevHx);
+            btnPrv.onclick = async () => {
+                SafeSession.setItem("currentFileName", prevNm);
+                SafeSession.setItem("currentFileKey", prevHx);
+                await SafeSession.save();
                 window.location.reload();
             };
         }
@@ -848,9 +864,10 @@ async function setNav() {
             const nxtHx = toHex(nxtKy);
             const btnNxt = document.getElementById("btnNextFile");
             btnNxt.classList.remove("hidden");
-            btnNxt.onclick = () => {
-                sessionStorage.setItem("currentFileName", nxtNm);
-                sessionStorage.setItem("currentFileKey", nxtHx);
+            btnNxt.onclick = async () => {
+                SafeSession.setItem("currentFileName", nxtNm);
+                SafeSession.setItem("currentFileKey", nxtHx);
+                await SafeSession.save();
                 window.location.reload();
             };
         }

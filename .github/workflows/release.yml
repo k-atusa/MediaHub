@@ -1,7 +1,8 @@
 name: Release
 
-# Builds multi-platform Go binaries (with embedded static web client)
-# and automatically creates a GitHub Release when changes are pushed to main or a version tag is pushed.
+# Multi-platform Go binary build & release workflow.
+# Triggered when a release with 'vX.X.X' format is published manually.
+# Builds multi-platform binaries from the 'main' branch and attaches them to the release.
 #
 # Binary Filename Convention:
 #   mediahub-server-{version}-{os}-{arch}[.exe]
@@ -14,51 +15,67 @@ name: Release
 #   - Linux arm64:    mediahub-server-{version}-linux-arm64
 
 on:
-  push:
-    branches: [main]
-    tags: ['v*']
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release Tag (e.g. v1.5.0)'
+        required: true
+        default: 'v1.5.0'
 
 permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.event.release.tag_name || github.ref }}
   cancel-in-progress: true
 
 jobs:
   build-and-release:
-    name: Build & Release Multi-Platform Binaries
+    name: Build & Attach Multi-Platform Binaries
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repository (main branch)
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
 
       - name: Compute Release Metadata
         id: meta
         run: |
-          VERSION="1.5.0"
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            TAG="${GITHUB_REF#refs/tags/}"
-            TAG_VER="${TAG#v}"
-            if [[ -n "${TAG_VER}" ]]; then
-              VERSION="${TAG_VER}"
-            fi
-            NAME="MediaHub ${TAG}"
-          else
-            YMD="$(date -u +%Y%m%d)"
-            SHA_SHORT="${GITHUB_SHA::7}"
-            TAG="v${VERSION}-${YMD}-${SHA_SHORT}"
-            NAME="MediaHub v${VERSION} (${YMD}.${SHA_SHORT})"
+          set -euo pipefail
+
+          RAW_TAG="${{ github.event.release.tag_name || inputs.tag }}"
+          RELEASE_NAME="${{ github.event.release.name || '' }}"
+
+          echo "Event Release Tag:  ${RAW_TAG}"
+          echo "Event Release Name: ${RELEASE_NAME}"
+
+          # Extract semantic version pattern (vX.X.X) from Tag or Name
+          VERSION=""
+          if [[ "${RAW_TAG}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            VERSION="$(echo "${RAW_TAG}" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')"
+          elif [[ "${RELEASE_NAME}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            VERSION="$(echo "${RELEASE_NAME}" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')"
           fi
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+          if [[ -z "${VERSION}" ]]; then
+            echo "::error::Release tag ('${RAW_TAG}') or name ('${RELEASE_NAME}') does not match expected 'vX.X.X' format."
+            exit 1
+          fi
+
+          TAG="${RAW_TAG:-v${VERSION}}"
+          if [[ "${TAG}" != v* ]]; then
+            TAG="v${TAG}"
+          fi
+
+          echo "Resolved Version: ${VERSION}"
+          echo "Resolved Tag:     ${TAG}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "name=${NAME}" >> "$GITHUB_OUTPUT"
-          echo "Release Tag:     ${TAG}"
-          echo "Release Version: ${VERSION}"
-          echo "Release Name:    ${NAME}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
 
       # ---- Server Cross Compilation (Go) ----
       - name: Setup Go
@@ -98,14 +115,11 @@ jobs:
           cat checksums.txt
           cd ..
 
-      # ---- Publish Release ----
-      - name: Publish GitHub Release
+      # ---- Attach Binaries to Release ----
+      - name: Attach Binaries to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
-          name: ${{ steps.meta.outputs.name }}
-          prerelease: false
-          generate_release_notes: true
           token: ${{ secrets.GITHUB_TOKEN }}
           files: |
             build/mediahub-server-*

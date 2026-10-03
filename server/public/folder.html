@@ -876,7 +876,8 @@
             background-color: rgba(255, 255, 255, 0.12);
         }
 
-        @media (hover: none), (max-width: 768px) {
+        @media (hover: none),
+        (max-width: 768px) {
             .file-more-btn {
                 opacity: 1;
             }
@@ -1593,10 +1594,12 @@
                 left: -35%;
                 width: 35%;
             }
+
             60% {
                 left: 100%;
                 width: 70%;
             }
+
             100% {
                 left: 100%;
                 width: 70%;
@@ -2087,13 +2090,13 @@
             background-color: #f9dedc;
         }
 
-        /* Clear Cache Dialog Custom UI */
-        #clearCacheModal {
-            max-width: 420px;
+        /* Trim Folder Dialog Custom UI */
+        #trimFolderModal {
+            max-width: 440px;
             padding: 24px 24px 20px 24px;
         }
 
-        #clearCacheModal .dialog-body {
+        #trimFolderModal .dialog-body {
             white-space: normal;
             font-size: 14px;
             color: var(--g-text-sub);
@@ -2101,11 +2104,7 @@
             margin-bottom: 16px;
         }
 
-        #clearCacheModal .dialog-title {
-            margin-bottom: 12px;
-        }
-
-        #clearCacheModal .dialog-m3-icon {
+        #trimFolderModal .dialog-title {
             margin-bottom: 12px;
         }
 
@@ -2343,6 +2342,7 @@
                     opacity: 0;
                     transform: scale(0.97);
                 }
+
                 to {
                     opacity: 1;
                     transform: scale(1);
@@ -2550,8 +2550,15 @@
         }
 
         @keyframes m3FadeIn {
-            from { opacity: 0; transform: translateY(-4px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(-4px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .chips-label {
@@ -2699,6 +2706,7 @@
         .filter-items-scroll-list::-webkit-scrollbar {
             width: 5px;
         }
+
         .filter-items-scroll-list::-webkit-scrollbar-thumb {
             background: var(--g-border);
             border-radius: 3px;
@@ -2790,15 +2798,18 @@
             <button class="mobile-search-back-btn" id="btnMobileSearchClose" type="button" title="Back">
                 <span class="material-symbols-outlined">arrow_back</span>
             </button>
-            <input type="text" class="search-input" placeholder="Search in MediaHub" id="topSearchInput" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
-            <button class="search-clear-btn" id="btnSearchClear" type="button" title="Clear search" style="display: none;">
+            <input type="text" class="search-input" placeholder="Search in MediaHub" id="topSearchInput"
+                autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
+            <button class="search-clear-btn" id="btnSearchClear" type="button" title="Clear search"
+                style="display: none;">
                 <span class="material-symbols-outlined" style="font-size: 18px;">close</span>
             </button>
         </div>
 
         <div class="header-right">
             <!-- Mobile Search Toggle Button -->
-            <button class="header-icon-btn mobile-search-toggle" id="btnMobileSearchToggle" type="button" title="Search">
+            <button class="header-icon-btn mobile-search-toggle" id="btnMobileSearchToggle" type="button"
+                title="Search">
                 <span class="material-symbols-outlined">search</span>
             </button>
             <!-- Account Menu Dropdown (Triggered by Avatar) -->
@@ -2827,11 +2838,6 @@
                     <div class="drive-menu-item" id="accountMenuItemPassword">
                         <span class="material-symbols-outlined menu-icon">lock_reset</span>
                         <span class="menu-label">Change password</span>
-                    </div>
-                    <!-- Clear Cache Option -->
-                    <div class="drive-menu-item" id="accountMenuItemTrim">
-                        <span class="material-symbols-outlined menu-icon">cleaning_services</span>
-                        <span class="menu-label">Clear cache</span>
                     </div>
                     <div class="drive-menu-divider"></div>
                     <!-- Logout Option -->
@@ -2911,13 +2917,21 @@
                         <span class="breadcrumb-separator" id="breadcrumbSeparator">/</span>
                         <span class="breadcrumb-current" id="breadcrumbFolderName"></span>
                     </div>
-                    <h1 class="workspace-folder-title" id="currentFolderTitle">My Drive</h1>
+                    <div class="workspace-title-row" style="display: flex; align-items: center; gap: 8px;">
+                        <h1 class="workspace-folder-title" id="currentFolderTitle">My Drive</h1>
+                        <button id="btnCurrentFolderMore" type="button"
+                            style="display: none; width: 32px; height: 32px; border-radius: 50%; border: none; background: transparent; align-items: center; justify-content: center; cursor: pointer; color: var(--g-text-secondary, #5f6368); transition: background-color 0.15s ease;"
+                            title="Folder options" aria-label="Folder options">
+                            <span class="material-symbols-outlined" style="font-size: 20px;">more_vert</span>
+                        </button>
+                    </div>
                 </div>
 
                 <div class="workspace-action-group">
                     <!-- View Options Dropdown Menu (Windows File Explorer Style) -->
                     <div class="view-action-wrapper" id="viewActionWrapper">
-                        <button class="top-action-btn" id="btnViewMenu" type="button" aria-haspopup="true" aria-expanded="false" title="View options">
+                        <button class="top-action-btn" id="btnViewMenu" type="button" aria-haspopup="true"
+                            aria-expanded="false" title="View options">
                             <span class="material-symbols-outlined" id="viewModeIcon">grid_view</span>
                             <span>View</span>
                         </button>
@@ -2953,7 +2967,8 @@
                     </div>
                     <!-- Sort As Dropdown Menu -->
                     <div class="sort-action-wrapper" id="sortActionWrapper">
-                        <button class="top-action-btn" id="btnSortMenu" type="button" aria-haspopup="true" aria-expanded="false" title="Sort files">
+                        <button class="top-action-btn" id="btnSortMenu" type="button" aria-haspopup="true"
+                            aria-expanded="false" title="Sort files">
                             <span class="material-symbols-outlined" id="sortModeIcon">swap_vert</span>
                             <span id="sortModeText">Sort as</span>
                         </button>
@@ -2984,7 +2999,8 @@
                     </div>
                     <!-- Keyword Filter Dropdown (Matches Sort & View dropdown style) -->
                     <div class="filter-action-wrapper" id="filterActionWrapper">
-                        <button class="top-action-btn" id="btnKeywordFilter" type="button" aria-haspopup="true" aria-expanded="false" title="Filter files by keywords">
+                        <button class="top-action-btn" id="btnKeywordFilter" type="button" aria-haspopup="true"
+                            aria-expanded="false" title="Filter files by keywords">
                             <span class="material-symbols-outlined" id="keywordFilterIcon">filter_list</span>
                             <span>Filter</span>
                             <span class="filter-count-badge" id="filterCountBadge" style="display: none;">0</span>
@@ -2992,21 +3008,30 @@
                         <div class="filter-dropdown-menu" id="filterDropdownMenu">
                             <div class="filter-menu-header" id="filterMenuHeader">
                                 <span class="filter-header-title">Filter by keywords</span>
-                                <button type="button" id="btnClearAllKeywords" class="filter-menu-clear-btn" style="display: none;">Clear all</button>
+                                <button type="button" id="btnClearAllKeywords" class="filter-menu-clear-btn"
+                                    style="display: none;">Clear all</button>
                             </div>
                             <!-- Quick search within keywords -->
-                            <div class="filter-search-wrap" id="keywordSearchWrap" style="padding: 4px 8px 6px 8px; display: none;">
+                            <div class="filter-search-wrap" id="keywordSearchWrap"
+                                style="padding: 4px 8px 6px 8px; display: none;">
                                 <div style="position: relative; display: flex; align-items: center;">
-                                    <span class="material-symbols-outlined" style="position: absolute; left: 8px; font-size: 16px; color: var(--g-text-muted);">search</span>
-                                    <input type="text" id="keywordFilterSearchInput" class="filter-dropdown-search-input" placeholder="Search keywords..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
+                                    <span class="material-symbols-outlined"
+                                        style="position: absolute; left: 8px; font-size: 16px; color: var(--g-text-muted);">search</span>
+                                    <input type="text" id="keywordFilterSearchInput"
+                                        class="filter-dropdown-search-input" placeholder="Search keywords..."
+                                        autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+                                        data-lpignore="true">
                                 </div>
                             </div>
                             <!-- Keywords scrollable list items -->
                             <div class="filter-items-scroll-list" id="keywordListContainer"></div>
                             <div id="keywordEmptyMessage" class="filter-empty-message" style="display: none;">
-                                <span class="material-symbols-outlined" style="font-size: 26px; margin-bottom: 4px; display: block; opacity: 0.6;">search_off</span>
-                                <div style="font-size: 13px; font-weight: 500; color: var(--g-text-main);">No keywords found</div>
-                                <div style="font-size: 11px; color: var(--g-text-muted); margin-top: 2px;">(Requires 4+ occurrences across files)</div>
+                                <span class="material-symbols-outlined"
+                                    style="font-size: 26px; margin-bottom: 4px; display: block; opacity: 0.6;">search_off</span>
+                                <div style="font-size: 13px; font-weight: 500; color: var(--g-text-main);">No keywords
+                                    found</div>
+                                <div style="font-size: 11px; color: var(--g-text-muted); margin-top: 2px;">(Requires 4+
+                                    occurrences across files)</div>
                             </div>
                         </div>
                     </div>
@@ -3029,7 +3054,8 @@
                 <!-- Active Filter Chips Bar (Shown when keyword filters are applied) -->
                 <div id="activeFilterChipsBar" class="active-filter-chips-bar" style="display: none;">
                     <span class="chips-label">
-                        <span class="material-symbols-outlined" style="font-size: 16px; color: var(--g-primary-blue);">filter_alt</span>
+                        <span class="material-symbols-outlined"
+                            style="font-size: 16px; color: var(--g-primary-blue);">filter_alt</span>
                         Filters:
                     </span>
                     <div class="chips-scroll-wrap" id="activeChipsList"></div>
@@ -3060,7 +3086,8 @@
                 <div class="empty-state-view" id="emptyStateContainer">
                     <span class="material-symbols-outlined empty-cloud-icon" id="emptyStateIcon">cloud_upload</span>
                     <div class="empty-title" id="emptyStateTitle">This folder is empty</div>
-                    <div class="empty-subtitle" id="emptyStateSubtitle">Drag and drop files anywhere on the page, or use the upload button.</div>
+                    <div class="empty-subtitle" id="emptyStateSubtitle">Drag and drop files anywhere on the page, or use
+                        the upload button.</div>
                     <button class="btn-empty-upload" id="btnEmptyUploadAction">
                         <span class="material-symbols-outlined">add</span>
                         <span>Upload</span>
@@ -3091,12 +3118,16 @@
         <input type="file" id="folderInput" webkitdirectory directory multiple>
         <button id="btnUpload">Upload</button>
         <button id="btnTrim">Trim</button>
-        <input type="text" id="newFolderName" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
+        <input type="text" id="newFolderName" autocomplete="off" autocorrect="off" autocapitalize="off"
+            spellcheck="false" data-lpignore="true">
         <button id="btnCreateFolder">Create</button>
-        <input type="text" id="renameOldFolderName" style="display: none;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-        <input type="text" id="renameNewFolderName" style="display: none;" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <input type="text" id="renameOldFolderName" style="display: none;" autocomplete="off" autocorrect="off"
+            autocapitalize="off" spellcheck="false">
+        <input type="text" id="renameNewFolderName" style="display: none;" autocomplete="off" autocorrect="off"
+            autocapitalize="off" spellcheck="false">
         <button id="btnRenameFolder" style="display: none;"></button>
         <button id="btnExport" style="display: none;"></button>
+        <button id="btnUnlinkFolder" style="display: none;"></button>
         <button id="btnDeleteFolder" style="display: none;"></button>
         <button id="btnChangePassword" style="display: none;"></button>
         <span id="lblUserHash" style="display: none;"></span>
@@ -3112,9 +3143,18 @@
             <span class="material-symbols-outlined menu-icon">share</span>
             <span class="menu-label">Share folder</span>
         </div>
-        <div class="drive-menu-item" id="folderMenuDelete">
-            <span class="material-symbols-outlined menu-icon">delete_outline</span>
-            <span class="menu-label">Delete folder</span>
+        <div class="drive-menu-item" id="folderMenuTrim">
+            <span class="material-symbols-outlined menu-icon">cleaning_services</span>
+            <span class="menu-label">Trim orphan files</span>
+        </div>
+        <div class="drive-menu-item" id="folderMenuUnlink">
+            <span class="material-symbols-outlined menu-icon">link_off</span>
+            <span class="menu-label">Remove from account</span>
+        </div>
+        <div class="drive-menu-divider"></div>
+        <div class="drive-menu-item" id="folderMenuDelete" style="color: var(--g-danger, #b3261e);">
+            <span class="material-symbols-outlined menu-icon">delete_forever</span>
+            <span class="menu-label">Delete permanently</span>
         </div>
     </div>
 
@@ -3133,7 +3173,8 @@
             <span class="menu-label">Download</span>
         </div>
         <div class="drive-menu-item" id="fileMenuDelete" style="color: var(--g-danger, #b3261e);">
-            <span class="material-symbols-outlined menu-icon" style="color: var(--g-danger, #b3261e);">delete_outline</span>
+            <span class="material-symbols-outlined menu-icon"
+                style="color: var(--g-danger, #b3261e);">delete_outline</span>
             <span class="menu-label" style="color: var(--g-danger, #b3261e);">Delete</span>
         </div>
     </div>
@@ -3144,7 +3185,8 @@
             <span class="material-symbols-outlined">create_new_folder</span>
         </div>
         <div class="dialog-title">New folder</div>
-        <input type="text" id="modalFolderNameInput" class="dialog-input" placeholder="Untitled folder" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
+        <input type="text" id="modalFolderNameInput" class="dialog-input" placeholder="Untitled folder"
+            autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
         <div class="dialog-btn-group">
             <button class="btn-dialog-cancel" id="btnCancelNewFolder" type="button">Cancel</button>
             <button class="btn-dialog-confirm" id="btnConfirmNewFolder" type="button">Create</button>
@@ -3157,8 +3199,11 @@
             <span class="material-symbols-outlined">drive_file_rename_outline</span>
         </div>
         <div class="dialog-title">Rename</div>
-        <input type="text" id="modalRenameFolderNameInput" class="dialog-input" placeholder="Folder name" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
-        <div id="renameFolderErrorText" style="color: var(--g-danger, #b3261e); font-size: 13px; margin-top: -12px; margin-bottom: 16px; display: none;"></div>
+        <input type="text" id="modalRenameFolderNameInput" class="dialog-input" placeholder="Folder name"
+            autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
+        <div id="renameFolderErrorText"
+            style="color: var(--g-danger, #b3261e); font-size: 13px; margin-top: -12px; margin-bottom: 16px; display: none;">
+        </div>
         <div class="dialog-btn-group">
             <button class="btn-dialog-cancel" id="btnCancelRenameFolder" type="button">Cancel</button>
             <button class="btn-dialog-confirm" id="btnConfirmRenameFolder" type="button">OK</button>
@@ -3171,8 +3216,11 @@
             <span class="material-symbols-outlined">drive_file_rename_outline</span>
         </div>
         <div class="dialog-title">Rename</div>
-        <input type="text" id="modalRenameFileNameInput" class="dialog-input" placeholder="File name" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-form-type="other">
-        <div id="renameFileErrorText" style="color: var(--g-danger, #b3261e); font-size: 13px; margin-top: -12px; margin-bottom: 16px; display: none;"></div>
+        <input type="text" id="modalRenameFileNameInput" class="dialog-input" placeholder="File name" autocomplete="off"
+            autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-form-type="other">
+        <div id="renameFileErrorText"
+            style="color: var(--g-danger, #b3261e); font-size: 13px; margin-top: -12px; margin-bottom: 16px; display: none;">
+        </div>
         <div class="dialog-btn-group">
             <button class="btn-dialog-cancel" id="btnCancelRenameFile" type="button">Cancel</button>
             <button class="btn-dialog-confirm" id="btnConfirmRenameFile" type="button">OK</button>
@@ -3185,35 +3233,37 @@
             <span class="material-symbols-outlined">lock_reset</span>
         </div>
         <div class="dialog-title">Change Password</div>
-        <input type="password" id="newPassword" class="dialog-input" placeholder="New Password" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
-        <input type="password" id="newPasswordConfirm" class="dialog-input" placeholder="Confirm Password" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
+        <input type="password" id="newPassword" class="dialog-input" placeholder="New Password"
+            autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
+        <input type="password" id="newPasswordConfirm" class="dialog-input" placeholder="Confirm Password"
+            autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
         <div class="dialog-btn-group">
             <button id="btnCancelPw" class="btn-dialog-cancel" type="button">Cancel</button>
             <button id="btnConfirmPw" class="btn-dialog-confirm" type="button">Save</button>
         </div>
     </dialog>
 
-    <!-- Clear Cache / Trim Dialog (Material You M3 Dialog) -->
-    <dialog id="clearCacheModal">
-        <div class="dialog-m3-icon">
-            <span class="material-symbols-outlined" style="color: var(--g-primary-blue);">cleaning_services</span>
+    <!-- Trim Folder Dialog (Material You Dialog) -->
+    <dialog id="trimFolderModal">
+        <div class="dialog-title">
+            <span class="material-symbols-outlined" style="color: var(--g-primary-blue, #0b57d0);">cleaning_services</span>
+            <span>Trim orphan files?</span>
         </div>
-        <div class="dialog-title">Clear Server Cache</div>
-        <div class="dialog-body" id="clearCacheModalBody">
-            This will scan all your encrypted folders on the server and safely remove unreferenced orphan files to free up storage space.
-        </div>
-        <div id="clearCacheStatusArea" style="display: none; margin-bottom: 16px;">
-            <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px;">
-                <div id="clearCacheStatusText" style="font-size: 14px; color: var(--g-text-main); line-height: 1.5; word-break: break-all; text-align: left;">Scanning encrypted folders...</div>
-                <div id="clearCacheProgressPercent" style="font-size: 13px; font-weight: 500; color: var(--g-primary-blue); flex-shrink: 0; display: none;">0%</div>
+        <div class="dialog-body">
+            <div id="trimFolderDesc" style="margin-bottom: 12px; line-height: 1.5; color: var(--g-text-sub);">
+                Scan this folder on the server and remove unreferenced orphan files that are not mapped in your folder. Active files will remain completely untouched.
             </div>
-            <div class="m3-linear-progress">
-                <div id="clearCacheProgressBar" class="m3-linear-bar indeterminate"></div>
+            <div id="trimFolderStatusArea" style="display: none; margin-bottom: 12px;">
+                <div id="trimFolderStatusText" style="font-size: 13.5px; color: var(--g-text-main); margin-bottom: 8px;">Scanning files...</div>
+                <div class="m3-linear-progress">
+                    <div id="trimFolderProgressBar" class="m3-linear-bar indeterminate"></div>
+                </div>
             </div>
+            <div id="trimFolderResultText" style="font-size: 13.5px; color: var(--g-text-main); display: none; line-height: 1.5;"></div>
         </div>
-        <div class="dialog-btn-group" id="clearCacheBtnGroup">
-            <button class="btn-dialog-cancel" id="btnCancelClearCache" type="button">Cancel</button>
-            <button class="btn-dialog-confirm" id="btnConfirmClearCache" type="button">Clear cache</button>
+        <div class="dialog-actions" id="trimFolderActions">
+            <button id="btnCancelTrimFolder" class="btn-dialog-text" type="button">Cancel</button>
+            <button id="btnConfirmTrimFolder" class="btn-dialog-primary" type="button">Trim</button>
         </div>
     </dialog>
 
@@ -3227,7 +3277,8 @@
             <div id="shareModalDesc" style="margin-bottom: 16px;">Set a password to encrypt this folder's share token.
                 Anyone with the token file and password can access the folder.</div>
             <input type="password" id="sharePasswordInput" class="dialog-input" placeholder="Set share password"
-                autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
+                autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false"
+                data-lpignore="true">
             <div id="shareErrorText"
                 style="color: var(--g-danger); font-size: 13px; margin-top: -12px; margin-bottom: 8px; display: none;">
             </div>
@@ -3238,19 +3289,35 @@
         </div>
     </dialog>
 
-    <!-- Delete Folder Dialog (Material You Dialog) -->
+    <!-- Unlink Folder Dialog (Remove from account) (Material You Dialog) -->
+    <dialog id="unlinkFolderModal">
+        <div class="dialog-title">
+            <span class="material-symbols-outlined" style="color: var(--g-primary-blue, #0b57d0);">link_off</span>
+            <span>Remove folder from account?</span>
+        </div>
+        <div class="dialog-body" id="unlinkFolderText">
+            Are you sure you want to remove this folder from your account? The folder and all files inside it will
+            remain accessible on the server for other users who share it. If no other users are linking to this folder, it will remain as an unlinked orphan folder on the server.
+        </div>
+        <div class="dialog-actions">
+            <button id="btnCancelUnlinkFolder" class="btn-dialog-text" type="button">Cancel</button>
+            <button id="btnConfirmUnlinkFolder" class="btn-dialog-primary" type="button">Remove</button>
+        </div>
+    </dialog>
+
+    <!-- Delete Folder Permanently Dialog (Material You Dialog) -->
     <dialog id="deleteFolderModal">
         <div class="dialog-title">
-            <span class="material-symbols-outlined" style="color: var(--g-danger, #b3261e);">delete</span>
-            <span>Delete folder?</span>
+            <span class="material-symbols-outlined" style="color: var(--g-danger, #b3261e);">delete_forever</span>
+            <span>Delete folder permanently?</span>
         </div>
         <div class="dialog-body" id="deleteFolderText">
             Are you sure you want to delete this folder? All files and encrypted metadata inside it will be permanently
-            deleted.
+            deleted from the server for ALL users sharing this folder.
         </div>
         <div class="dialog-actions">
             <button id="btnCancelDeleteFolder" class="btn-dialog-text" type="button">Cancel</button>
-            <button id="btnConfirmDeleteFolder" class="btn-dialog-danger" type="button">Delete</button>
+            <button id="btnConfirmDeleteFolder" class="btn-dialog-danger" type="button">Delete permanently</button>
         </div>
     </dialog>
 
@@ -3337,6 +3404,9 @@
     <script type="module">
         import { SymMaster, Masker } from './Bencrypt.js';
         import { DecodeCfg, DecodeInt } from './Opsec.js';
+        import { SafeSession } from './session.js';
+
+        await SafeSession.init();
 
         const fromHex = (hex) => new Uint8Array(hex.match(/.{1,2}/g).map(b => parseInt(b, 16)));
         const toHex = (buf) => Array.from(buf).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -3359,8 +3429,8 @@
             if (fileSizeCache[folderName]) return fileSizeCache[folderName];
 
             try {
-                const usrHsh = sessionStorage.getItem("userHash");
-                const usrKeyHex = sessionStorage.getItem("userKey");
+                const usrHsh = SafeSession.getItem("userHash");
+                const usrKeyHex = SafeSession.getItem("userKey");
                 if (!usrHsh || !usrKeyHex) return {};
 
                 const rawUK = fromHex(usrKeyHex);
@@ -3409,8 +3479,8 @@
             }
 
             try {
-                const usrHsh = sessionStorage.getItem("userHash");
-                const usrKeyHex = sessionStorage.getItem("userKey");
+                const usrHsh = SafeSession.getItem("userHash");
+                const usrKeyHex = SafeSession.getItem("userKey");
                 if (!usrHsh || !usrKeyHex) return [];
 
                 const rawUK = fromHex(usrKeyHex);
@@ -3820,7 +3890,7 @@
         function navToRoot() {
             if (isMobileView()) closeMobileSidebar();
             folderSelect.value = "";
-            sessionStorage.removeItem("oldFold");
+            SafeSession.removeItem("oldFold");
             updateFolderDisplay();
             syncRootFolderGrid();
             syncSidebarFolderList();
@@ -3868,6 +3938,9 @@
                 if (viewActionWrapper) viewActionWrapper.style.display = "";
                 if (sortActionWrapper) sortActionWrapper.style.display = "";
 
+                const btnCurrentFolderMore = document.getElementById("btnCurrentFolderMore");
+                if (btnCurrentFolderMore) btnCurrentFolderMore.style.display = "inline-flex";
+
                 // Highlight active in sidebar
                 document.querySelectorAll(".nav-folder-item").forEach(item => {
                     if (item.dataset.folderName === current) {
@@ -3882,6 +3955,9 @@
                 breadcrumbName.style.display = "none";
                 breadcrumbSeparator.style.display = "none";
                 folderTitle.textContent = "My Drive";
+
+                const btnCurrentFolderMore = document.getElementById("btnCurrentFolderMore");
+                if (btnCurrentFolderMore) btnCurrentFolderMore.style.display = "none";
 
                 rootFolderView.style.display = "flex";
                 mediaContainer.style.display = "none";
@@ -3900,6 +3976,16 @@
             }
         }
         window.updateFolderDisplay = updateFolderDisplay;
+
+        const btnCurrentFolderMore = document.getElementById("btnCurrentFolderMore");
+        if (btnCurrentFolderMore) {
+            btnCurrentFolderMore.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const current = folderSelect.value;
+                if (!current) return;
+                openFolderContextMenu(e, current, btnCurrentFolderMore);
+            });
+        }
 
         let rootSearchCounter = 0;
 
@@ -4055,16 +4141,16 @@
                     card.appendChild(title);
                     card.appendChild(folderChip);
 
-                    card.addEventListener("click", () => {
+                    card.addEventListener("click", async () => {
                         const rFK = file.fileKey.slice();
                         const rSK = file.folderKey.slice();
-                        sessionStorage.setItem("currentFileKey", toHex(rFK));
-                        sessionStorage.setItem("currentFileName", file.fileName);
-                        sessionStorage.setItem("currentFolderId", file.folderId);
-                        sessionStorage.setItem("currentFolderKey", toHex(rSK));
-                        sessionStorage.setItem("oldFold", file.folderName);
+                        SafeSession.setItem("currentFileKey", toHex(rFK));
+                        SafeSession.setItem("currentFileName", file.fileName);
+                        SafeSession.setItem("currentFolderId", file.folderId);
+                        SafeSession.setItem("currentFolderKey", toHex(rSK));
+                        SafeSession.setItem("oldFold", file.folderName);
                         rFK.fill(0); rSK.fill(0);
-                        window.location.href = "./viewer.html";
+                        await SafeSession.navigate("./viewer.html");
                     });
 
                     filesGridContainer.appendChild(card);
@@ -4078,6 +4164,7 @@
         const folderActionMenu = document.getElementById("folderActionMenu");
         const folderMenuRename = document.getElementById("folderMenuRename");
         const folderMenuShare = document.getElementById("folderMenuShare");
+        const folderMenuTrim = document.getElementById("folderMenuTrim");
         const folderMenuDelete = document.getElementById("folderMenuDelete");
         let activeFolderMoreBtn = null;
 
@@ -4165,20 +4252,34 @@
             });
         }
 
+        if (folderMenuTrim) {
+            folderMenuTrim.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const targetFolder = folderActionMenu ? folderActionMenu.dataset.targetFolder : "";
+                closeFolderContextMenu();
+                if (!targetFolder) return;
+                openTrimFolderDialog(targetFolder);
+            });
+        }
+
+        const folderMenuUnlink = document.getElementById("folderMenuUnlink");
+        if (folderMenuUnlink) {
+            folderMenuUnlink.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const targetFolder = folderActionMenu ? folderActionMenu.dataset.targetFolder : "";
+                closeFolderContextMenu();
+                if (!targetFolder) return;
+                openUnlinkFolderDialog(targetFolder);
+            });
+        }
+
         if (folderMenuDelete) {
             folderMenuDelete.addEventListener("click", (e) => {
                 e.stopPropagation();
                 const targetFolder = folderActionMenu ? folderActionMenu.dataset.targetFolder : "";
                 closeFolderContextMenu();
                 if (!targetFolder) return;
-
-                if (folderSelect.value !== targetFolder) {
-                    folderSelect.value = targetFolder;
-                    folderSelect.dispatchEvent(new Event("change"));
-                    updateFolderDisplay();
-                }
-                const btnDeleteFolder = document.getElementById("btnDeleteFolder");
-                if (btnDeleteFolder) btnDeleteFolder.click();
+                openDeleteFolderDialog(targetFolder);
             });
         }
 
@@ -4682,6 +4783,193 @@
             renameFolderModal.addEventListener("click", (e) => {
                 if (e.target === renameFolderModal) {
                     renameFolderModal.close();
+                }
+            });
+        }
+
+        // Trim folder modal binding (orphan files cleanup)
+        const trimFolderModal = document.getElementById("trimFolderModal");
+        const trimFolderDesc = document.getElementById("trimFolderDesc");
+        const trimFolderStatusArea = document.getElementById("trimFolderStatusArea");
+        const trimFolderStatusText = document.getElementById("trimFolderStatusText");
+        const trimFolderResultText = document.getElementById("trimFolderResultText");
+        const btnCancelTrimFolder = document.getElementById("btnCancelTrimFolder");
+        const btnConfirmTrimFolder = document.getElementById("btnConfirmTrimFolder");
+        let folderBeingTrimmed = "";
+
+        function openTrimFolderDialog(folderName) {
+            if (typeof newDriveMenu !== "undefined" && newDriveMenu) newDriveMenu.classList.remove("open");
+            folderBeingTrimmed = folderName;
+            if (trimFolderDesc) {
+                trimFolderDesc.style.display = "block";
+                trimFolderDesc.innerHTML = `Scan folder "<strong>${folderName.replace(/</g, "&lt;")}</strong>" on the server and remove unreferenced orphan files that are not mapped in your folder.<br><br><span style="font-size: 13px; color: var(--g-text-secondary, #5f6368);">Active files in this folder will remain completely safe.</span>`;
+            }
+            if (trimFolderStatusArea) trimFolderStatusArea.style.display = "none";
+            if (trimFolderResultText) {
+                trimFolderResultText.style.display = "none";
+                trimFolderResultText.innerHTML = "";
+            }
+            if (btnCancelTrimFolder) {
+                btnCancelTrimFolder.style.display = "inline-flex";
+                btnCancelTrimFolder.disabled = false;
+            }
+            if (btnConfirmTrimFolder) {
+                btnConfirmTrimFolder.textContent = "Trim";
+                btnConfirmTrimFolder.disabled = false;
+            }
+            if (trimFolderModal) {
+                trimFolderModal.showModal();
+            }
+        }
+        window.openTrimFolderDialog = openTrimFolderDialog;
+
+        if (btnCancelTrimFolder) {
+            btnCancelTrimFolder.addEventListener("click", () => {
+                if (trimFolderModal) trimFolderModal.close();
+            });
+        }
+
+        if (btnConfirmTrimFolder) {
+            btnConfirmTrimFolder.addEventListener("click", async () => {
+                if (btnConfirmTrimFolder.textContent === "Done" || btnConfirmTrimFolder.textContent === "Close") {
+                    if (trimFolderModal) trimFolderModal.close();
+                    return;
+                }
+                if (!folderBeingTrimmed) return;
+                const target = folderBeingTrimmed;
+
+                if (trimFolderDesc) trimFolderDesc.style.display = "none";
+                if (trimFolderStatusArea) {
+                    trimFolderStatusArea.style.display = "block";
+                    if (trimFolderStatusText) trimFolderStatusText.textContent = "Scanning folder and trimming orphan files on server...";
+                }
+                if (btnCancelTrimFolder) btnCancelTrimFolder.disabled = true;
+                btnConfirmTrimFolder.disabled = true;
+
+                try {
+                    allFoldersFilesCache = null;
+                    allFoldersFilesCacheTime = 0;
+                    if (window.executeTrimFolder) {
+                        const result = await window.executeTrimFolder(target);
+                        if (trimFolderStatusArea) trimFolderStatusArea.style.display = "none";
+                        if (trimFolderResultText) {
+                            trimFolderResultText.style.display = "block";
+                            trimFolderResultText.innerHTML = `<div style="color: var(--g-text-main); font-weight: 500; margin-bottom: 6px;">✅ ${result.text}</div><div style="font-size: 13px; color: var(--g-text-secondary);">Active files mapped in folder: ${result.pidsCount}</div>`;
+                        }
+                        if (btnCancelTrimFolder) btnCancelTrimFolder.style.display = "none";
+                        btnConfirmTrimFolder.textContent = "Done";
+                        btnConfirmTrimFolder.disabled = false;
+                        if (typeof fetchAllFoldersAndFiles === "function") {
+                            await fetchAllFoldersAndFiles(true);
+                        }
+                    }
+                } catch (err) {
+                    if (trimFolderStatusArea) trimFolderStatusArea.style.display = "none";
+                    if (trimFolderResultText) {
+                        trimFolderResultText.style.display = "block";
+                        trimFolderResultText.innerHTML = `<div style="color: var(--g-danger, #b3261e); font-weight: 500;">❌ Trim failed</div><div style="font-size: 13px; color: var(--g-danger, #b3261e); margin-top: 4px;">${(err.message || err).replace(/</g, "&lt;")}</div>`;
+                    }
+                    if (btnCancelTrimFolder) btnCancelTrimFolder.style.display = "none";
+                    btnConfirmTrimFolder.textContent = "Close";
+                    btnConfirmTrimFolder.disabled = false;
+                }
+            });
+        }
+
+        if (trimFolderModal) {
+            trimFolderModal.addEventListener("click", (e) => {
+                if (e.target === trimFolderModal && btnConfirmTrimFolder && !btnConfirmTrimFolder.disabled) {
+                    trimFolderModal.close();
+                }
+            });
+        }
+
+        // Unlink folder modal binding (참조 해제 - remove from this account only)
+        const unlinkFolderModal = document.getElementById("unlinkFolderModal");
+        const unlinkFolderText = document.getElementById("unlinkFolderText");
+        const btnCancelUnlinkFolder = document.getElementById("btnCancelUnlinkFolder");
+        const btnConfirmUnlinkFolder = document.getElementById("btnConfirmUnlinkFolder");
+        let folderBeingUnlinked = "";
+
+        function openUnlinkFolderDialog(folderName) {
+            if (typeof newDriveMenu !== "undefined" && newDriveMenu) newDriveMenu.classList.remove("open");
+            folderBeingUnlinked = folderName;
+            if (unlinkFolderText) {
+                unlinkFolderText.innerHTML = `Are you sure you want to remove folder "<strong>${folderName.replace(/</g, "&lt;")}</strong>" from your account?<br><br><span style="font-size: 13px; color: var(--g-text-secondary, #5f6368);">The folder and all files inside it will remain on the server and accessible to other users who share it.</span>`;
+            }
+            if (unlinkFolderModal) {
+                unlinkFolderModal.showModal();
+            }
+        }
+        window.openUnlinkFolderDialog = openUnlinkFolderDialog;
+
+        if (btnCancelUnlinkFolder) {
+            btnCancelUnlinkFolder.addEventListener("click", () => {
+                if (unlinkFolderModal) unlinkFolderModal.close();
+            });
+        }
+
+        if (btnConfirmUnlinkFolder) {
+            btnConfirmUnlinkFolder.addEventListener("click", async () => {
+                if (!folderBeingUnlinked) return;
+                const target = folderBeingUnlinked;
+                if (unlinkFolderModal) unlinkFolderModal.close();
+                allFoldersFilesCache = null;
+                if (window.unlinkFolder) {
+                    await window.unlinkFolder(target);
+                }
+            });
+        }
+
+        if (unlinkFolderModal) {
+            unlinkFolderModal.addEventListener("click", (e) => {
+                if (e.target === unlinkFolderModal) {
+                    unlinkFolderModal.close();
+                }
+            });
+        }
+
+        // Delete folder permanently modal binding (영구 삭제)
+        const deleteFolderModal = document.getElementById("deleteFolderModal");
+        const deleteFolderText = document.getElementById("deleteFolderText");
+        const btnCancelDeleteFolder = document.getElementById("btnCancelDeleteFolder");
+        const btnConfirmDeleteFolder = document.getElementById("btnConfirmDeleteFolder");
+        let folderBeingDeleted = "";
+
+        function openDeleteFolderDialog(folderName) {
+            if (typeof newDriveMenu !== "undefined" && newDriveMenu) newDriveMenu.classList.remove("open");
+            folderBeingDeleted = folderName;
+            if (deleteFolderText) {
+                deleteFolderText.innerHTML = `Are you sure you want to permanently delete folder "<strong>${folderName.replace(/</g, "&lt;")}</strong>"?<br><br><span style="font-size: 13px; color: var(--g-danger, #b3261e); font-weight: 500;">Warning: All files and encrypted metadata will be permanently deleted from the server for ALL users sharing this folder. This action cannot be undone.</span>`;
+            }
+            if (deleteFolderModal) {
+                deleteFolderModal.showModal();
+            }
+        }
+        window.openDeleteFolderDialog = openDeleteFolderDialog;
+
+        if (btnCancelDeleteFolder) {
+            btnCancelDeleteFolder.addEventListener("click", () => {
+                if (deleteFolderModal) deleteFolderModal.close();
+            });
+        }
+
+        if (btnConfirmDeleteFolder) {
+            btnConfirmDeleteFolder.addEventListener("click", async () => {
+                if (!folderBeingDeleted) return;
+                const target = folderBeingDeleted;
+                if (deleteFolderModal) deleteFolderModal.close();
+                allFoldersFilesCache = null;
+                if (window.deleteFolder) {
+                    await window.deleteFolder(target);
+                }
+            });
+        }
+
+        if (deleteFolderModal) {
+            deleteFolderModal.addEventListener("click", (e) => {
+                if (e.target === deleteFolderModal) {
+                    deleteFolderModal.close();
                 }
             });
         }
@@ -5256,227 +5544,18 @@
             });
         }
 
-        const accountMenuItemTrim = document.getElementById("accountMenuItemTrim");
-        const clearCacheModal = document.getElementById("clearCacheModal");
-        const btnCancelClearCache = document.getElementById("btnCancelClearCache");
-        const btnConfirmClearCache = document.getElementById("btnConfirmClearCache");
-        const clearCacheModalBody = document.getElementById("clearCacheModalBody");
-        const clearCacheStatusArea = document.getElementById("clearCacheStatusArea");
-        const clearCacheStatusText = document.getElementById("clearCacheStatusText");
-        const clearCacheProgressBar = document.getElementById("clearCacheProgressBar");
-        const clearCacheProgressPercent = document.getElementById("clearCacheProgressPercent");
-        const clearCacheBtnGroup = document.getElementById("clearCacheBtnGroup");
 
-        if (accountMenuItemTrim) {
-            accountMenuItemTrim.addEventListener("click", () => {
-                if (accountDropdownMenu) accountDropdownMenu.classList.remove("open");
-                if (clearCacheModal) {
-                    clearCacheModal.dataset.preventBackdropClose = "false";
-                    clearCacheModalBody.style.display = "block";
-                    clearCacheModalBody.innerHTML = "This will scan all your encrypted folders on the server and safely remove unreferenced orphan files to free up storage space.";
-                    clearCacheStatusArea.style.display = "none";
-                    clearCacheBtnGroup.style.display = "flex";
-                    btnCancelClearCache.style.display = "inline-flex";
-                    btnCancelClearCache.disabled = false;
-                    btnConfirmClearCache.style.display = "inline-flex";
-                    btnConfirmClearCache.disabled = false;
-                    btnConfirmClearCache.textContent = "Clear cache";
-                    clearCacheModal.showModal();
-                }
-            });
-        }
-
-        if (btnCancelClearCache) {
-            btnCancelClearCache.addEventListener("click", () => {
-                if (clearCacheModal) clearCacheModal.close();
-            });
-        }
-
-        if (btnConfirmClearCache) {
-            btnConfirmClearCache.addEventListener("click", async () => {
-                if (btnConfirmClearCache.textContent === "Done" || btnConfirmClearCache.textContent === "OK") {
-                    if (clearCacheModal) clearCacheModal.close();
-                    return;
-                }
-
-                const usrHsh = sessionStorage.getItem("userHash");
-                const usrKeyHex = sessionStorage.getItem("userKey");
-                if (!usrHsh || !usrKeyHex) {
-                    alert("Session expired. Please sign in again.");
-                    return;
-                }
-
-                // Prevent closing during trim
-                clearCacheModal.dataset.preventBackdropClose = "true";
-
-                // Show in-progress UI with indeterminate progress while scanning user data
-                clearCacheModalBody.style.display = "none";
-                clearCacheStatusArea.style.display = "block";
-                clearCacheStatusText.textContent = "Scanning encrypted folders...";
-                if (clearCacheProgressBar) {
-                    clearCacheProgressBar.classList.add("indeterminate");
-                    clearCacheProgressBar.style.width = "0%";
-                }
-                if (clearCacheProgressPercent) {
-                    clearCacheProgressPercent.style.display = "none";
-                    clearCacheProgressPercent.textContent = "0%";
-                }
-                clearCacheBtnGroup.style.display = "none";
-
-                try {
-                    const rawUK = fromHex(usrKeyHex);
-                    const sm = new SymMaster("gcm1", rawUK);
-                    rawUK.fill(0);
-
-                    const usrRes = await fetch(`${window.location.origin}/api/userdata/${usrHsh}`);
-                    if (!usrRes.ok) {
-                        throw new Error(usrRes.status === 404 ? "User data not found" : "Failed to load user data");
-                    }
-                    const usrDec = await sm.DeBin(new Uint8Array(await usrRes.arrayBuffer()));
-                    const fldMap = DecodeCfg(usrDec);
-                    usrDec.fill(0);
-
-                    const folderEntries = Object.entries(fldMap);
-                    if (folderEntries.length === 0) {
-                        clearCacheModal.dataset.preventBackdropClose = "false";
-                        clearCacheStatusArea.style.display = "none";
-                        clearCacheModalBody.style.display = "block";
-                        clearCacheModalBody.innerHTML = "<span style='color: var(--g-text-main); font-weight: 500;'>No folders found to clear cache.</span>";
-                        clearCacheBtnGroup.style.display = "flex";
-                        btnCancelClearCache.style.display = "none";
-                        btnConfirmClearCache.style.display = "inline-flex";
-                        btnConfirmClearCache.disabled = false;
-                        btnConfirmClearCache.textContent = "OK";
-                        return;
-                    }
-
-                    // Switch to determinate progress bar
-                    if (clearCacheProgressBar) {
-                        clearCacheProgressBar.classList.remove("indeterminate");
-                        clearCacheProgressBar.style.width = "0%";
-                    }
-                    if (clearCacheProgressPercent) {
-                        clearCacheProgressPercent.style.display = "inline-block";
-                        clearCacheProgressPercent.textContent = "0%";
-                    }
-
-                    let totalCleanedFolders = 0;
-                    let totalOrphanFiles = 0;
-                    let totalOrphanPids = 0;
-                    let totalKeptPids = 0;
-                    let reportLines = [];
-
-                    for (let i = 0; i < folderEntries.length; i++) {
-                        const [fName, fldKey] = folderEntries[i];
-                        const currentPercent = Math.round((i / folderEntries.length) * 100);
-                        if (clearCacheProgressBar) clearCacheProgressBar.style.width = `${currentPercent}%`;
-                        if (clearCacheProgressPercent) clearCacheProgressPercent.textContent = `${currentPercent}%`;
-                        clearCacheStatusText.textContent = `Cleaning folder (${i + 1}/${folderEntries.length}): ${fName}...`;
-
-                        try {
-                            const fldId = getObjPid(fldKey);
-                            const fldSm = new SymMaster("gcm1", fldKey.slice(0, 32));
-                            const flsRes = await fetch(`${window.location.origin}/api/storage/${fldId}/names`);
-
-                            let validPids = [];
-                            if (flsRes.ok) {
-                                const flsDec = await fldSm.DeBin(new Uint8Array(await flsRes.arrayBuffer()));
-                                const flsMap = DecodeCfg(flsDec);
-                                flsDec.fill(0);
-
-                                for (const [, flKey] of Object.entries(flsMap)) {
-                                    if (flKey && flKey.length >= 44) {
-                                        const pid = getObjPid(flKey);
-                                        if (pid) validPids.push(pid);
-                                    }
-                                }
-                            }
-
-                            // Call /api/trim/{fldId}
-                            const trimRes = await fetch(`${window.location.origin}/api/trim/${fldId}`, {
-                                method: "POST",
-                                headers: {
-                                    "Content-Type": "application/json",
-                                    "X-User-Hash": usrHsh
-                                },
-                                body: JSON.stringify({ pids: validPids })
-                            });
-
-                            if (trimRes.ok) {
-                                const msg = await trimRes.text();
-                                totalCleanedFolders++;
-                                const match = msg.match(/Trimmed (\d+) files \((\d+) orphan PIDs removed, (\d+) PIDs kept\)/);
-                                if (match) {
-                                    const delFiles = parseInt(match[1], 10);
-                                    const delPids = parseInt(match[2], 10);
-                                    const keptPids = parseInt(match[3], 10);
-                                    totalOrphanFiles += delFiles;
-                                    totalOrphanPids += delPids;
-                                    totalKeptPids += keptPids;
-                                    if (delFiles > 0) {
-                                        reportLines.push(`📁 ${fName}: Removed ${delFiles} orphan file(s)`);
-                                    }
-                                }
-                            } else {
-                                const errData = await trimRes.json().catch(() => ({ error: trimRes.statusText }));
-                                console.warn(`Trim warning for ${fName}:`, errData.error);
-                            }
-                        } catch (fErr) {
-                            console.warn(`Trim failed for folder ${fName}:`, fErr);
-                        }
-
-                        const donePercent = Math.round(((i + 1) / folderEntries.length) * 100);
-                        if (clearCacheProgressBar) clearCacheProgressBar.style.width = `${donePercent}%`;
-                        if (clearCacheProgressPercent) clearCacheProgressPercent.textContent = `${donePercent}%`;
-                    }
-
-                    // Invalidate all-folders cache
-                    if (typeof fetchAllFoldersAndFiles === "function") {
-                        await fetchAllFoldersAndFiles(true);
-                    }
-
-                    // Display final completion result
-                    clearCacheModal.dataset.preventBackdropClose = "false";
-                    clearCacheStatusArea.style.display = "none";
-                    clearCacheModalBody.style.display = "block";
-                    let resultHtml = `<div style="font-weight: 500; font-size: 15px; color: var(--g-text-main); margin-bottom: 6px;">${totalOrphanFiles > 0 ? "✅ Cache cleared successfully!" : "✨ Cache is already clean!"}</div><div style="font-size: 13.5px; color: var(--g-text-sub); line-height: 1.5; margin-bottom: ${reportLines.length > 0 ? "10px" : "0"};">Scanned <b>${totalCleanedFolders}</b> folder(s).<br>${totalOrphanFiles > 0 ? `Removed <b>${totalOrphanFiles}</b> orphan file(s) (${totalOrphanPids} items).` : "No orphan files found."}</div>`;
-                    if (reportLines.length > 0) {
-                        resultHtml += `<div style="max-height: 120px; overflow-y: auto; font-size: 12.5px; color: var(--g-text-muted); line-height: 1.5;">${reportLines.map(line => `<div style="padding: 2px 0;">${line}</div>`).join("")}</div>`;
-                    }
-                    clearCacheModalBody.innerHTML = resultHtml;
-
-                    // Show button group with only Done button (cancel button hidden)
-                    clearCacheBtnGroup.style.display = "flex";
-                    btnCancelClearCache.style.display = "none";
-                    btnConfirmClearCache.style.display = "inline-flex";
-                    btnConfirmClearCache.disabled = false;
-                    btnConfirmClearCache.textContent = "Done";
-
-                } catch (err) {
-                    console.error("Clear cache failed:", err);
-                    clearCacheModal.dataset.preventBackdropClose = "false";
-                    clearCacheStatusArea.style.display = "none";
-                    clearCacheModalBody.style.display = "block";
-                    clearCacheModalBody.innerHTML = `<span style="color: var(--g-danger);">Failed to clear cache: ${err.message || err}</span>`;
-                    clearCacheBtnGroup.style.display = "flex";
-                    btnCancelClearCache.style.display = "none";
-                    btnConfirmClearCache.style.display = "inline-flex";
-                    btnConfirmClearCache.disabled = false;
-                    btnConfirmClearCache.textContent = "OK";
-                }
-            });
-        }
 
         if (accountMenuItemLogout) {
-            accountMenuItemLogout.addEventListener("click", () => {
-                sessionStorage.clear();
-                window.location.href = './index.html';
+            accountMenuItemLogout.addEventListener("click", async () => {
+                SafeSession.clear();
+                await SafeSession.navigate('./index.html');
             });
         }
 
         function syncUserProfileUI() {
-            const username = sessionStorage.getItem("username") || "User";
-            const usrHsh = sessionStorage.getItem("userHash") || "";
+            const username = SafeSession.getItem("username") || "User";
+            const usrHsh = SafeSession.getItem("userHash") || "";
             const initial = (username.slice(0, 2) || "TE").toUpperCase();
 
             const headerAvatar = document.getElementById("headerAvatar");
