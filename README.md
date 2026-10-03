@@ -10,6 +10,7 @@ project WHY(Web Hub Yard): Media Hub
 - 텍스트, pdf, 이미지, 동영상의 재생을 지원합니다.
 - 제로 트러스트 구조라 동시성 제어가 없습니다. **같은 폴더에서는 각 사람의 업로드가 끝난 뒤에 사용하세요**
 - 미디어허브는 가벼운 미디어 감상용입니다. 별도의 백업 이용을 권장합니다.
+- **폴더 라이프사이클 관리**: 중앙 권한 서버가 없으므로 폴더별 "소유자(Owner)"를 정하고, 공유받은 참여자는 `Unlink(참조 해제)`를, 최종 소유자만 `Delete(영구 삭제)`를 사용해야 합니다.
 
 ## Usage
 
@@ -17,6 +18,7 @@ project WHY(Web Hub Yard): Media Hub
 - MediaHub supports views of text, pdf, image, and video.
 - System does not care about concurrency: **Each user must upload after other user's session is cleared.**
 - Focus of MediaHub is lightweight media share/watch. Making your own backup drive with other service is recommended.
+- **Folder Lifecycle Management**: Due to the absence of a central ACL server, designate a specific "Owner" per folder. Peers must use `Unlink`, and only the final owner should execute `Delete`.
 
 ## 주의사항
 
@@ -33,6 +35,18 @@ project WHY(Web Hub Yard): Media Hub
 - Uploading with browser limits file size to 2GiB. Use other clients(desktop/android) to large-scale upload.
 - There is some differences about following web standards among the browsers. Recommended is FireFox, but Chromium based are also good.
 - With private TLS certificate, you cannot use streaming in Chrome. Streaming is disabled for all WebKit browsers due to its limitation.
+
+---
+
+## Zero-Trust Operational Protocol
+
+Because MediaHub strictly operates under a client-side Zero-Knowledge / E2EE architecture, the backend server retains zero identity keys and does not enforce centralized Access Control Lists (ACL) to differentiate between an "owner" and a "shared peer".
+
+To prevent premature data destruction in a decentralized trust environment, all participants must adhere to the following operational lifecycle protocol:
+
+1. **Designated Ownership Model**: Establish a single designated **Owner** per shared folder by explicit mutual agreement among peers. The owner assumes operational responsibility for the folder's end-of-life cycle.
+2. **Peers Must Only `Unlink`**: When a peer no longer needs access to a shared folder, they must exclusively use **Unlink**. This cleanly drops the cryptographic key from their personal `userdata` without mutating backend storage or disrupting other peers.
+3. **Hard Deletion (`Delete`) by Owner Only**: The **Delete** operation permanently wipes physical encrypted blobs and directory structures on the host server. The designated owner should execute `Delete` only after verifying that all shared participants have unlinked and the folder has reached its final retirement.
 
 ---
 
