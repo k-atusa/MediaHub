@@ -76,7 +76,6 @@ func initEnv() {
 	// make directories
 	os.MkdirAll(filepath.Join(cfg.StorageDir, "users"), 0755)
 	os.MkdirAll(filepath.Join(cfg.StorageDir, "data"), 0755)
-	os.MkdirAll("./public", 0755)
 
 	// make certificate if not exists
 	certDir := filepath.Dir(cfg.CertFile)
@@ -94,6 +93,18 @@ func initEnv() {
 func postError(w http.ResponseWriter, error string, code int) {
 	time.Sleep(1500 * time.Millisecond)
 	http.Error(w, error, code)
+}
+
+// serve static files in public or embeddedFS
+func serveFrontend() http.Handler {
+	if info, err := os.Stat("./public"); err == nil && info.IsDir() {
+		return http.FileServer(http.Dir("./public"))
+	}
+	sub, err := fs.Sub(publicFS, "public")
+	if err != nil {
+		log.Fatalf("failed to initialize embedded filesystem: %v", err)
+	}
+	return http.FileServer(http.FS(sub))
 }
 
 // handles userdata
@@ -443,17 +454,6 @@ func makeCert(certOut string, keyOut string) {
 	pem.Encode(kFile, &pem.Block{Type: "EC PRIVATE KEY", Bytes: b})
 }
 
-func frontendHandler() http.Handler {
-	if info, err := os.Stat("./public"); err == nil && info.IsDir() {
-		return http.FileServer(http.Dir("./public"))
-	}
-	sub, err := fs.Sub(publicFS, "public")
-	if err != nil {
-		log.Fatalf("failed to initialize embedded filesystem: %v", err)
-	}
-	return http.FileServer(http.FS(sub))
-}
-
 func main() {
 	initEnv()
 
@@ -464,7 +464,7 @@ func main() {
 	mux.HandleFunc("/api/media/", serveMedia)
 	mux.HandleFunc("/api/notice", serveNotice)
 	mux.HandleFunc("/api/trim/", serveTrim)
-	mux.Handle("/", frontendHandler())
+	mux.Handle("/", serveFrontend())
 
 	// start server with TLS
 	log.Printf("Server is running on port %s", cfg.Port)
