@@ -8,13 +8,14 @@ const regMap = new Map();
 const cchMap = new Map();
 
 // cache map functions
-function cchGet(flPid, idx) {
+const cchGet = (flPid, idx) => {
     const k = `${flPid}_${idx}`;
     const entry = cchMap.get(k);
     if (entry) { entry.ts = Date.now(); return entry.dataPromise; }
     return null;
-}
-function cchSet(flPid, idx, dataPromise) {
+};
+
+const cchSet = (flPid, idx, dataPromise) => {
     const k = `${flPid}_${idx}`;
     cchMap.set(k, { dataPromise, ts: Date.now() });
     if (cchMap.size > CACHE_MAX) {
@@ -24,37 +25,38 @@ function cchSet(flPid, idx, dataPromise) {
         }
         if (oldKey) cchMap.delete(oldKey);
     }
-}
-function cchPurg(flPid) {
+};
+
+const cchPurg = (flPid) => {
     for (const k of [...cchMap.keys()]) {
         if (k.startsWith(flPid + '_')) cchMap.delete(k);
     }
-}
+};
 
-function hexToU8(hex) {
+const hexToU8 = (hex) => {
     const arr = new Uint8Array(hex.length / 2);
     for (let i = 0; i < arr.length; i++) arr[i] = parseInt(hex.substr(i * 2, 2), 16);
     return arr;
-}
+};
 
 // XOR counter into IV.
-function mkiv(gIV, count) {
+const mkiv = (gIV, count) => {
     const iv = new Uint8Array(gIV);
     const buf = new ArrayBuffer(8);
     new DataView(buf).setBigUint64(0, BigInt(count), true);
     const cb = new Uint8Array(buf);
     for (let i = 0; i < 8; i++) iv[4 + i] ^= cb[i];
     return iv;
-}
+};
 
-function vidMime(name) {
+const vidMime = (name) => {
     const ext = (name || '').split('.').pop().toLowerCase();
     const map = {
         mp4: 'video/mp4', webm: 'video/webm', mov: 'video/mp4', mkv: 'video/x-matroska',
         mp3: 'audio/mpeg', ogg: 'audio/ogg', wav: 'audio/wav', m4a: 'audio/mp4', aac: 'audio/aac', flac: 'audio/flac', opus: 'audio/opus'
     };
     return map[ext] || 'video/mp4';
-}
+};
 
 // Handle SW messages.
 self.addEventListener('message', async (e) => {
@@ -90,7 +92,7 @@ self.addEventListener('message', async (e) => {
     }
 });
 
-async function getInfo(flPid) {
+const getInfo = async (flPid) => {
     if (regMap.has(flPid)) return regMap.get(flPid);
 
     // Ask clients for key if missing.
@@ -128,7 +130,7 @@ self.addEventListener('fetch', (e) => {
     );
 });
 
-async function hndlStrm(req, fldId, flPid) {
+const hndlStrm = async (req, fldId, flPid) => {
     const rh = req.headers.get('Range');
     let origSize = 0;
     try {
@@ -250,7 +252,7 @@ async function hndlStrm(req, fldId, flPid) {
 }
 
 // Lazy-load globalIV from file header (first 12 bytes).
-async function ensureGIV(info, fldId, flPid) {
+const ensureGIV = async (info, fldId, flPid) => {
     if (info.gIV) return info.gIV;
     if (!info.gIVPromise) {
         info.gIVPromise = (async () => {
@@ -265,7 +267,7 @@ async function ensureGIV(info, fldId, flPid) {
 }
 
 // Fetch and decrypt chunk.
-async function fetchChk(info, fldId, flPid, chkIdx) {
+const fetchChk = async (info, fldId, flPid, chkIdx) => {
     const { origSize, cryptoKey } = info;
 
     // Ensure globalIV is loaded from file header.
