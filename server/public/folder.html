@@ -3646,6 +3646,7 @@
                         const btnNext = document.getElementById("btnNextPage");
                         if (btnNext) {
                             isInfiniteScrollLoading = true;
+                            window.isInfiniteScrollLoading = true;
                             if (infiniteScrollLoader) infiniteScrollLoader.style.display = "flex";
 
                             const prevCount = mediaGrid.children.length;
@@ -3658,6 +3659,7 @@
                                 if (mediaGrid.children.length > prevCount || elapsed >= 2500) {
                                     clearInterval(pollInterval);
                                     isInfiniteScrollLoading = false;
+                                    window.isInfiniteScrollLoading = false;
                                     if (infiniteScrollLoader) infiniteScrollLoader.style.display = "none";
                                 }
                             }, 40);
@@ -3891,6 +3893,8 @@
             if (isMobileView()) closeMobileSidebar();
             folderSelect.value = "";
             SafeSession.removeItem("oldFold");
+            SafeSession.removeItem("oldPage");
+            SafeSession.removeItem("lastViewedFile");
             updateFolderDisplay();
             syncRootFolderGrid();
             syncSidebarFolderList();

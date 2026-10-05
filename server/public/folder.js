@@ -441,6 +441,9 @@ document.getElementById("folderSelect").addEventListener("change", async (e) => 
     state.key = state.fldMap[state.name];
     const rawK = mask.XOR(state.key); state.id = getObjPid(rawK); rawK.fill(0);
     state.page = 1;
+    SafeSession.setItem("oldFold", state.name);
+    SafeSession.setItem("oldPage", 1);
+    SafeSession.removeItem("lastViewedFile");
     document.getElementById("btnDeleteFolder").classList.remove("hidden");
     await loadFld();
 });
@@ -589,6 +592,8 @@ async function openFileByName(name) {
                     SafeSession.setItem("currentFolderId", state.id);
                     SafeSession.setItem("currentFolderKey", toHex(rSK));
                     SafeSession.setItem("oldFold", state.name);
+                    SafeSession.setItem("oldPage", state.page);
+                    SafeSession.setItem("lastViewedFile", actualName);
                     rFK.fill(0); rSK.fill(0);
                     await SafeSession.navigate("./viewer.html");
                 }
@@ -603,6 +608,8 @@ async function openFileByName(name) {
     SafeSession.setItem("currentFolderId", state.id);
     SafeSession.setItem("currentFolderKey", toHex(rSK));
     SafeSession.setItem("oldFold", state.name);
+    SafeSession.setItem("oldPage", state.page);
+    SafeSession.setItem("lastViewedFile", actualName);
     rFK.fill(0); rSK.fill(0);
     await SafeSession.navigate("./viewer.html");
     return true;
@@ -610,8 +617,12 @@ async function openFileByName(name) {
 window.openFileByName = openFileByName;
 
 // Render files grid.
-async function showFls() {
-    const grid = document.getElementById("mediaGrid"); grid.innerHTML = "";
+async function showFls(isAppend = false) {
+    const isAppending = isAppend || window.isInfiniteScrollLoading === true;
+    const grid = document.getElementById("mediaGrid");
+    if (!isAppending) {
+        grid.innerHTML = "";
+    }
     let entries = Object.entries(state.flsMap);
 
     // Search query filtering (case-insensitive & NFC normalized for Korean/multilingual)
@@ -656,13 +667,17 @@ async function showFls() {
     }
 
     const total = Math.ceil(entries.length / state.limit) || 1;
+    if (state.page > total) state.page = total;
+    if (state.page < 1) state.page = 1;
+
     document.getElementById("pageIndicator").textContent = `${state.page} / ${total}`;
 
     // Save page state.
     SafeSession.setItem("oldPage", state.page);
 
-    const start = (state.page - 1) * state.limit;
-    for (const [name, fileKey] of entries.slice(start, start + state.limit)) {
+    const start = isAppending ? (state.page - 1) * state.limit : 0;
+    const end = Math.min(state.page * state.limit, entries.length);
+    for (const [name, fileKey] of entries.slice(start, end)) {
         const card = document.createElement("div"); card.className = "media-card";
         card.dataset.fileName = name;
         const img = document.createElement("img"); img.className = "thumb-img"; img.alt = "Loading...";
@@ -1386,8 +1401,8 @@ if (btnUnlinkFolder) {
 }
 
 // Handle pagination.
-document.getElementById("btnPrevPage").addEventListener("click", async () => { if (state.page > 1) { state.page--; await showFls(); } });
-document.getElementById("btnNextPage").addEventListener("click", async () => { if (state.page < Math.ceil(Object.keys(state.flsMap).length / state.limit)) { state.page++; await showFls(); } });
+document.getElementById("btnPrevPage").addEventListener("click", async () => { if (state.page > 1) { state.page--; await showFls(false); } });
+document.getElementById("btnNextPage").addEventListener("click", async () => { if (state.page < Math.ceil(Object.keys(state.flsMap).length / state.limit)) { state.page++; await showFls(true); } });
 // Trim orphan files in folder
 async function executeTrimFolder(rawFolderName) {
     const target = (rawFolderName || state.name || "").trim();
@@ -1578,6 +1593,7 @@ async function boot() {
             SafeSession.setItem("oldFold", matchingFolderName);
             SafeSession.setItem("oldPage", "1");
             document.getElementById("btnDeleteFolder").classList.remove("hidden");
+            if (window.updateFolderDisplay) window.updateFolderDisplay();
             await loadFld();
 
             if (targetFileName) {
@@ -1633,7 +1649,24 @@ async function boot() {
         const rawK = mask.XOR(state.key); state.id = getObjPid(rawK); rawK.fill(0);
         state.page = oldPage ? parseInt(oldPage, 10) : 1;
         document.getElementById("btnDeleteFolder").classList.remove("hidden");
+        if (window.updateFolderDisplay) window.updateFolderDisplay();
         await loadFld();
+
+        const lastViewed = SafeSession.getItem("lastViewedFile");
+        if (lastViewed) {
+            SafeSession.removeItem("lastViewedFile");
+            setTimeout(() => {
+                const targetCard = Array.from(document.querySelectorAll(".media-card")).find(c => c.dataset.fileName === lastViewed);
+                if (targetCard) {
+                    targetCard.scrollIntoView({ block: "center", behavior: "smooth" });
+                    targetCard.style.outline = "2px solid var(--g-primary-blue, #1a73e8)";
+                    targetCard.style.transition = "outline 0.5s ease";
+                    setTimeout(() => {
+                        targetCard.style.outline = "";
+                    }, 1500);
+                }
+            }, 100);
+        }
     }
 }
 boot();
