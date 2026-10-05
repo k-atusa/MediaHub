@@ -234,7 +234,7 @@ async function hndlStrm(req, fldId, flPid) {
                 'Content-Length': len.toString(),
                 'Content-Range': `bytes ${rStart}-${rEnd}/${origSize}`,
                 'Accept-Ranges': 'bytes',
-                'Cache-Control': 'no-store, no-cache, must-revalidate'
+                'Cache-Control': 'no-cache'
             }
         });
     } catch (err) {

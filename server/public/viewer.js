@@ -7,8 +7,8 @@ const mask = new Masker();
 
 await SafeSession.init();
 
-// Option: Disable ServiceWorker for WebKit (Safari).
-const OPT_NOSW_WEBKIT = true;
+// Option: Disable ServiceWorker for WebKit (Safari). Set to false to allow on-the-fly streaming on WebKit.
+const OPT_NOSW_WEBKIT = false;
 
 const SERVER = window.location.origin;
 const fromHex = (hex) => new Uint8Array(hex.match(/.{1,2}/g).map(b => parseInt(b, 16)));
@@ -86,7 +86,7 @@ function escapeHtml(str) {
 
 
 
-function renderAudioPlayer(srcUrl, body) {
+function renderAudioPlayer(srcUrl, body, onError) {
     body.innerHTML = `
         <div class="audio-player-card">
             <div class="audio-hero-icon-box">
@@ -97,6 +97,14 @@ function renderAudioPlayer(srcUrl, body) {
             <audio controls autoplay class="audio-element" id="audioPlayer" src="${srcUrl}"></audio>
         </div>
     `;
+    if (onError) {
+        const audio = body.querySelector('#audioPlayer');
+        if (audio) {
+            audio.addEventListener('error', () => {
+                onError(audio.error ? `Code ${audio.error.code}: ${audio.error.message}` : 'Audio playback error');
+            });
+        }
+    }
 }
 
 function getUnsupportedIcon(filename) {
@@ -223,16 +231,28 @@ async function start() {
     if (kind === 'video' || kind === 'audio') {
         const isWebkit = /AppleWebKit/i.test(navigator.userAgent) && (!/Chrome/i.test(navigator.userAgent) || /CriOS/i.test(navigator.userAgent));
         if (OPT_NOSW_WEBKIT && isWebkit) {
-            console.log("WebKit detected. Fallback to full down.");
+            console.log("WebKit forced fallback to full down.");
             await fullDown(flPid, body);
             return;
         }
 
         body.innerHTML = `<p style="color:var(--preview-subtext);font-size:13px;margin:20px 0">Preparing ${kind} stream…</p>`;
         try {
-            const reg = await navigator.serviceWorker.register('./sw.js?v=2.3', { updateViaCache: 'none' });
+            const reg = await navigator.serviceWorker.register('./sw.js?v=2.4', { updateViaCache: 'none' });
             try { await reg.update(); } catch (_) {}
             await navigator.serviceWorker.ready;
+
+            // Ensure Service Worker is controlling the page before requesting media
+            if (!navigator.serviceWorker.controller) {
+                await new Promise((resolve) => {
+                    const onControllerChange = () => {
+                        navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+                        resolve();
+                    };
+                    navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+                    setTimeout(resolve, 500);
+                });
+            }
 
             const rawKey = mask.XOR(flKey);
             const keyHex = toHex(rawKey);
@@ -270,10 +290,19 @@ async function start() {
             });
             await ack;
 
+            // Graceful fallback helper in case media element fails to play SW stream
+            let fallbackTriggered = false;
+            const fallbackToFullDown = async (reason) => {
+                if (fallbackTriggered) return;
+                fallbackTriggered = true;
+                console.warn(`SW stream playback failed (${reason}). Falling back to full download...`);
+                await fullDown(flPid, body);
+            };
+
             // Set media player source.
             body.innerHTML = '';
             if (kind === 'audio') {
-                renderAudioPlayer(`/sw-stream/${fldId}/${flPid}`, body);
+                renderAudioPlayer(`/sw-stream/${fldId}/${flPid}`, body, fallbackToFullDown);
             } else {
                 const v = document.createElement('video');
                 v.controls = true;
@@ -282,6 +311,11 @@ async function start() {
                 v.preload = 'metadata';
                 v.style.width = '100%';
                 v.src = `/sw-stream/${fldId}/${flPid}`;
+
+                v.addEventListener('error', () => {
+                    fallbackToFullDown(v.error ? `Code ${v.error.code}: ${v.error.message}` : "Video playback error");
+                });
+
                 body.appendChild(v);
             }
         } catch (err) {
