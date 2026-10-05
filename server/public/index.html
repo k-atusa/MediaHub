@@ -37,6 +37,7 @@
             --g-border-card: #c4c7c5;
             --g-primary-blue: #0b57d0;
             --g-primary-hover: #0842a0;
+            --g-danger: #b3261e;
             --g-text-main: #1f1f1f;
             --g-text-sub: #444746;
             --g-card-shadow: rgba(60, 64, 67, 0.1);
@@ -51,6 +52,7 @@
                 --g-border-card: #444746;
                 --g-primary-blue: #a8c7fa;
                 --g-primary-hover: #d3e3fd;
+                --g-danger: #f2b8b5;
                 --g-text-main: #e3e3e3;
                 --g-text-sub: #c4c7c5;
                 --g-card-shadow: rgba(0, 0, 0, 0.5);
@@ -65,6 +67,7 @@
             --g-border-card: #444746;
             --g-primary-blue: #a8c7fa;
             --g-primary-hover: #d3e3fd;
+            --g-danger: #f2b8b5;
             --g-text-main: #e3e3e3;
             --g-text-sub: #c4c7c5;
             --g-card-shadow: rgba(0, 0, 0, 0.5);
@@ -78,6 +81,7 @@
             --g-border-card: #c4c7c5;
             --g-primary-blue: #0b57d0;
             --g-primary-hover: #0842a0;
+            --g-danger: #b3261e;
             --g-text-main: #1f1f1f;
             --g-text-sub: #444746;
             --g-card-shadow: rgba(60, 64, 67, 0.1);
@@ -422,15 +426,15 @@
         </div>
     </main>
 
-    <!-- Notice Dialog -->
+    <!-- Notice Dialog (Material You Dialog) -->
     <dialog id="noticeModal">
         <div class="dialog-title">
-            <span class="material-symbols-outlined" style="color: var(--g-primary-blue);">campaign</span>
-            <span>Notice</span>
+            <span class="material-symbols-outlined" id="noticeIcon" style="color: var(--g-primary-blue);">campaign</span>
+            <span id="noticeTitle">Notice</span>
         </div>
         <div id="noticeText" class="dialog-body"></div>
         <div class="dialog-actions">
-            <button id="btnConfirmNotice" class="btn-dialog-primary">OK</button>
+            <button id="btnConfirmNotice" class="btn-dialog-primary" type="button">OK</button>
         </div>
     </dialog>
 
@@ -497,6 +501,75 @@
             }
         });
         updateThemeUI();
+
+        // Material You Dialog Helpers
+        window.showNotice = function (msg, title = "Notice", icon = "campaign") {
+            const modal = document.getElementById("noticeModal");
+            if (!modal) {
+                return Promise.resolve();
+            }
+            const textEl = document.getElementById("noticeText");
+            const titleEl = document.getElementById("noticeTitle");
+            const iconEl = document.getElementById("noticeIcon");
+            const btn = document.getElementById("btnConfirmNotice");
+
+            if (textEl) textEl.textContent = msg;
+            if (titleEl) titleEl.textContent = title;
+            if (iconEl) {
+                iconEl.textContent = icon;
+                if (icon === "error" || icon === "delete") {
+                    iconEl.style.color = "var(--g-danger, #b3261e)";
+                } else if (icon === "warning") {
+                    iconEl.style.color = "#ea8600";
+                } else if (icon === "check_circle" || icon === "check") {
+                    iconEl.style.color = "#137333";
+                } else {
+                    iconEl.style.color = "var(--g-primary-blue, #0b57d0)";
+                }
+            }
+
+            modal.showModal();
+            return new Promise(resolve => {
+                const handler = () => {
+                    btn.removeEventListener("click", handler);
+                    modal.close();
+                    resolve();
+                };
+                btn.addEventListener("click", handler);
+                modal.addEventListener("close", () => {
+                    btn.removeEventListener("click", handler);
+                    resolve();
+                }, { once: true });
+            });
+        };
+
+        window.alert = (msg) => {
+            let title = "Notice";
+            let icon = "campaign";
+            if (typeof msg === "string") {
+                if (msg.includes("❌") || msg.toLowerCase().includes("fail") || msg.toLowerCase().includes("error") || msg.toLowerCase().includes("invalid")) {
+                    title = "Error";
+                    icon = "error";
+                } else if (msg.includes("⚠️") || msg.toLowerCase().includes("warning") || msg.toLowerCase().includes("fill")) {
+                    title = "Notice";
+                    icon = "warning";
+                } else if (msg.includes("✅") || msg.toLowerCase().includes("success")) {
+                    title = "Success";
+                    icon = "check_circle";
+                }
+            }
+            return window.showNotice(msg, title, icon);
+        };
+
+        // Backdrop click close for all dialogs
+        document.querySelectorAll("dialog").forEach(dialog => {
+            dialog.addEventListener("click", (e) => {
+                const rect = dialog.getBoundingClientRect();
+                const isInDialog = (rect.top <= e.clientY && e.clientY <= rect.top + rect.height
+                    && rect.left <= e.clientX && e.clientX <= rect.left + rect.width);
+                if (!isInDialog) dialog.close();
+            });
+        });
     </script>
 
     <script type="module" src="./login.js"></script>
