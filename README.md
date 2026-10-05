@@ -26,7 +26,7 @@ project WHY(Web Hub Yard): Media Hub
 - 동영상의 경우 전체 다운로드 대신 실시간 스트리밍을 사용합니다.
 - 브라우저 상에서의 업로드는 파일 크기가 2GiB로 제한됩니다. 대량 업로드는 다른 클라이언트(데스크탑/안드로이드)를 사용하십시오.
 - 브라우저 간 웹 표준 준수 호환성이 다릅니다. 파이어폭스 사용을 권장하지만 크로미움 기반 브라우저도 괜찮습니다.
-- 사설 TLS 인증서를 사용한다면 크롬에서 동영상 스트리밍을 할 수 없습니다. 애플 WebKit 기반의 모든 브라우저는 스트리밍을 할 수 없습니다.
+- 사설 TLS 인증서를 사용한다면 크롬에서 동영상 스트리밍을 할 수 없습니다.
 
 ## Limitation
 
@@ -34,7 +34,7 @@ project WHY(Web Hub Yard): Media Hub
 - For video, it uses real-time streaming. Still, buffering can take time several seconds.
 - Uploading with browser limits file size to 2GiB. Use other clients(desktop/android) to large-scale upload.
 - There is some differences about following web standards among the browsers. Recommended is FireFox, but Chromium based are also good.
-- With private TLS certificate, you cannot use streaming in Chrome. Streaming is disabled for all WebKit browsers due to its limitation.
+- With private TLS certificate, you cannot use streaming in Chrome.
 
 ---
 
