@@ -7,9 +7,6 @@ const mask = new Masker();
 
 await SafeSession.init();
 
-// Option: Disable ServiceWorker for WebKit (Safari).
-const OPT_NOSW_WEBKIT = true;
-
 const SERVER = window.location.origin;
 const fromHex = (hex) => new Uint8Array(hex.match(/.{1,2}/g).map(b => parseInt(b, 16)));
 const toHex = (buf) => Array.from(buf).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -72,21 +69,21 @@ const TEXT_EXTS = [
     'readme', 'license', 'makefile', 'dockerfile'
 ];
 
-function formatBytes(bytes) {
+const formatBytes = (bytes) => {
     if (bytes === undefined || bytes === null || isNaN(bytes) || bytes === 0) return "0 B";
     const k = 1024;
     const sizes = ["B", "KB", "MB", "GB", "TB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return (bytes / Math.pow(k, i)).toFixed(i === 0 ? 0 : 1) + " " + sizes[i];
-}
+};
 
-function escapeHtml(str) {
+const escapeHtml = (str) => {
     return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
+};
 
 
 
-function renderAudioPlayer(srcUrl, body) {
+const renderAudioPlayer = (srcUrl, body, onError) => {
     body.innerHTML = `
         <div class="audio-player-card">
             <div class="audio-hero-icon-box">
@@ -97,9 +94,17 @@ function renderAudioPlayer(srcUrl, body) {
             <audio controls autoplay class="audio-element" id="audioPlayer" src="${srcUrl}"></audio>
         </div>
     `;
-}
+    if (onError) {
+        const audio = body.querySelector('#audioPlayer');
+        if (audio) {
+            audio.addEventListener('error', () => {
+                onError(audio.error ? `Code ${audio.error.code}: ${audio.error.message}` : 'Audio playback error');
+            });
+        }
+    }
+};
 
-function getUnsupportedIcon(filename) {
+const getUnsupportedIcon = (filename) => {
     const ext = ((filename || '').split('.').pop() || '').toLowerCase();
     if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz'].includes(ext)) return 'folder_zip';
     if (['exe', 'dmg', 'iso', 'bin', 'apk', 'app', 'msi', 'deb', 'rpm'].includes(ext)) return 'deployed_code';
@@ -108,10 +113,10 @@ function getUnsupportedIcon(filename) {
     if (['ppt', 'pptx', 'odp'].includes(ext)) return 'slideshow';
     if (['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac', 'wma'].includes(ext)) return 'audiotrack';
     return 'draft';
-}
+};
 
 // Get media type by ext.
-function getKind(name) {
+const getKind = (name) => {
     const ext = ((name || '').split('.').pop() || '').toLowerCase();
     if (VIDEO_EXTS.includes(ext)) return 'video';
     if (AUDIO_EXTS.includes(ext)) return 'audio';
@@ -119,9 +124,9 @@ function getKind(name) {
     if (PDF_EXTS.includes(ext)) return 'pdf';
     if (TEXT_EXTS.includes(ext)) return 'text';
     return 'unsupported';
-}
+};
 
-function getMime(name) {
+const getMime = (name) => {
     const ext = ((name || '').split('.').pop() || '').toLowerCase();
     const mimeMap = {
         'pdf': 'application/pdf',
@@ -175,9 +180,9 @@ function getMime(name) {
         'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
     };
     return mimeMap[ext] || 'application/octet-stream';
-}
+};
 
-function renderUnsupported(body) {
+const renderUnsupported = (body) => {
     const icon = getUnsupportedIcon(flName);
     const sizeStr = origSize > 0 ? formatBytes(origSize) : '';
     body.innerHTML = `
@@ -200,12 +205,12 @@ function renderUnsupported(body) {
 
     const btn = document.getElementById("btnUnsupportedDownload");
     if (btn) {
-        btn.addEventListener("click", downFl);
+        btn.addEventListener("click", () => downFl());
     }
-}
+};
 
 // Load and render file.
-async function start() {
+const start = async () => {
     const rawFK = mask.XOR(flKey);
     const flPid = getObjPid(rawFK);
     rawFK.fill(0);
@@ -221,18 +226,23 @@ async function start() {
 
     // Video & Audio: Stream via SW.
     if (kind === 'video' || kind === 'audio') {
-        const isWebkit = /AppleWebKit/i.test(navigator.userAgent) && (!/Chrome/i.test(navigator.userAgent) || /CriOS/i.test(navigator.userAgent));
-        if (OPT_NOSW_WEBKIT && isWebkit) {
-            console.log("WebKit detected. Fallback to full down.");
-            await fullDown(flPid, body);
-            return;
-        }
-
         body.innerHTML = `<p style="color:var(--preview-subtext);font-size:13px;margin:20px 0">Preparing ${kind} stream…</p>`;
         try {
-            const reg = await navigator.serviceWorker.register('./sw.js?v=2.3', { updateViaCache: 'none' });
-            try { await reg.update(); } catch (_) {}
+            const reg = await navigator.serviceWorker.register('./sw.js?v=2.4', { updateViaCache: 'none' });
+            try { await reg.update(); } catch (_) { }
             await navigator.serviceWorker.ready;
+
+            // Ensure Service Worker is controlling the page before requesting media
+            if (!navigator.serviceWorker.controller) {
+                await new Promise((resolve) => {
+                    const onControllerChange = () => {
+                        navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+                        resolve();
+                    };
+                    navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+                    setTimeout(resolve, 500);
+                });
+            }
 
             const rawKey = mask.XOR(flKey);
             const keyHex = toHex(rawKey);
@@ -270,10 +280,19 @@ async function start() {
             });
             await ack;
 
+            // Graceful fallback helper in case media element fails to play SW stream
+            let fallbackTriggered = false;
+            const fallbackToFullDown = async (reason) => {
+                if (fallbackTriggered) return;
+                fallbackTriggered = true;
+                console.warn(`SW stream playback failed (${reason}). Falling back to full download...`);
+                await fullDown(flPid, body);
+            };
+
             // Set media player source.
             body.innerHTML = '';
             if (kind === 'audio') {
-                renderAudioPlayer(`/sw-stream/${fldId}/${flPid}`, body);
+                renderAudioPlayer(`/sw-stream/${fldId}/${flPid}`, body, fallbackToFullDown);
             } else {
                 const v = document.createElement('video');
                 v.controls = true;
@@ -282,6 +301,11 @@ async function start() {
                 v.preload = 'metadata';
                 v.style.width = '100%';
                 v.src = `/sw-stream/${fldId}/${flPid}`;
+
+                v.addEventListener('error', () => {
+                    fallbackToFullDown(v.error ? `Code ${v.error.code}: ${v.error.message}` : "Video playback error");
+                });
+
                 body.appendChild(v);
             }
         } catch (err) {
@@ -296,7 +320,7 @@ async function start() {
 }
 
 // Download file directly.
-async function fullDown(flPid, body) {
+const fullDown = async (flPid, body) => {
     // Get total file size.
     const head = await fetch(`${SERVER}/api/media/${fldId}/${flPid}/dat`, {
         headers: { 'Range': 'bytes=0-0' }
@@ -366,7 +390,7 @@ async function fullDown(flPid, body) {
 }
 
 // Rename current file.
-async function performRename(newNm) {
+const performRename = async (newNm) => {
     const rawNewNm = (newNm || "").trim();
     if (!rawNewNm) {
         if (window.showNotice) window.showNotice("⚠️ File name cannot be empty", "Notice", "warning");
@@ -429,7 +453,7 @@ async function performRename(newNm) {
     }
 }
 
-function openRenameModal() {
+const openRenameModal = () => {
     const modal = document.getElementById("renameFileModal");
     const input = document.getElementById("modalRenameFileInput");
     const errText = document.getElementById("renameFileErrorText");
@@ -459,7 +483,7 @@ function openRenameModal() {
 }
 
 // Save decrypted file.
-async function downFl() {
+const downFl = async () => {
     // If not decrypted into rawBuf yet (e.g. video streaming or unsupported preview):
     if (!rawBuf) {
         const rawFK = mask.XOR(flKey);
@@ -518,8 +542,35 @@ async function downFl() {
     a.download = flName; a.click();
 }
 
+const executeDelete = async () => {
+    try {
+        const rawFK = mask.XOR(flKey);
+        const flPid = getObjPid(rawFK);
+        rawFK.fill(0);
+        await fetch(`${SERVER}/api/media/${fldId}/${flPid}/dat`, { method: "DELETE" });
+        await fetch(`${SERVER}/api/media/${fldId}/${flPid}/thumb`, { method: "DELETE" });
+        const res = await fetch(`${SERVER}/api/storage/${fldId}/names`);
+        const rawSK = mask.XOR(fldKey);
+        const sm = new SymMaster("gcm1", rawSK.slice(0, 32));
+        rawSK.fill(0);
+        const dec = await sm.DeBin(new Uint8Array(await res.arrayBuffer()));
+        const flsMap = DecodeCfg(dec);
+        dec.fill(0);
+        if (flsMap[flName]?.fill) flsMap[flName].fill(0);
+        delete flsMap[flName];
+        const encoded = EncodeCfg(flsMap);
+        for (const v of Object.values(flsMap)) if (v?.fill) v.fill(0);
+        await fetch(`${SERVER}/api/storage/${fldId}/names`, { method: "POST", body: await sm.EnBin(encoded) });
+        encoded.fill(0);
+        window.location.href = "./folder.html";
+    } catch (e) {
+        if (window.showNotice) window.showNotice("❌ Delete failed", "Error", "error");
+        else alert("❌ Delete failed");
+    }
+};
+
 // Delete file and metadata.
-function delFl() {
+const delFl = () => {
     const modal = document.getElementById("deleteFileModal");
     if (!modal) {
         if (!confirm("Delete this file?")) return;
@@ -554,44 +605,17 @@ function delFl() {
     modal.addEventListener("close", cleanup, { once: true });
     btnConfirm.addEventListener("click", onConfirm);
     btnCancel.addEventListener("click", onCancel);
-}
-
-async function executeDelete() {
-    try {
-        const rawFK = mask.XOR(flKey);
-        const flPid = getObjPid(rawFK);
-        rawFK.fill(0);
-        await fetch(`${SERVER}/api/media/${fldId}/${flPid}/dat`, { method: "DELETE" });
-        await fetch(`${SERVER}/api/media/${fldId}/${flPid}/thumb`, { method: "DELETE" });
-        const res = await fetch(`${SERVER}/api/storage/${fldId}/names`);
-        const rawSK = mask.XOR(fldKey);
-        const sm = new SymMaster("gcm1", rawSK.slice(0, 32));
-        rawSK.fill(0);
-        const dec = await sm.DeBin(new Uint8Array(await res.arrayBuffer()));
-        const flsMap = DecodeCfg(dec);
-        dec.fill(0);
-        if (flsMap[flName]?.fill) flsMap[flName].fill(0);
-        delete flsMap[flName];
-        const encoded = EncodeCfg(flsMap);
-        for (const v of Object.values(flsMap)) if (v?.fill) v.fill(0);
-        await fetch(`${SERVER}/api/storage/${fldId}/names`, { method: "POST", body: await sm.EnBin(encoded) });
-        encoded.fill(0);
-        window.location.href = "./folder.html";
-    } catch (e) {
-        if (window.showNotice) window.showNotice("❌ Delete failed", "Error", "error");
-        else alert("❌ Delete failed");
-    }
-}
+};
 
 // Render decrypted content.
-function render(buf, body) {
+const render = (buf, body) => {
     const url = URL.createObjectURL(new Blob([buf], { type: getMime(flName) }));
     const kind = getKind(flName);
     body.innerHTML = "";
 
     // Clean up any existing Viewer.js instance
     if (window.currentViewer) {
-        try { window.currentViewer.destroy(); } catch (e) {}
+        try { window.currentViewer.destroy(); } catch (e) { }
         window.currentViewer = null;
     }
 
@@ -663,14 +687,14 @@ function render(buf, body) {
     }
 }
 
-async function shareFl() {
+const shareFl = async () => {
     if (!fldId || !flKey) return;
     let fileParam = flName;
     try {
         const rawFK = mask.XOR(flKey);
         fileParam = getObjPid(rawFK);
         rawFK.fill(0);
-    } catch (_) {}
+    } catch (_) { }
     const shareUrl = `${window.location.origin}/folder.html?folder=${encodeURIComponent(fldId)}&file=${encodeURIComponent(fileParam)}`;
     try {
         await navigator.clipboard.writeText(shareUrl);
@@ -702,7 +726,16 @@ async function shareFl() {
 const btnViewerMore = document.getElementById("btnViewerMore");
 const viewerActionMenu = document.getElementById("viewerActionMenu");
 
-function openViewerMenu(e) {
+const closeViewerMenu = () => {
+    if (!viewerActionMenu) return;
+    viewerActionMenu.classList.remove("open");
+    viewerActionMenu.style.display = "none";
+    if (btnViewerMore) {
+        btnViewerMore.classList.remove("open");
+    }
+};
+
+const openViewerMenu = (e) => {
     if (!viewerActionMenu || !btnViewerMore) return;
     if (viewerActionMenu.classList.contains("open")) {
         closeViewerMenu();
@@ -731,16 +764,7 @@ function openViewerMenu(e) {
     viewerActionMenu.style.top = `${top}px`;
     viewerActionMenu.style.visibility = "";
     viewerActionMenu.classList.add("open");
-}
-
-function closeViewerMenu() {
-    if (!viewerActionMenu) return;
-    viewerActionMenu.classList.remove("open");
-    viewerActionMenu.style.display = "none";
-    if (btnViewerMore) {
-        btnViewerMore.classList.remove("open");
-    }
-}
+};
 
 if (btnViewerMore) {
     btnViewerMore.addEventListener("click", (e) => {
@@ -833,7 +857,7 @@ document.getElementById("btnDown")?.addEventListener("click", downFl);
 document.getElementById("btnDelete")?.addEventListener("click", delFl);
 
 // Setup prev/next navigation.
-async function setNav() {
+const setNav = async () => {
     try {
         const res = await fetch(`${SERVER}/api/storage/${fldId}/names`);
         if (res.status === 404) return;

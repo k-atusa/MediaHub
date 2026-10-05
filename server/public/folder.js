@@ -51,7 +51,7 @@ class FileSrc {
 }
 
 // Save map to server.
-async function saveUsr() {
+const saveUsr = async () => {
     const rawUK = mask.XOR(usrKey);
     const sm = new SymMaster("gcm1", rawUK);
     rawUK.fill(0);
@@ -69,7 +69,7 @@ async function saveUsr() {
 window.syncCanonicalFolderNames = () => { };
 
 // Load map from server.
-async function loadUsr() {
+const loadUsr = async () => {
     const res = await fetch(`${SERVER}/api/userdata/${usrHsh}`);
     if (res.status === 404) return;
     const rawUK = mask.XOR(usrKey);
@@ -83,7 +83,7 @@ async function loadUsr() {
 }
 
 // Render folder list.
-function showFld() {
+const showFld = () => {
     const select = document.getElementById("folderSelect");
     select.innerHTML = '<option value="">-- Folder --</option>';
     Object.keys(state.fldMap).forEach(name => {
@@ -110,7 +110,7 @@ document.getElementById("btnCreateFolder").addEventListener("click", async () =>
 });
 
 // Rename folder implementation
-async function doRenameFolder(rawOldName, rawNewName) {
+const doRenameFolder = async (rawOldName, rawNewName) => {
     const oldName = (rawOldName || "").trim();
     const newName = (rawNewName || "").trim();
 
@@ -200,7 +200,7 @@ if (btnRenameFolder) {
     });
 }
 
-function promptSharePassword() {
+const promptSharePassword = () => {
     return new Promise((resolve) => {
         const modal = document.getElementById("importShareModal");
         if (!modal) {
@@ -259,7 +259,7 @@ function promptSharePassword() {
     });
 }
 
-function showConfirmModal(msg, title = "Confirm", icon = "help", confirmText = "Confirm", isDanger = false) {
+const showConfirmModal = (msg, title = "Confirm", icon = "help", confirmText = "Confirm", isDanger = false) => {
     return new Promise((resolve) => {
         const modal = document.getElementById("confirmModal");
         if (!modal) {
@@ -441,12 +441,15 @@ document.getElementById("folderSelect").addEventListener("change", async (e) => 
     state.key = state.fldMap[state.name];
     const rawK = mask.XOR(state.key); state.id = getObjPid(rawK); rawK.fill(0);
     state.page = 1;
+    SafeSession.setItem("oldFold", state.name);
+    SafeSession.setItem("oldPage", 1);
+    SafeSession.removeItem("lastViewedFile");
     document.getElementById("btnDeleteFolder").classList.remove("hidden");
     await loadFld();
 });
 
 // Fetch folder files.
-async function loadFld() {
+const loadFld = async () => {
     keywordsBuilt = false;
     selectKeywords.clear();
     document.getElementById("uploadContainer").classList.remove("hidden");
@@ -468,7 +471,7 @@ async function loadFld() {
 }
 
 // Helper to extract file size from masked flInfo
-function getEntrySize(flKeyMasked) {
+const getEntrySize = (flKeyMasked) => {
     if (!flKeyMasked) return 0;
     const raw = mask.XOR(flKeyMasked);
     let sz = 0;
@@ -489,7 +492,7 @@ const keywordCounts = {};
 const selectKeywords = new Set();
 const tokenCache = new Map();
 
-function extractTokens(nameOnly) {
+const extractTokens = (nameOnly) => {
     const tokens = [];
     const lower = (nameOnly || "").normalize('NFC').toLowerCase();
 
@@ -509,7 +512,7 @@ function extractTokens(nameOnly) {
     return tokens;
 }
 
-function isValidKeyword(token) {
+const isValidKeyword = (token) => {
     let byteLen = 0;
     for (let i = 0; i < token.length; i++) {
         const code = token.charCodeAt(i);
@@ -527,7 +530,7 @@ function isValidKeyword(token) {
     return false;
 }
 
-function buildKeywords() {
+const buildKeywords = () => {
     availKeywords.length = 0;
     Object.keys(keywordCounts).forEach(k => delete keywordCounts[k]);
     tokenCache.clear();
@@ -566,7 +569,7 @@ function buildKeywords() {
 }
 
 // Open file in viewer
-async function openFileByName(name) {
+const openFileByName = async (name) => {
     if (!state.flsMap || !state.key) return false;
     let targetKey = state.flsMap[name];
     let actualName = name;
@@ -589,6 +592,8 @@ async function openFileByName(name) {
                     SafeSession.setItem("currentFolderId", state.id);
                     SafeSession.setItem("currentFolderKey", toHex(rSK));
                     SafeSession.setItem("oldFold", state.name);
+                    SafeSession.setItem("oldPage", state.page);
+                    SafeSession.setItem("lastViewedFile", actualName);
                     rFK.fill(0); rSK.fill(0);
                     await SafeSession.navigate("./viewer.html");
                 }
@@ -603,6 +608,8 @@ async function openFileByName(name) {
     SafeSession.setItem("currentFolderId", state.id);
     SafeSession.setItem("currentFolderKey", toHex(rSK));
     SafeSession.setItem("oldFold", state.name);
+    SafeSession.setItem("oldPage", state.page);
+    SafeSession.setItem("lastViewedFile", actualName);
     rFK.fill(0); rSK.fill(0);
     await SafeSession.navigate("./viewer.html");
     return true;
@@ -610,8 +617,12 @@ async function openFileByName(name) {
 window.openFileByName = openFileByName;
 
 // Render files grid.
-async function showFls() {
-    const grid = document.getElementById("mediaGrid"); grid.innerHTML = "";
+const showFls = async (isAppend = false) => {
+    const isAppending = isAppend || window.isInfiniteScrollLoading === true;
+    const grid = document.getElementById("mediaGrid");
+    if (!isAppending) {
+        grid.innerHTML = "";
+    }
     let entries = Object.entries(state.flsMap);
 
     // Search query filtering (case-insensitive & NFC normalized for Korean/multilingual)
@@ -656,13 +667,17 @@ async function showFls() {
     }
 
     const total = Math.ceil(entries.length / state.limit) || 1;
+    if (state.page > total) state.page = total;
+    if (state.page < 1) state.page = 1;
+
     document.getElementById("pageIndicator").textContent = `${state.page} / ${total}`;
 
     // Save page state.
     SafeSession.setItem("oldPage", state.page);
 
-    const start = (state.page - 1) * state.limit;
-    for (const [name, fileKey] of entries.slice(start, start + state.limit)) {
+    const start = isAppending ? (state.page - 1) * state.limit : 0;
+    const end = Math.min(state.page * state.limit, entries.length);
+    for (const [name, fileKey] of entries.slice(start, end)) {
         const card = document.createElement("div"); card.className = "media-card";
         card.dataset.fileName = name;
         const img = document.createElement("img"); img.className = "thumb-img"; img.alt = "Loading...";
@@ -701,7 +716,7 @@ async function showFls() {
 }
 
 // Rename file implementation
-async function renameFile(rawOldName, rawNewName) {
+const renameFile = async (rawOldName, rawNewName) => {
     const oldName = (rawOldName || "").trim();
     const newName = (rawNewName || "").trim();
 
@@ -766,7 +781,7 @@ async function renameFile(rawOldName, rawNewName) {
 }
 window.renameFile = renameFile;
 // Share file link
-async function shareFile(fileName) {
+const shareFile = async (fileName) => {
     const targetFile = (fileName || "").trim();
     if (!state.id || !targetFile) return;
 
@@ -812,7 +827,7 @@ async function shareFile(fileName) {
 window.shareFile = shareFile;
 
 // Download decrypted file directly from folder list
-async function downloadFileDirectly(fileName) {
+const downloadFileDirectly = async (fileName) => {
     const targetFile = (fileName || "").trim();
     const fileKey = state.flsMap[targetFile];
     if (!fileKey) return;
@@ -897,7 +912,7 @@ async function downloadFileDirectly(fileName) {
 window.downloadFile = downloadFileDirectly;
 
 // Delete file implementation
-async function deleteFile(fileName) {
+const deleteFile = async (fileName) => {
     const targetFile = (fileName || "").trim();
     if (!targetFile || !state.flsMap[targetFile]) return;
 
@@ -1034,7 +1049,7 @@ if (searchInputEl) {
 }
 
 // Fetch thumb file.
-async function loadThm(filePid, ext, imgEl, fileKeyRaw) {
+const loadThm = async (filePid, ext, imgEl, fileKeyRaw) => {
     const res = await fetch(`${SERVER}/api/media/${state.id}/${filePid}/thumb`);
     if (res.status === 404) {
         imgEl.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='%23333'><rect width='24' height='24' rx='2'/><text x='50%' y='60%' font-family='sans-serif' font-size='5' font-weight='bold' fill='%23aaa' text-anchor='middle'>" + ext + "</text></svg>";
@@ -1266,7 +1281,7 @@ document.getElementById("btnUpload").addEventListener("click", async () => {
 });
 
 // Unlink folder (참조 해제 - remove from this user's account only)
-async function executeUnlinkFolder(rawFolderName) {
+const executeUnlinkFolder = async (rawFolderName) => {
     const target = (rawFolderName || state.name || "").trim();
     if (!target) return;
 
@@ -1310,7 +1325,7 @@ async function executeUnlinkFolder(rawFolderName) {
 window.unlinkFolder = executeUnlinkFolder;
 
 // Permanently delete folder from server (영구 삭제)
-async function executeDeleteFolder(rawFolderName) {
+const executeDeleteFolder = async (rawFolderName) => {
     const target = (rawFolderName || state.name || "").trim();
     if (!target) return;
 
@@ -1386,10 +1401,10 @@ if (btnUnlinkFolder) {
 }
 
 // Handle pagination.
-document.getElementById("btnPrevPage").addEventListener("click", async () => { if (state.page > 1) { state.page--; await showFls(); } });
-document.getElementById("btnNextPage").addEventListener("click", async () => { if (state.page < Math.ceil(Object.keys(state.flsMap).length / state.limit)) { state.page++; await showFls(); } });
+document.getElementById("btnPrevPage").addEventListener("click", async () => { if (state.page > 1) { state.page--; await showFls(false); } });
+document.getElementById("btnNextPage").addEventListener("click", async () => { if (state.page < Math.ceil(Object.keys(state.flsMap).length / state.limit)) { state.page++; await showFls(true); } });
 // Trim orphan files in folder
-async function executeTrimFolder(rawFolderName) {
+const executeTrimFolder = async (rawFolderName) => {
     const target = (rawFolderName || state.name || "").trim();
     if (!target) {
         throw new Error("No folder specified");
@@ -1546,7 +1561,7 @@ document.getElementById("btnChangePassword").addEventListener("click", () => {
 });
 
 // Restore session or open shared link.
-async function boot() {
+const boot = async () => {
     await loadUsr();
 
     // Check URL parameters for direct file or folder link
@@ -1578,6 +1593,7 @@ async function boot() {
             SafeSession.setItem("oldFold", matchingFolderName);
             SafeSession.setItem("oldPage", "1");
             document.getElementById("btnDeleteFolder").classList.remove("hidden");
+            if (window.updateFolderDisplay) window.updateFolderDisplay();
             await loadFld();
 
             if (targetFileName) {
@@ -1633,7 +1649,24 @@ async function boot() {
         const rawK = mask.XOR(state.key); state.id = getObjPid(rawK); rawK.fill(0);
         state.page = oldPage ? parseInt(oldPage, 10) : 1;
         document.getElementById("btnDeleteFolder").classList.remove("hidden");
+        if (window.updateFolderDisplay) window.updateFolderDisplay();
         await loadFld();
+
+        const lastViewed = SafeSession.getItem("lastViewedFile");
+        if (lastViewed) {
+            SafeSession.removeItem("lastViewedFile");
+            setTimeout(() => {
+                const targetCard = Array.from(document.querySelectorAll(".media-card")).find(c => c.dataset.fileName === lastViewed);
+                if (targetCard) {
+                    targetCard.scrollIntoView({ block: "center", behavior: "smooth" });
+                    targetCard.style.outline = "2px solid var(--g-primary-blue, #1a73e8)";
+                    targetCard.style.transition = "outline 0.5s ease";
+                    setTimeout(() => {
+                        targetCard.style.outline = "";
+                    }, 1500);
+                }
+            }, 100);
+        }
     }
 }
 boot();

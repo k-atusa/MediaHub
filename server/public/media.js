@@ -1,7 +1,7 @@
 // MediaHub Thumbnail & Decoder
 
 // make thumbnail from image
-export async function makeImg(file) {
+export const makeImg = async (file) => {
     try {
         const bmp = await createImageBitmap(file);
         const canvas = document.createElement("canvas");
@@ -17,11 +17,11 @@ export async function makeImg(file) {
             ctx.drawImage(bmp, 0, 0, size, size, 0, 0, 256, 256);
         }
         bmp.close(); return new Promise(r => canvas.toBlob(r, "image/jpeg", 0.7));
-    } catch (e) { return null; }
-}
+    } catch { return null; }
+};
 
 // make thumbnail from video
-export function makeVid(file) {
+export const makeVid = (file) => {
     return new Promise((resolve) => {
         const video = document.createElement("video");
         video.preload = "metadata"; video.muted = true; video.playsInline = true;
@@ -38,7 +38,7 @@ export function makeVid(file) {
         };
         video.onerror = () => { URL.revokeObjectURL(video.src); resolve(null); };
     });
-}
+};
 
 // Range Data Provider
 export class RangeSrc {

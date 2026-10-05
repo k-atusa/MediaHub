@@ -15,7 +15,14 @@ const getPid = async (key) => { return toHex(SHA3256(key).slice(0, 16)); };
 async function makeKeys() {
     const username = document.getElementById("username").value.trim();
     const password = document.getElementById("password").value;
-    if (!username || !password) { alert("⚠️ Fill in all fields"); return null; }
+    if (!username || !password) {
+        if (window.showNotice) {
+            await window.showNotice("Please fill in all fields.", "Notice", "warning");
+        } else {
+            alert("Please fill in all fields.");
+        }
+        return null;
+    }
 
     const pwBytes = NormPW(password);
     const saltBytes = SHA3256(new TextEncoder().encode(username + SECRET_PEPPER));
@@ -47,14 +54,22 @@ document.getElementById("btnRegister").addEventListener("click", async () => {
     const username = document.getElementById("username").value.trim();
     try {
         const check = await fetch(`${SERVER_URL}/api/userdata/${res.userHash}`);
-        if (check.status !== 404) return alert("❌ Already registered");
+        if (check.status !== 404) {
+            if (window.showNotice) {
+                await window.showNotice("This account is already registered.", "Already Registered", "warning");
+            } else {
+                alert("Already registered");
+            }
+            return;
+        }
 
         const inviteModal = document.getElementById("inviteModal");
         const inviteCodeInput = document.getElementById("inviteCodeInput");
         inviteCodeInput.value = "";
         inviteModal.showModal();
+        inviteCodeInput.focus();
 
-        document.getElementById("btnConfirmInvite").onclick = async () => {
+        const submitInvite = async () => {
             const inviteCode = inviteCodeInput.value.trim();
             inviteModal.close();
             try {
@@ -64,17 +79,53 @@ document.getElementById("btnRegister").addEventListener("click", async () => {
                     body: new Uint8Array(0)
                 });
                 if (!req.ok) {
-                    if (req.status === 403) return alert("❌ Invalid Invite Code");
-                    return alert("❌ Register failed");
+                    if (req.status === 403) {
+                        if (window.showNotice) {
+                            await window.showNotice("Invalid invite code. Please check and try again.", "Registration Failed", "error");
+                        } else {
+                            alert("Invalid invite code");
+                        }
+                        return;
+                    }
+                    if (window.showNotice) {
+                        await window.showNotice("Registration failed. Please try again.", "Registration Failed", "error");
+                    } else {
+                        alert("Register failed");
+                    }
+                    return;
                 }
-                alert("✅ Registered"); await setSess(res.userHash, res.userKey, username);
-            } catch (e) { alert("❌ Register failed"); }
+                if (window.showNotice) {
+                    await window.showNotice("Account registered successfully.", "Success", "check_circle");
+                }
+                await setSess(res.userHash, res.userKey, username);
+            } catch (e) {
+                if (window.showNotice) {
+                    await window.showNotice("Registration failed: " + (e.message || "Unknown error"), "Registration Failed", "error");
+                } else {
+                    alert("Register failed");
+                }
+            }
+        };
+
+        document.getElementById("btnConfirmInvite").onclick = submitInvite;
+
+        inviteCodeInput.onkeydown = (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                submitInvite();
+            }
         };
 
         document.getElementById("btnCancelInvite").onclick = () => {
             inviteModal.close();
         };
-    } catch (e) { alert("❌ Register failed"); }
+    } catch (e) {
+        if (window.showNotice) {
+            await window.showNotice("Registration failed: " + (e.message || "Unknown error"), "Registration Failed", "error");
+        } else {
+            alert("Register failed");
+        }
+    }
 });
 
 // Handle Enter key for login
@@ -91,9 +142,22 @@ document.getElementById("btnLogin").addEventListener("click", async () => {
     const username = document.getElementById("username").value.trim();
     try {
         const check = await fetch(`${SERVER_URL}/api/userdata/${res.userHash}`);
-        if (check.status === 404) return alert("❌ Invalid credentials");
+        if (check.status === 404) {
+            if (window.showNotice) {
+                await window.showNotice("Invalid username or password.", "Login Failed", "error");
+            } else {
+                alert("Invalid credentials");
+            }
+            return;
+        }
         await setSess(res.userHash, res.userKey, username);
-    } catch (e) { alert("❌ Login failed"); }
+    } catch (e) {
+        if (window.showNotice) {
+            await window.showNotice("Login failed: " + (e.message || "Unknown error"), "Login Failed", "error");
+        } else {
+            alert("Login failed");
+        }
+    }
 });
 
 // Check and show notice if present
@@ -103,17 +167,10 @@ async function checkNotice() {
         if (!res.ok) return;
         const data = await res.json();
         if (data.notice && data.notice.trim() !== "" && !SafeSession.getItem("noticeShown")) {
-            const modal = document.getElementById("noticeModal");
-            const text = document.getElementById("noticeText");
-            const btnConfirm = document.getElementById("btnConfirmNotice");
-
-            text.textContent = data.notice;
-            modal.showModal();
+            if (window.showNotice) {
+                await window.showNotice(data.notice, "Notice", "campaign");
+            }
             SafeSession.setItem("noticeShown", "true");
-
-            btnConfirm.addEventListener("click", () => {
-                modal.close();
-            });
         }
     } catch (e) {
         console.error("Failed to load notice:", e);

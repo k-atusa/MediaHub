@@ -5,8 +5,8 @@ import { Masker } from './Bencrypt.js';
 const mask = new Masker();
 
 // Encrypt folder share token with password
-export async function makeToken(name, maskedKey, password) {
-    const pw = (password !== undefined) ? password : prompt("Set share password:");
+export const makeToken = async (name, maskedKey, password) => {
+    const pw = password ?? prompt("Set share password:");
     if (!pw) return null;
 
     const rawKey = mask.XOR(maskedKey);
@@ -16,16 +16,16 @@ export async function makeToken(name, maskedKey, password) {
     const head = await op.Encpw("arg2st", NormPW(pw));
     rawKey.fill(0);
     return Encode64(head, "#"); // no opsec-write layer
-}
+};
 
 // Decrypt folder share token with password
-export async function loadToken(token, password) {
+export const loadToken = async (token, password) => {
     try {
         const raw = Decode64(token, "#");
         const op = new Opsec();
         op.View(raw);
 
-        const pw = (password !== undefined) ? password : prompt("Enter share password:");
+        const pw = password ?? prompt("Enter share password:");
         if (!pw) return null;
 
         await op.Decpw(NormPW(pw));
@@ -33,5 +33,7 @@ export async function loadToken(token, password) {
         const maskedKey = mask.XOR(op.SmsgInfo);
         op.SmsgInfo.fill(0);
         return { name: op.Smsg, key: maskedKey };
-    } catch (e) { return null; }
-}
+    } catch {
+        return null;
+    }
+};

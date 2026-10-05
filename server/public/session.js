@@ -6,19 +6,17 @@
 const STORAGE_KEY = '__mh_enc_session__';
 const KEK_HEX_REGEX = /^[0-9a-fA-F]{64}$/;
 
-function toHex(buf) {
-    return Array.from(buf).map(b => b.toString(16).padStart(2, '0')).join('');
-}
+const toHex = (buf) => Array.from(buf).map(b => b.toString(16).padStart(2, '0')).join('');
 
-function fromHex(hex) {
+const fromHex = (hex) => {
     if (!hex || hex.length % 2 !== 0) return new Uint8Array(0);
     const matches = hex.match(/.{1,2}/g);
     if (!matches) return new Uint8Array(0);
     return new Uint8Array(matches.map(b => parseInt(b, 16)));
-}
+};
 
 // Retrieve or generate ephemeral KEK from window.name (RAM only)
-function getOrGenerateKEK() {
+const getOrGenerateKEK = () => {
     let kekHex = window.name;
     if (typeof kekHex === 'string' && KEK_HEX_REGEX.test(kekHex)) {
         return kekHex;
@@ -29,10 +27,10 @@ function getOrGenerateKEK() {
     rand.fill(0);
     window.name = kekHex;
     return kekHex;
-}
+};
 
 // Import raw 32-byte hex key for Web Crypto AES-GCM
-async function importKEK(hexKey) {
+const importKEK = async (hexKey) => {
     const rawKey = fromHex(hexKey);
     const cryptoKey = await crypto.subtle.importKey(
         'raw',
@@ -43,10 +41,10 @@ async function importKEK(hexKey) {
     );
     rawKey.fill(0);
     return cryptoKey;
-}
+};
 
 // Encrypt plaintext JS object to IV(12B hex) + Ciphertext(hex)
-async function encryptSession(dataObj, hexKey) {
+const encryptSession = async (dataObj, hexKey) => {
     const cryptoKey = await importKEK(hexKey);
     const iv = new Uint8Array(12);
     crypto.getRandomValues(iv);
@@ -55,7 +53,7 @@ async function encryptSession(dataObj, hexKey) {
     const plainBytes = new TextEncoder().encode(jsonStr);
 
     const cipherBuffer = await crypto.subtle.encrypt(
-        { name: 'AES-GCM', iv: iv },
+        { name: 'AES-GCM', iv },
         cryptoKey,
         plainBytes
     );
@@ -64,10 +62,10 @@ async function encryptSession(dataObj, hexKey) {
     const resultHex = toHex(iv) + toHex(cipherBytes);
     iv.fill(0);
     return resultHex;
-}
+};
 
 // Decrypt IV(12B hex) + Ciphertext(hex) to JS object
-async function decryptSession(payloadHex, hexKey) {
+const decryptSession = async (payloadHex, hexKey) => {
     if (!payloadHex || payloadHex.length < 24) return null;
     const ivHex = payloadHex.slice(0, 24);
     const cipherHex = payloadHex.slice(24);
@@ -77,7 +75,7 @@ async function decryptSession(payloadHex, hexKey) {
     const cryptoKey = await importKEK(hexKey);
 
     const decryptedBuffer = await crypto.subtle.decrypt(
-        { name: 'AES-GCM', iv: iv },
+        { name: 'AES-GCM', iv },
         cryptoKey,
         cipherBytes
     );
@@ -85,7 +83,7 @@ async function decryptSession(payloadHex, hexKey) {
     iv.fill(0);
     const text = new TextDecoder().decode(decryptedBuffer);
     return JSON.parse(text);
-}
+};
 
 class SafeSessionManager {
     constructor() {
@@ -136,7 +134,7 @@ class SafeSessionManager {
             // Also clean legacy client-local unlinked folder tracking from localStorage
             try {
                 localStorage.removeItem('mh_unlinked_folders');
-            } catch (_) {}
+            } catch (_) { }
 
             if (migrated || !encPayload) {
                 await this.save();
@@ -177,7 +175,7 @@ class SafeSessionManager {
         try {
             sessionStorage.clear();
             window.name = '';
-        } catch (_) {}
+        } catch (_) { }
     }
 
     scheduleSave() {
