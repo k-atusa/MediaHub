@@ -7,9 +7,6 @@ const mask = new Masker();
 
 await SafeSession.init();
 
-// Option: Disable ServiceWorker for WebKit (Safari). Set to false to allow on-the-fly streaming on WebKit.
-const OPT_NOSW_WEBKIT = false;
-
 const SERVER = window.location.origin;
 const fromHex = (hex) => new Uint8Array(hex.match(/.{1,2}/g).map(b => parseInt(b, 16)));
 const toHex = (buf) => Array.from(buf).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -229,13 +226,6 @@ async function start() {
 
     // Video & Audio: Stream via SW.
     if (kind === 'video' || kind === 'audio') {
-        const isWebkit = /AppleWebKit/i.test(navigator.userAgent) && (!/Chrome/i.test(navigator.userAgent) || /CriOS/i.test(navigator.userAgent));
-        if (OPT_NOSW_WEBKIT && isWebkit) {
-            console.log("WebKit forced fallback to full down.");
-            await fullDown(flPid, body);
-            return;
-        }
-
         body.innerHTML = `<p style="color:var(--preview-subtext);font-size:13px;margin:20px 0">Preparing ${kind} stream…</p>`;
         try {
             const reg = await navigator.serviceWorker.register('./sw.js?v=2.4', { updateViaCache: 'none' });
