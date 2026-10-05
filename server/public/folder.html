@@ -2540,13 +2540,16 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            padding: 8px 24px;
+            padding: 8px 16px;
+            margin: 2px 0 12px 0;
             background-color: var(--m3-surface-container);
-            border-bottom: 1px solid var(--g-border-subtle);
+            border: 1px solid var(--g-border-subtle);
+            border-radius: 12px;
             font-size: 13px;
             flex-wrap: wrap;
             animation: m3FadeIn 0.15s ease-out;
             z-index: 10;
+            box-sizing: border-box;
         }
 
         @keyframes m3FadeIn {
