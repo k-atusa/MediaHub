@@ -95,16 +95,33 @@ func postError(w http.ResponseWriter, error string, code int) {
 	http.Error(w, error, code)
 }
 
-// serve static files in public or embeddedFS
+// serve static files in public or embeddedFS with SPA fallback
 func serveFrontend() http.Handler {
+	var fsys http.FileSystem
 	if info, err := os.Stat("./public"); err == nil && info.IsDir() {
-		return http.FileServer(http.Dir("./public"))
+		fsys = http.Dir("./public")
+	} else {
+		sub, err := fs.Sub(publicFS, "public")
+		if err != nil {
+			log.Fatalf("failed to initialize embedded filesystem: %v", err)
+		}
+		fsys = http.FS(sub)
 	}
-	sub, err := fs.Sub(publicFS, "public")
-	if err != nil {
-		log.Fatalf("failed to initialize embedded filesystem: %v", err)
-	}
-	return http.FileServer(http.FS(sub))
+	fileServer := http.FileServer(fsys)
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/")
+		if path != "" {
+			f, err := fsys.Open(path)
+			if err == nil {
+				f.Close()
+				fileServer.ServeHTTP(w, r)
+				return
+			}
+		}
+		r.URL.Path = "/"
+		fileServer.ServeHTTP(w, r)
+	})
 }
 
 // handles userdata

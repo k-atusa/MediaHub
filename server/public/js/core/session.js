@@ -113,11 +113,11 @@ class SafeSessionManager {
             }
 
             // Migration & Disk Cleansing:
-            // Absorb any plaintext keys into RAM and immediately PURGE them from disk (LevelDB)
+            // Absorb any legacy plaintext keys into RAM and immediately PURGE them from disk
             const legacyKeys = [
                 'userHash', 'userKey', 'username',
                 'currentFolderId', 'currentFolderKey', 'currentFileKey', 'currentFileName',
-                'oldFold', 'oldPage', 'redirectAfterLogin', 'noticeShown'
+                'oldFold', 'oldPage', 'redirectAfterLogin', 'noticeShown', 'lastViewedFile'
             ];
             let migrated = false;
             for (const k of legacyKeys) {
@@ -131,7 +131,6 @@ class SafeSessionManager {
                 }
             }
 
-            // Also clean legacy client-local unlinked folder tracking from localStorage
             try {
                 localStorage.removeItem('mh_unlinked_folders');
             } catch (_) { }
@@ -199,17 +198,10 @@ class SafeSessionManager {
             console.error('[SafeSession] Failed to encrypt session to disk:', e);
         }
     }
-
-    // Safe navigation helper: ensures disk encryption flush completes before redirect
-    async navigate(url) {
-        await this.save();
-        window.location.href = url;
-    }
 }
 
 export const SafeSession = new SafeSessionManager();
 
-// Expose globally for inline scripts and compatibility
 if (typeof window !== 'undefined') {
     window.SafeSession = SafeSession;
 }
