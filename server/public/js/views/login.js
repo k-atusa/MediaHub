@@ -1,21 +1,19 @@
-// MediaHub Login & Registration View
-import { NormPW } from '../engine/Bencode.js';
-import { HashMaster, SHA3256, Masker } from '../engine/Bencrypt.js';
+// MediaHub Login & Registration View Controller (Pure UI)
 import { SafeSession } from '../core/session.js';
 import { router } from '../core/router.js';
-import { showNotice, showAlert, toHex, getUserPid } from '../core/utils.js';
+import { ShowNotice, ToHex } from '../core/utils.js';
 import { driveService } from '../services/drive.js';
-
-const mask = new Masker();
-const SECRET_PEPPER = "_PROJECT_WHY_MEDIAHUB_PEPPER_2026_!@#$";
+import { adapter } from '../adapter.js';
 
 export class LoginView {
+    // Initialize LoginView with root container and state
     constructor() {
         this.container = document.getElementById('view-login');
         this.initialized = false;
     }
 
-    init() {
+    // Bind UI button clicks and keyboard enter events
+    Init() {
         if (this.initialized) return;
         this.initialized = true;
 
@@ -45,47 +43,38 @@ export class LoginView {
         }
     }
 
-    async makeKeys() {
-        const username = document.getElementById("username").value.trim();
-        const password = document.getElementById("password").value;
-        if (!username || !password) {
-            await showNotice("Please fill in all fields.", "Notice", "warning");
-            return null;
-        }
+    // Save authenticated user credentials to SafeSession and transition to drive view
+    async setSession(userHash, maskedKey, username) {
+        const rawUk = driveService.UnmaskKey(maskedKey);
+        const redirectUrl = SafeSession.GetItem("redirectAfterLogin");
 
-        const pwBytes = NormPW(password);
-        const saltBytes = SHA3256(new TextEncoder().encode(username + SECRET_PEPPER));
-        const hm = new HashMaster("arg2st");
-        const [storeKey, userKey] = await hm.KDF(pwBytes, saltBytes);
-        const masked = mask.XOR(userKey);
-        userKey.fill(0);
-        return { userHash: await getUserPid(storeKey), userKey: masked };
-    }
+        SafeSession.Clear();
+        SafeSession.SetItem("userHash", userHash);
+        SafeSession.SetItem("userKey", ToHex(rawUk));
+        SafeSession.SetItem("username", username);
+        rawUk.fill(0);
 
-    async setSession(hash, maskedKey, username) {
-        const raw = mask.XOR(maskedKey);
-        const redirectUrl = SafeSession.getItem("redirectAfterLogin");
-        SafeSession.clear();
-        SafeSession.setItem("userHash", hash);
-        SafeSession.setItem("userKey", toHex(raw));
-        SafeSession.setItem("username", username);
-        raw.fill(0);
-
-        await SafeSession.save();
-        await driveService.initSession();
+        await SafeSession.Save();
+        await driveService.InitSession();
 
         if (redirectUrl) {
-            SafeSession.removeItem("redirectAfterLogin");
-            router.navigate(redirectUrl);
+            SafeSession.RemoveItem("redirectAfterLogin");
+            await router.Navigate(redirectUrl);
         } else {
-            router.navigate('/drive');
+            await router.Navigate('/drive');
         }
     }
 
+    // Handle user sign-in action with credential validation and adapter authentication
     async handleLogin() {
-        const res = await this.makeKeys();
-        if (!res) return;
-        const username = document.getElementById("username").value.trim();
+        const username = document.getElementById("username")?.value.trim() || "";
+        const password = document.getElementById("password")?.value || "";
+
+        if (!username || !password) {
+            await ShowNotice("Please fill in all fields.", "Notice", "warning");
+            return;
+        }
+
         const btnLogin = document.getElementById("btnLogin");
         const origText = btnLogin ? btnLogin.textContent : "";
         if (btnLogin) {
@@ -94,14 +83,20 @@ export class LoginView {
         }
 
         try {
-            const check = await fetch(`${window.location.origin}/api/userdata/${res.userHash}`);
-            if (check.status === 404) {
-                await showNotice("Invalid username or password.", "Login Failed", "error");
+            // Derive authentication credentials through backend adapter
+            const { userHash, maskedKey } = await adapter.DeriveKeys(username, password);
+
+            // Verify if user account exists
+            const exists = await adapter.CheckUserExists(userHash);
+            if (!exists) {
+                await ShowNotice("Invalid username or password.", "Login Failed", "error");
                 return;
             }
-            await this.setSession(res.userHash, res.userKey, username);
+
+            // Persist session and navigate
+            await this.setSession(userHash, maskedKey, username);
         } catch (e) {
-            await showNotice("Login failed: " + (e.message || "Unknown error"), "Login Failed", "error");
+            await ShowNotice("Login failed: " + (e.message || "Unknown error"), "Login Failed", "error");
         } finally {
             if (btnLogin) {
                 btnLogin.disabled = false;
@@ -110,15 +105,24 @@ export class LoginView {
         }
     }
 
+    // Handle new account registration dialog and submission
     async handleRegister() {
-        const res = await this.makeKeys();
-        if (!res) return;
-        const username = document.getElementById("username").value.trim();
+        const username = document.getElementById("username")?.value.trim() || "";
+        const password = document.getElementById("password")?.value || "";
+
+        if (!username || !password) {
+            await ShowNotice("Please fill in all fields.", "Notice", "warning");
+            return;
+        }
 
         try {
-            const check = await fetch(`${window.location.origin}/api/userdata/${res.userHash}`);
-            if (check.status !== 404) {
-                await showNotice("This account is already registered.", "Already Registered", "warning");
+            // Derive keys through backend adapter
+            const { userHash, maskedKey } = await adapter.DeriveKeys(username, password);
+
+            // Check if already registered
+            const exists = await adapter.CheckUserExists(userHash);
+            if (exists) {
+                await ShowNotice("This account is already registered.", "Already Registered", "warning");
                 return;
             }
 
@@ -134,23 +138,12 @@ export class LoginView {
                 const inviteCode = inviteCodeInput.value.trim();
                 inviteModal.close();
                 try {
-                    const req = await fetch(`${window.location.origin}/api/userdata/${res.userHash}`, {
-                        method: "POST",
-                        headers: { "X-Invite-Code": inviteCode },
-                        body: new Uint8Array(0)
-                    });
-                    if (!req.ok) {
-                        if (req.status === 403) {
-                            await showNotice("Invalid invite code. Please check and try again.", "Registration Failed", "error");
-                            return;
-                        }
-                        await showNotice("Registration failed. Please try again.", "Registration Failed", "error");
-                        return;
-                    }
-                    await showNotice("Account registered successfully.", "Success", "check_circle");
-                    await this.setSession(res.userHash, res.userKey, username);
+                    // Register account through backend adapter
+                    await adapter.RegisterUser(userHash, inviteCode);
+                    await ShowNotice("Account registered successfully.", "Success", "check_circle");
+                    await this.setSession(userHash, maskedKey, username);
                 } catch (e) {
-                    await showNotice("Registration failed: " + (e.message || "Unknown error"), "Registration Failed", "error");
+                    await ShowNotice("Registration failed: " + (e.message || "Unknown error"), "Registration Failed", "error");
                 }
             };
 
@@ -165,30 +158,31 @@ export class LoginView {
                 inviteModal.close();
             };
         } catch (e) {
-            await showNotice("Registration failed: " + (e.message || "Unknown error"), "Registration Failed", "error");
+            await ShowNotice("Registration failed: " + (e.message || "Unknown error"), "Registration Failed", "error");
         }
     }
 
+    // Fetch and display optional system notice modal if not previously acknowledged
     async checkNotice() {
         try {
-            const res = await fetch(`${window.location.origin}/api/notice`);
-            if (!res.ok) return;
-            const data = await res.json();
-            if (data.notice && data.notice.trim() !== "" && !SafeSession.getItem("noticeShown")) {
-                await showNotice(data.notice, "Notice", "campaign");
-                SafeSession.setItem("noticeShown", "true");
+            const notice = await adapter.FetchNotice();
+            if (notice && notice.trim() !== "" && !SafeSession.GetItem("noticeShown")) {
+                await ShowNotice(notice, "Notice", "campaign");
+                SafeSession.SetItem("noticeShown", "true");
             }
         } catch (e) {
             console.error("Failed to load notice:", e);
         }
     }
 
-    mount() {
-        this.init();
+    // Mount login view, clear password field, and trigger notice check
+    Mount() {
+        this.Init();
         const pwdInput = document.getElementById("password");
         if (pwdInput) pwdInput.value = "";
         this.checkNotice();
     }
 }
 
+// Global login view singleton instance
 export const loginView = new LoginView();

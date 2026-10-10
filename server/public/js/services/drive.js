@@ -1,33 +1,32 @@
-// MediaHub Drive Service (E2EE Metadata, Folder/File Operations & Search)
-import { SHA3256, SymMaster, Random, Masker, HashMaster } from '../engine/Bencrypt.js';
-import { EncodeCfg, DecodeCfg, EncodeInt, DecodeInt } from '../engine/Opsec.js';
-import { NormPW } from '../engine/Bencode.js';
-import { SafeSession } from '../core/session.js';
-import { toHex, fromHex, getObjPid, getUserPid, formatBytes } from '../core/utils.js';
-import { NetSrc } from '../core/media.js';
+// MediaHub Drive Service (Domain State Management, Upload Pipeline & Orchestration)
+import { Masker, Random, SymMaster } from './engine/Bencrypt.js';
+import { DecodeInt, EncodeInt, PadLen } from './engine/Opsec.js';
+import { SafeSession } from './core/session.js';
+import { ToHex, FromHex, GetObjPid, FormatBytes } from './core/utils.js';
+import { adapter } from './adapter.js';
 
 const mask = new Masker();
-const maskMap = (m) => {
-    for (const k of Object.keys(m)) {
-        const r = m[k];
-        m[k] = mask.XOR(r);
-        r.fill(0);
-    }
-};
-const rawMap = (m) => {
-    const c = {};
-    for (const [k, v] of Object.entries(m)) c[k] = mask.XOR(v);
-    return c;
-};
-const wipeMap = (m) => {
-    for (const v of Object.values(m)) if (v?.fill) v.fill(0);
-};
-
-const SECRET_PEPPER = "_PROJECT_WHY_MEDIAHUB_PEPPER_2026_!@#$";
 const BRACKET_PATTERN = /[\[\(]([^\]\)]+)[\]\)]/g;
 const SPLIT_PATTERN = /[._\-\s]+/;
 
-class DriveService {
+// File chunk stream source reader for client-side file encryption
+class FileSrc {
+    constructor(file) {
+        this.file = file;
+        this.off = 0;
+    }
+    // Read specified chunk byte slice from underlying File object
+    async read(size) {
+        if (this.off >= this.file.size) return new Uint8Array(0);
+        const chunk = this.file.slice(this.off, this.off + size);
+        const buf = await chunk.arrayBuffer();
+        this.off += buf.byteLength;
+        return new Uint8Array(buf);
+    }
+}
+
+export class DriveService {
+    // Initialize DriveService domain state containers, upload flags and caches
     constructor() {
         this.serverUrl = window.location.origin;
         this.usrHsh = null;
@@ -50,14 +49,33 @@ class DriveService {
         this.keywordCounts = {};
         this.selectKeywords = new Set();
         this.tokenCache = new Map();
+
+        // Upload pipeline state
+        this.isUploadCancelled = false;
+        this.currentUploadXhr = null;
+        this.activeUploadFileIdx = -1;
+        this.isUploading = false;
     }
 
-    async initSession() {
-        await SafeSession.init();
-        this.usrHsh = SafeSession.getItem("userHash");
-        const rawUkHex = SafeSession.getItem("userKey");
+    // Mask raw cryptographic key buffer with XOR mask
+    MaskKey(rawKey) {
+        if (!rawKey) return null;
+        return mask.XOR(rawKey);
+    }
+
+    // Unmask XOR-masked key into a fresh raw key buffer
+    UnmaskKey(maskedKey) {
+        if (!maskedKey) return null;
+        return mask.XOR(maskedKey);
+    }
+
+    // Initialize authenticated user session from SafeSession store
+    async InitSession() {
+        await SafeSession.Init();
+        this.usrHsh = SafeSession.GetItem("userHash");
+        const rawUkHex = SafeSession.GetItem("userKey");
         if (rawUkHex) {
-            const raw = fromHex(rawUkHex);
+            const raw = FromHex(rawUkHex);
             this.usrKey = mask.XOR(raw);
             raw.fill(0);
         } else {
@@ -66,7 +84,8 @@ class DriveService {
         return Boolean(this.usrHsh && this.usrKey);
     }
 
-    clearSession() {
+    // Clear active session memory and reset all local state
+    ClearSession() {
         if (this.usrKey) {
             const raw = mask.XOR(this.usrKey);
             raw.fill(0);
@@ -80,55 +99,43 @@ class DriveService {
         this.currentFolderId = "";
         this.fileSizeCache = {};
         this.allFoldersFilesCache = null;
-        SafeSession.clear();
+        SafeSession.Clear();
     }
 
-    async loadUser() {
+    // Load and decrypt user folder catalog through backend adapter
+    async LoadUser() {
         if (!this.usrHsh || !this.usrKey) return false;
-        const res = await fetch(`${this.serverUrl}/api/userdata/${this.usrHsh}`);
-        if (res.status === 404) {
-            this.fldMap = {};
+        const map = await adapter.LoadUserData(this.usrHsh, this.usrKey);
+        this.fldMap = {};
+        for (const [k, v] of Object.entries(map)) {
+            this.fldMap[k] = mask.XOR(v);
+            v.fill(0);
+        }
+        return true;
+    }
+
+    // Encrypt and persist user folder catalog through backend adapter
+    async SaveUser() {
+        if (!this.usrHsh || !this.usrKey) return false;
+        const rawMap = {};
+        for (const [k, v] of Object.entries(this.fldMap)) {
+            rawMap[k] = mask.XOR(v);
+        }
+        try {
+            await adapter.SaveUserData(this.usrHsh, rawMap, this.usrKey);
             return true;
+        } finally {
+            for (const v of Object.values(rawMap)) if (v?.fill) v.fill(0);
         }
-        if (!res.ok) throw new Error(`Failed to load userdata (HTTP ${res.status})`);
-
-        const rawUK = mask.XOR(this.usrKey);
-        const sm = new SymMaster("gcm1", rawUK);
-        rawUK.fill(0);
-
-        const dec = await sm.DeBin(new Uint8Array(await res.arrayBuffer()));
-        this.fldMap = DecodeCfg(dec);
-        dec.fill(0);
-        maskMap(this.fldMap);
-        return true;
     }
 
-    async saveUser() {
-        if (!this.usrHsh || !this.usrKey) return false;
-        const rawUK = mask.XOR(this.usrKey);
-        const sm = new SymMaster("gcm1", rawUK);
-        rawUK.fill(0);
-
-        const um = rawMap(this.fldMap);
-        const encoded = EncodeCfg(um);
-        wipeMap(um);
-
-        const res = await fetch(`${this.serverUrl}/api/userdata/${this.usrHsh}`, {
-            method: "POST",
-            body: await sm.EnBin(encoded)
-        });
-        encoded.fill(0);
-        if (!res.ok) {
-            throw new Error(`Failed to save userdata to server (HTTP ${res.status})`);
-        }
-        return true;
-    }
-
-    async createFolder(name) {
+    // Create a new folder with cryptographically random key
+    async CreateFolder(name) {
         const trimmed = (name || "").trim();
         if (!trimmed || this.fldMap[trimmed]) {
             throw new Error("Invalid or duplicate folder name");
         }
+
         const rk = new Uint8Array(44);
         rk.set(Random(32), 0);
         rk.set(Random(12), 32);
@@ -136,12 +143,13 @@ class DriveService {
         rk.fill(0);
 
         this.fldMap[trimmed] = maskedKey;
-        await this.saveUser();
-        this.invalidateCache();
+        await this.SaveUser();
+        this.InvalidateCache();
         return trimmed;
     }
 
-    async renameFolder(rawOldName, rawNewName) {
+    // Rename existing folder in local map and save user metadata
+    async RenameFolder(rawOldName, rawNewName) {
         const oldName = (rawOldName || "").trim();
         const newName = (rawNewName || "").trim();
         if (!oldName || !newName) throw new Error("Folder name cannot be empty.");
@@ -167,11 +175,11 @@ class DriveService {
 
             if (this.currentFolderName === actualOldKey || (this.currentFolderName && this.currentFolderName.normalize('NFC') === actualOldKey.normalize('NFC'))) {
                 this.currentFolderName = newName;
-                SafeSession.setItem("oldFold", newName);
+                SafeSession.SetItem("oldFold", newName);
             }
 
-            await this.saveUser();
-            this.invalidateCache();
+            await this.SaveUser();
+            this.InvalidateCache();
         } catch (err) {
             this.fldMap = origFldMap;
             this.currentFolderName = origCurrentName;
@@ -179,7 +187,8 @@ class DriveService {
         }
     }
 
-    async unlinkFolder(rawFolderName) {
+    // Unlink folder from current user catalog without deleting remote files
+    async UnlinkFolder(rawFolderName) {
         const target = (rawFolderName || this.currentFolderName || "").trim();
         if (!target) return;
 
@@ -196,14 +205,15 @@ class DriveService {
             this.currentFolderId = "";
             this.currentFolderKey = null;
             this.flsMap = {};
-            SafeSession.removeItem("oldFold");
+            SafeSession.RemoveItem("oldFold");
         }
 
-        await this.saveUser();
-        this.invalidateCache();
+        await this.SaveUser();
+        this.InvalidateCache();
     }
 
-    async deleteFolderPermanently(rawFolderName) {
+    // Permanently delete folder metadata and binary content from server
+    async DeleteFolder(rawFolderName) {
         const target = (rawFolderName || this.currentFolderName || "").trim();
         if (!target) return;
 
@@ -216,13 +226,10 @@ class DriveService {
 
         const maskedKey = this.fldMap[actualKey];
         const rawK = mask.XOR(maskedKey);
-        const fldId = getObjPid(rawK);
+        const fldId = GetObjPid(rawK);
         rawK.fill(0);
 
-        await fetch(`${this.serverUrl}/api/storage/${fldId}/names`, {
-            method: "DELETE",
-            headers: { "X-User-Hash": this.usrHsh }
-        });
+        await adapter.DeleteFolderMeta(fldId, this.usrHsh);
 
         delete this.fldMap[actualKey];
         if (this.currentFolderName === actualKey || (this.currentFolderName && this.currentFolderName.normalize('NFC') === actualKey.normalize('NFC'))) {
@@ -230,14 +237,15 @@ class DriveService {
             this.currentFolderId = "";
             this.currentFolderKey = null;
             this.flsMap = {};
-            SafeSession.removeItem("oldFold");
+            SafeSession.RemoveItem("oldFold");
         }
 
-        await this.saveUser();
-        this.invalidateCache();
+        await this.SaveUser();
+        this.InvalidateCache();
     }
 
-    async trimFolder(rawFolderName) {
+    // Trim orphan file objects from folder repository
+    async TrimFolder(rawFolderName) {
         const target = (rawFolderName || this.currentFolderName || "").trim();
         if (!target) throw new Error("No folder specified");
 
@@ -250,58 +258,39 @@ class DriveService {
 
         const maskedKey = this.fldMap[actualKey];
         const rawK = mask.XOR(maskedKey);
-        const fldId = getObjPid(rawK);
-
-        let pids = [];
-        if (this.currentFolderName === actualKey && this.currentFolderId === fldId && Object.keys(this.flsMap).length > 0) {
-            for (const [, fileKey] of Object.entries(this.flsMap)) {
-                const rawFK = mask.XOR(fileKey);
-                pids.push(getObjPid(rawFK.slice(0, 44)));
-                rawFK.fill(0);
-            }
-        } else {
-            const fldSm = new SymMaster("gcm1", rawK.slice(0, 32));
-            const res = await fetch(`${this.serverUrl}/api/storage/${fldId}/names`, {
-                headers: { "X-User-Hash": this.usrHsh }
-            });
-            if (res.ok) {
-                const encBytes = new Uint8Array(await res.arrayBuffer());
-                if (encBytes.length > 0) {
-                    const dec = await fldSm.DeBin(encBytes);
-                    const map = DecodeCfg(dec);
-                    dec.fill(0);
-                    for (const [, fileKey] of Object.entries(map)) {
-                        const rawFK = mask.XOR(fileKey);
-                        pids.push(getObjPid(rawFK.slice(0, 44)));
-                        rawFK.fill(0);
-                    }
-                }
-            }
-        }
+        const fldId = GetObjPid(rawK);
         rawK.fill(0);
 
-        const res = await fetch(`${this.serverUrl}/api/trim/${fldId}`, {
-            method: "POST",
-            headers: { "X-User-Hash": this.usrHsh, "Content-Type": "application/json" },
-            body: JSON.stringify({ pids })
-        });
-        const text = await res.text();
-        if (!res.ok) throw new Error(text || res.statusText);
-
-        if (this.currentFolderName === actualKey) {
-            await this.loadFolderFiles();
+        const pids = [];
+        if (this.currentFolderName === actualKey && this.currentFolderId === fldId && Object.keys(this.flsMap).length > 0) {
+            for (const [, fileKey] of Object.entries(this.flsMap)) {
+                const rawFk = mask.XOR(fileKey);
+                pids.push(GetObjPid(rawFk.slice(0, 44)));
+                rawFk.fill(0);
+            }
+        } else {
+            const map = await adapter.LoadFolderMeta(fldId, maskedKey);
+            for (const [, fileKey] of Object.entries(map)) {
+                pids.push(GetObjPid(fileKey.slice(0, 44)));
+            }
         }
-        this.invalidateCache();
+
+        const text = await adapter.TrimFolder(fldId, { pids }, this.usrHsh);
+        if (this.currentFolderName === actualKey) {
+            await this.LoadFolderFiles();
+        }
+        this.InvalidateCache();
         return { text, pidsCount: pids.length };
     }
 
-    async selectFolder(folderName) {
+    // Select active folder by name and load associated file metadata
+    async SelectFolder(folderName) {
         if (!folderName) {
             this.currentFolderName = "";
             this.currentFolderId = "";
             this.currentFolderKey = null;
             this.flsMap = {};
-            SafeSession.removeItem("oldFold");
+            SafeSession.RemoveItem("oldFold");
             return false;
         }
 
@@ -315,15 +304,16 @@ class DriveService {
         this.currentFolderName = actualKey;
         this.currentFolderKey = this.fldMap[actualKey];
         const rawK = mask.XOR(this.currentFolderKey);
-        this.currentFolderId = getObjPid(rawK);
+        this.currentFolderId = GetObjPid(rawK);
         rawK.fill(0);
 
-        SafeSession.setItem("oldFold", actualKey);
-        await this.loadFolderFiles();
+        SafeSession.SetItem("oldFold", actualKey);
+        await this.LoadFolderFiles();
         return true;
     }
 
-    async loadFolderFiles() {
+    // Load and decrypt file catalog for the currently selected folder
+    async LoadFolderFiles() {
         if (!this.currentFolderId || !this.currentFolderKey) {
             this.flsMap = {};
             return;
@@ -331,22 +321,17 @@ class DriveService {
         this.keywordsBuilt = false;
         this.selectKeywords.clear();
 
-        const res = await fetch(`${this.serverUrl}/api/storage/${this.currentFolderId}/names`);
-        if (res.status === 404) {
-            this.flsMap = {};
-        } else {
-            const rawK = mask.XOR(this.currentFolderKey);
-            const sm = new SymMaster("gcm1", rawK.slice(0, 32));
-            rawK.fill(0);
-            const dec = await sm.DeBin(new Uint8Array(await res.arrayBuffer()));
-            this.flsMap = DecodeCfg(dec);
-            dec.fill(0);
-            maskMap(this.flsMap);
+        const map = await adapter.LoadFolderMeta(this.currentFolderId, this.currentFolderKey);
+        this.flsMap = {};
+        for (const [k, v] of Object.entries(map)) {
+            this.flsMap[k] = mask.XOR(v);
+            v.fill(0);
         }
-        this.buildKeywords();
+        this.BuildKeywords();
     }
 
-    async renameFile(rawOldName, rawNewName) {
+    // Rename a file within the current folder
+    async RenameFile(rawOldName, rawNewName) {
         const oldName = (rawOldName || "").trim();
         const newName = (rawNewName || "").trim();
         if (!oldName || !newName) throw new Error("File name cannot be empty.");
@@ -367,91 +352,70 @@ class DriveService {
             this.flsMap[newName] = this.flsMap[actualOldName];
             delete this.flsMap[actualOldName];
 
-            const rawSK = mask.XOR(this.currentFolderKey);
-            const sm = new SymMaster("gcm1", rawSK.slice(0, 32));
-            rawSK.fill(0);
-
-            const um = rawMap(this.flsMap);
-            const encoded = EncodeCfg(um);
-            wipeMap(um);
-
-            const cipherBin = await sm.EnBin(encoded);
-            encoded.fill(0);
-
-            const res = await fetch(`${this.serverUrl}/api/storage/${this.currentFolderId}/names`, {
-                method: "POST",
-                headers: { "X-User-Hash": this.usrHsh },
-                body: cipherBin
-            });
-            if (!res.ok) throw new Error(`Server returned HTTP ${res.status}`);
+            const rawMap = {};
+            for (const [k, v] of Object.entries(this.flsMap)) {
+                rawMap[k] = mask.XOR(v);
+            }
+            await adapter.SaveFolderMeta(this.currentFolderId, rawMap, this.currentFolderKey, this.usrHsh);
+            for (const v of Object.values(rawMap)) if (v?.fill) v.fill(0);
 
             this.keywordsBuilt = false;
-            this.buildKeywords();
-            this.invalidateCache();
+            this.BuildKeywords();
+            this.InvalidateCache();
         } catch (err) {
             this.flsMap = origFlsMap;
             throw err;
         }
     }
 
-    async deleteFile(fileName) {
+    // Delete a file and its associated binary blobs from the server
+    async DeleteFile(fileName) {
         const target = (fileName || "").trim();
         if (!target || !this.flsMap[target]) return;
 
-        const rawFK = mask.XOR(this.flsMap[target]);
-        const flPid = getObjPid(rawFK.slice(0, 44));
-        rawFK.fill(0);
+        const rawFk = mask.XOR(this.flsMap[target]);
+        const flPid = GetObjPid(rawFk.slice(0, 44));
+        rawFk.fill(0);
 
         try {
-            await fetch(`${this.serverUrl}/api/media/${this.currentFolderId}/${flPid}/dat`, { method: "DELETE" });
-            await fetch(`${this.serverUrl}/api/media/${this.currentFolderId}/${flPid}/thumb`, { method: "DELETE" });
+            await adapter.DeleteMedia(this.currentFolderId, flPid, this.usrHsh);
         } catch (e) {
             console.warn("Error deleting media binaries:", e);
         }
 
         delete this.flsMap[target];
 
-        const rawSK = mask.XOR(this.currentFolderKey);
-        const sm = new SymMaster("gcm1", rawSK.slice(0, 32));
-        rawSK.fill(0);
-
-        const um = rawMap(this.flsMap);
-        const encoded = EncodeCfg(um);
-        wipeMap(um);
-
-        const cipherBin = await sm.EnBin(encoded);
-        encoded.fill(0);
-
-        const res = await fetch(`${this.serverUrl}/api/storage/${this.currentFolderId}/names`, {
-            method: "POST",
-            headers: { "X-User-Hash": this.usrHsh },
-            body: cipherBin
-        });
-        if (!res.ok) throw new Error(`Server returned HTTP ${res.status}`);
+        const rawMap = {};
+        for (const [k, v] of Object.entries(this.flsMap)) {
+            rawMap[k] = mask.XOR(v);
+        }
+        await adapter.SaveFolderMeta(this.currentFolderId, rawMap, this.currentFolderKey, this.usrHsh);
+        for (const v of Object.values(rawMap)) if (v?.fill) v.fill(0);
 
         this.keywordsBuilt = false;
-        this.buildKeywords();
-        this.invalidateCache();
+        this.BuildKeywords();
+        this.InvalidateCache();
     }
 
-    async loadThumbnail(folderId, filePid, ext, imgEl, fileKeyRaw) {
+    // Load and decrypt thumbnail image for a file through backend adapter
+    async LoadThumbnail(folderId, filePid, ext, imgEl, fileKeyRaw) {
         try {
-            const res = await fetch(`${this.serverUrl}/api/media/${folderId}/${filePid}/thumb`);
-            if (res.status === 404 || !res.ok) {
-                imgEl.src = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='%23333'><rect width='24' height='24' rx='2'/><text x='50%' y='60%' font-family='sans-serif' font-size='5' font-weight='bold' fill='%23aaa' text-anchor='middle'>${ext}</text></svg>`;
-                fileKeyRaw.fill(0);
-                return;
-            }
-            const sm = new SymMaster("gcm1", fileKeyRaw.slice(0, 32));
+            const maskedFk = mask.XOR(fileKeyRaw);
+            const thumbUrl = await adapter.LoadThumbnailUrl(folderId, filePid, maskedFk);
             fileKeyRaw.fill(0);
-            imgEl.src = URL.createObjectURL(new Blob([await sm.DeBin(new Uint8Array(await res.arrayBuffer()))]));
+            if (thumbUrl) {
+                imgEl.src = thumbUrl;
+            } else {
+                imgEl.src = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='%23333'><rect width='24' height='24' rx='2'/><text x='50%' y='60%' font-family='sans-serif' font-size='5' font-weight='bold' fill='%23aaa' text-anchor='middle'>${ext}</text></svg>`;
+            }
         } catch (e) {
             fileKeyRaw.fill(0);
             imgEl.src = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='%23333'><rect width='24' height='24' rx='2'/><text x='50%' y='60%' font-family='sans-serif' font-size='5' font-weight='bold' fill='%23aaa' text-anchor='middle'>${ext}</text></svg>`;
         }
     }
 
-    getEntrySize(flKeyMasked) {
+    // Extract decoded original file size from masked file key
+    GetEntrySize(flKeyMasked) {
         if (!flKeyMasked) return 0;
         const raw = mask.XOR(flKeyMasked);
         let sz = 0;
@@ -462,7 +426,8 @@ class DriveService {
         return sz;
     }
 
-    extractTokens(nameOnly) {
+    // Extract search keyword tokens from raw filename string
+    ExtractTokens(nameOnly) {
         const tokens = [];
         const lower = (nameOnly || "").normalize('NFC').toLowerCase();
         const remaining = lower.replace(BRACKET_PATTERN, (_, group) => {
@@ -478,7 +443,8 @@ class DriveService {
         return tokens;
     }
 
-    isValidKeyword(token) {
+    // Validate if keyword token meets minimum length and character requirements
+    IsValidKeyword(token) {
         let byteLen = 0;
         for (let i = 0; i < token.length; i++) {
             const code = token.charCodeAt(i);
@@ -494,7 +460,8 @@ class DriveService {
         return false;
     }
 
-    buildKeywords() {
+    // Build keyword frequency index for keyword filtering
+    BuildKeywords() {
         this.availKeywords.length = 0;
         Object.keys(this.keywordCounts).forEach(k => delete this.keywordCounts[k]);
         this.tokenCache.clear();
@@ -506,12 +473,12 @@ class DriveService {
             const dotIdx = fileName.lastIndexOf('.');
             if (dotIdx > 0) nameOnly = fileName.substring(0, dotIdx);
 
-            const tokens = this.extractTokens(nameOnly);
+            const tokens = this.ExtractTokens(nameOnly);
             const unique = new Set(tokens);
             this.tokenCache.set(fileName, unique);
 
             for (const t of unique) {
-                if (this.isValidKeyword(t)) {
+                if (this.IsValidKeyword(t)) {
                     wordCount[t] = (wordCount[t] || 0) + 1;
                 }
             }
@@ -532,7 +499,8 @@ class DriveService {
         this.keywordsBuilt = true;
     }
 
-    async fetchFolderFileSizes(folderName) {
+    // Fetch and cache file sizes across a specific folder
+    async FetchFolderFileSizes(folderName) {
         if (!folderName) return {};
         if (this.fileSizeCache[folderName]) return this.fileSizeCache[folderName];
 
@@ -541,16 +509,10 @@ class DriveService {
             if (!fldKey) return {};
 
             const rawK = mask.XOR(fldKey);
-            const fldId = getObjPid(rawK);
-            const fldSm = new SymMaster("gcm1", rawK.slice(0, 32));
+            const fldId = GetObjPid(rawK);
             rawK.fill(0);
 
-            const flsRes = await fetch(`${this.serverUrl}/api/storage/${fldId}/names`);
-            if (!flsRes.ok) return {};
-            const flsDec = await fldSm.DeBin(new Uint8Array(await flsRes.arrayBuffer()));
-            const flsMap = DecodeCfg(flsDec);
-            flsDec.fill(0);
-
+            const flsMap = await adapter.LoadFolderMeta(fldId, fldKey);
             const sizes = {};
             for (const [name, flInfo] of Object.entries(flsMap)) {
                 if (flInfo && flInfo.length >= 52) {
@@ -565,7 +527,8 @@ class DriveService {
         }
     }
 
-    async fetchAllFoldersAndFiles(forceRefresh = false) {
+    // Fetch all files across all user folders with caching
+    async FetchAllFiles(forceRefresh = false) {
         const now = Date.now();
         if (!forceRefresh && this.allFoldersFilesCache && (now - this.allFoldersFilesCacheTime < 30000)) {
             return this.allFoldersFilesCache;
@@ -578,16 +541,10 @@ class DriveService {
             await Promise.all(folderEntries.map(async ([fName, fldKey]) => {
                 try {
                     const rawK = mask.XOR(fldKey);
-                    const fldId = getObjPid(rawK);
-                    const fldSm = new SymMaster("gcm1", rawK.slice(0, 32));
+                    const fldId = GetObjPid(rawK);
                     rawK.fill(0);
 
-                    const flsRes = await fetch(`${this.serverUrl}/api/storage/${fldId}/names`);
-                    if (!flsRes.ok) return;
-                    const flsDec = await fldSm.DeBin(new Uint8Array(await flsRes.arrayBuffer()));
-                    const flsMap = DecodeCfg(flsDec);
-                    flsDec.fill(0);
-
+                    const flsMap = await adapter.LoadFolderMeta(fldId, fldKey);
                     for (const [flName, flKey] of Object.entries(flsMap)) {
                         let size = 0;
                         if (flKey && flKey.length >= 52) {
@@ -616,58 +573,286 @@ class DriveService {
         }
     }
 
-    invalidateCache() {
+    // Invalidate local in-memory caches
+    InvalidateCache() {
         this.fileSizeCache = {};
         this.allFoldersFilesCache = null;
         this.allFoldersFilesCacheTime = 0;
     }
 
-    async changePassword(newPw) {
+    // Change master account password and migrate user encrypted data
+    async ChangePassword(newPw) {
         if (!newPw) throw new Error("Enter new password");
-        const username = SafeSession.getItem("username");
+        const username = SafeSession.GetItem("username");
         if (!username) throw new Error("Session invalid. Please login again.");
 
-        const pwBytes = NormPW(newPw);
-        const saltBytes = SHA3256(new TextEncoder().encode(username + SECRET_PEPPER));
-        const hm = new HashMaster("arg2st");
-        const [storeKey, newUserKeyRaw] = await hm.KDF(pwBytes, saltBytes);
-
-        const newHash = await getUserPid(storeKey);
-        const maskedNewKey = mask.XOR(newUserKeyRaw);
-        newUserKeyRaw.fill(0);
-
+        const { userHash: newHash, maskedKey: maskedNewKey } = await adapter.DeriveKeys(username, newPw);
         if (newHash === this.usrHsh) {
             throw new Error("New password must be different");
         }
 
-        const check = await fetch(`${this.serverUrl}/api/userdata/${newHash}`);
-        if (check.status !== 404) throw new Error("User already exists with this password");
+        const exists = await adapter.CheckUserExists(newHash);
+        if (exists) throw new Error("User already exists with this password");
 
-        const rawUK = mask.XOR(maskedNewKey);
-        const sm = new SymMaster("gcm1", rawUK);
-        rawUK.fill(0);
-        const um = rawMap(this.fldMap);
-        const encoded = EncodeCfg(um);
-        wipeMap(um);
+        const rawMap = {};
+        for (const [k, v] of Object.entries(this.fldMap)) {
+            rawMap[k] = mask.XOR(v);
+        }
 
-        const saveRes = await fetch(`${this.serverUrl}/api/userdata/${newHash}`, {
-            method: "POST",
-            headers: { "X-Old-Hash": this.usrHsh },
-            body: await sm.EnBin(encoded)
-        });
-        encoded.fill(0);
-        if (!saveRes.ok) throw new Error("Failed to create new user data");
+        await adapter.SaveUserData(newHash, rawMap, maskedNewKey, this.usrHsh);
+        for (const v of Object.values(rawMap)) if (v?.fill) v.fill(0);
 
         await fetch(`${this.serverUrl}/api/userdata/${this.usrHsh}`, { method: "DELETE" });
 
-        SafeSession.setItem("userHash", newHash);
-        SafeSession.setItem("userKey", toHex(mask.XOR(maskedNewKey)));
-        await SafeSession.save();
+        const rawNewKey = mask.XOR(maskedNewKey);
+        SafeSession.SetItem("userHash", newHash);
+        SafeSession.SetItem("userKey", ToHex(rawNewKey));
+        rawNewKey.fill(0);
+        await SafeSession.Save();
 
         this.usrHsh = newHash;
-        if (this.usrKey) mask.XOR(this.usrKey).fill(0);
         this.usrKey = maskedNewKey;
+    }
+
+    // Export folder share token using password
+    async ExportShareToken(folderName, password) {
+        const maskedKey = this.fldMap[folderName];
+        if (!maskedKey) return null;
+        return adapter.ExportShareToken(folderName, maskedKey, password);
+    }
+
+    // Import folder share token using password
+    async ImportShareToken(tokenText, password) {
+        return adapter.ImportShareToken(tokenText, password);
+    }
+
+    // Cancel current active upload pipeline
+    CancelUpload(fileIdx) {
+        this.isUploadCancelled = true;
+        if (this.currentUploadXhr) {
+            try {
+                this.currentUploadXhr.abort();
+            } catch (_) { }
+        }
+    }
+
+    // Prepare and sanitize file list for upload
+    PrepareFiles(fileList) {
+        const dt = new DataTransfer();
+        const ignoredNames = new Set([".DS_Store", "Thumbs.db", "desktop.ini"]);
+        const seenNames = new Set();
+
+        for (let i = 0; i < fileList.length; i++) {
+            const file = fileList[i];
+            if (file.name.startsWith("._") || ignoredNames.has(file.name)) continue;
+
+            let finalName = file.name;
+            if (seenNames.has(finalName)) {
+                if (file.webkitRelativePath) {
+                    const parts = file.webkitRelativePath.split('/');
+                    if (parts.length > 1) {
+                        parts.shift();
+                        finalName = parts.join('_');
+                    }
+                }
+                let counter = 1;
+                const origName = finalName;
+                const lastDot = origName.lastIndexOf('.');
+                const base = lastDot > 0 ? origName.slice(0, lastDot) : origName;
+                const ext = lastDot > 0 ? origName.slice(lastDot) : '';
+                while (seenNames.has(finalName)) {
+                    finalName = `${base} (${counter})${ext}`;
+                    counter++;
+                }
+            }
+            seenNames.add(finalName);
+
+            const uploadFile = (finalName === file.name)
+                ? file
+                : new File([file], finalName, { type: file.type, lastModified: file.lastModified });
+
+            dt.items.add(uploadFile);
+        }
+        return Array.from(dt.files);
+    }
+
+    // Encrypt and upload files to server storage with progress reporting
+    async UploadFiles(files, callbacks = {}) {
+        if (!files || files.length === 0) return;
+        if (!this.currentFolderId || !this.currentFolderKey) {
+            throw new Error("No folder selected for upload");
+        }
+
+        const {
+            onStart,
+            onFileProgress,
+            onFileComplete,
+            onSyncing,
+            onComplete,
+            onCancel
+        } = callbacks;
+
+        this.isUploadCancelled = false;
+        this.isUploading = true;
+        this.activeUploadFileIdx = -1;
+
+        if (onStart) onStart(files);
+
+        const folderId = this.currentFolderId;
+        const userHash = this.usrHsh;
+        let uploadedCount = 0;
+
+        try {
+            for (let i = 0; i < files.length; i++) {
+                if (this.isUploadCancelled) break;
+                this.activeUploadFileIdx = i;
+                const file = files[i];
+
+                if (onFileProgress) onFileProgress(i, 0, files.length);
+
+                // Delete existing duplicate binary on overwrite
+                if (this.flsMap[file.name]) {
+                    const oldRaw = mask.XOR(this.flsMap[file.name]);
+                    const oldFlPid = GetObjPid(oldRaw.slice(0, 44));
+                    oldRaw.fill(0);
+                    try {
+                        await adapter.DeleteMedia(folderId, oldFlPid, userHash);
+                    } catch (e) {
+                        console.warn("Failed to delete existing file binary", e);
+                    }
+                }
+
+                const fileKey = new Uint8Array(44);
+                fileKey.set(Random(32), 0);
+                fileKey.set(Random(12), 32);
+                const filePid = GetObjPid(fileKey);
+
+                // Make thumbnail
+                let thumb = null;
+                if (file.type.startsWith("image/") || file.name.toLowerCase().endsWith(".svg")) {
+                    thumb = await adapter.MakeImageThumb(file);
+                } else if (file.type.startsWith("video/")) {
+                    thumb = await adapter.MakeVideoThumb(file);
+                }
+
+                if (this.isUploadCancelled) throw new Error("UPLOAD_CANCELLED");
+
+                // Encrypt file with progress (0% -> 50%)
+                let encryptedBytes = 0;
+                const smx = new SymMaster("gcmx1", fileKey.slice(0, 32));
+                const encChks = [];
+
+                await smx.EnFile(new FileSrc(file), file.size, {
+                    write: async (c) => {
+                        if (this.isUploadCancelled) throw new Error("UPLOAD_CANCELLED");
+                        encChks.push(c);
+                        encryptedBytes += c.length;
+                        if (onFileProgress) {
+                            const percent = Math.min(50, Math.round((encryptedBytes / (file.size || 1)) * 50));
+                            onFileProgress(i, percent, files.length);
+                        }
+                    }
+                });
+
+                if (this.isUploadCancelled) throw new Error("UPLOAD_CANCELLED");
+
+                // Padding
+                const encSize = encChks.reduce((a, c) => a + c.length, 0);
+                const padSize = PadLen(encSize);
+                const totSize = encSize + padSize;
+                const medBuf = new Uint8Array(totSize);
+                let offset = 0;
+                for (const c of encChks) {
+                    medBuf.set(c, offset);
+                    offset += c.length;
+                }
+
+                if (padSize > 0) {
+                    let pOff = offset;
+                    const pEnd = offset + padSize;
+                    while (pOff < pEnd) {
+                        const chunk = Math.min(32768, pEnd - pOff);
+                        medBuf.set(Random(chunk), pOff);
+                        pOff += chunk;
+                    }
+                }
+
+                if (this.isUploadCancelled) throw new Error("UPLOAD_CANCELLED");
+
+                // Network upload via XHR (50% -> 95%)
+                await new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    this.currentUploadXhr = xhr;
+                    xhr.open("POST", `${this.serverUrl}/api/media/${folderId}/${filePid}/dat`);
+                    xhr.setRequestHeader("X-User-Hash", userHash);
+                    xhr.upload.onprogress = (e) => {
+                        if (e.lengthComputable && onFileProgress) {
+                            const uploadPercent = 50 + Math.min(45, Math.round((e.loaded / e.total) * 45));
+                            onFileProgress(i, uploadPercent, files.length);
+                        }
+                    };
+                    xhr.onload = () => {
+                        if (xhr.status >= 200 && xhr.status < 300) resolve();
+                        else reject(new Error(`Upload failed with status ${xhr.status}`));
+                    };
+                    xhr.onabort = () => reject(new Error("UPLOAD_CANCELLED"));
+                    xhr.onerror = () => reject(new Error("Network upload failed"));
+                    xhr.send(medBuf);
+                });
+                this.currentUploadXhr = null;
+
+                // Upload thumbnail
+                if (thumb) {
+                    const thmSm = new SymMaster("gcm1", fileKey.slice(0, 32));
+                    await fetch(`${this.serverUrl}/api/media/${folderId}/${filePid}/thumb`, {
+                        method: "POST",
+                        headers: { "X-User-Hash": userHash },
+                        body: await thmSm.EnBin(new Uint8Array(await thumb.arrayBuffer()))
+                    });
+                }
+
+                if (onFileProgress) onFileProgress(i, 100, files.length);
+                if (onFileComplete) onFileComplete(i, file.name);
+
+                const flInfo = new Uint8Array(52);
+                flInfo.set(fileKey, 0);
+                flInfo.set(EncodeInt(file.size, 8), 44);
+                this.flsMap[file.name] = mask.XOR(flInfo);
+                fileKey.fill(0);
+                flInfo.fill(0);
+                uploadedCount++;
+            }
+
+            // Sync metadata
+            if (uploadedCount > 0 && !this.isUploadCancelled) {
+                if (onSyncing) onSyncing();
+                const rawMap = {};
+                for (const [k, v] of Object.entries(this.flsMap)) {
+                    rawMap[k] = mask.XOR(v);
+                }
+                await adapter.SaveFolderMeta(folderId, rawMap, this.currentFolderKey, userHash);
+                for (const v of Object.values(rawMap)) if (v?.fill) v.fill(0);
+
+                this.keywordsBuilt = false;
+                this.BuildKeywords();
+                this.InvalidateCache();
+            }
+
+            if (onComplete) onComplete(uploadedCount);
+        } catch (err) {
+            if (err.message === "UPLOAD_CANCELLED") {
+                if (onCancel) onCancel(this.activeUploadFileIdx);
+            } else {
+                throw err;
+            }
+        } finally {
+            this.isUploadCancelled = false;
+            this.isUploading = false;
+            this.currentUploadXhr = null;
+            this.activeUploadFileIdx = -1;
+        }
     }
 }
 
+// Global drive service singleton instance
 export const driveService = new DriveService();

@@ -85,7 +85,7 @@ const decryptSession = async (payloadHex, hexKey) => {
     return JSON.parse(text);
 };
 
-class SafeSessionManager {
+export class SafeSessionManager {
     constructor() {
         this.ram = {};
         this._initPromise = null;
@@ -93,7 +93,8 @@ class SafeSessionManager {
         this._saveTimer = null;
     }
 
-    async init() {
+    // Initialize session decryption from encrypted sessionStorage using window.name KEK
+    async Init() {
         if (this._initPromise) return this._initPromise;
 
         this._initPromise = (async () => {
@@ -112,8 +113,7 @@ class SafeSessionManager {
                 }
             }
 
-            // Migration & Disk Cleansing:
-            // Absorb any legacy plaintext keys into RAM and immediately PURGE them from disk
+            // Migration & Disk Cleansing: purge legacy plaintext keys
             const legacyKeys = [
                 'userHash', 'userKey', 'username',
                 'currentFolderId', 'currentFolderKey', 'currentFileKey', 'currentFileName',
@@ -136,7 +136,7 @@ class SafeSessionManager {
             } catch (_) { }
 
             if (migrated || !encPayload) {
-                await this.save();
+                await this.Save();
             }
 
             this.isInitialized = true;
@@ -147,21 +147,21 @@ class SafeSessionManager {
     }
 
     // 0ms high-speed memory lookup (RAM Boundary)
-    getItem(key) {
+    GetItem(key) {
         if (!this.ram) return null;
         const val = this.ram[key];
         return val !== undefined ? val : null;
     }
 
     // Write to RAM immediately, schedule encrypted disk flush
-    setItem(key, value) {
+    SetItem(key, value) {
         if (!this.ram) this.ram = {};
         this.ram[key] = String(value);
         this.scheduleSave();
     }
 
     // Remove from RAM, schedule encrypted disk flush
-    removeItem(key) {
+    RemoveItem(key) {
         if (this.ram && key in this.ram) {
             delete this.ram[key];
             this.scheduleSave();
@@ -169,7 +169,7 @@ class SafeSessionManager {
     }
 
     // Clear both RAM and disk storage, erase ephemeral KEK
-    clear() {
+    Clear() {
         this.ram = {};
         try {
             sessionStorage.clear();
@@ -177,15 +177,16 @@ class SafeSessionManager {
         } catch (_) { }
     }
 
+    // Debounced schedule for encrypted disk write
     scheduleSave() {
         if (this._saveTimer) clearTimeout(this._saveTimer);
         this._saveTimer = setTimeout(() => {
-            this.save().catch(e => console.error('[SafeSession] Encrypted save error:', e));
+            this.Save().catch(e => console.error('[SafeSession] Encrypted save error:', e));
         }, 50);
     }
 
     // Single-pass serialization crossing RAM -> Disk boundary
-    async save() {
+    async Save() {
         if (this._saveTimer) {
             clearTimeout(this._saveTimer);
             this._saveTimer = null;
@@ -200,8 +201,5 @@ class SafeSessionManager {
     }
 }
 
+// Global SafeSession singleton instance
 export const SafeSession = new SafeSessionManager();
-
-if (typeof window !== 'undefined') {
-    window.SafeSession = SafeSession;
-}

@@ -1,19 +1,22 @@
-// MediaHub Core Utilities
+// MediaHub Core Utilities & Modals
 import { SHA3256 } from '../engine/Bencrypt.js';
 
-export const toHex = (buf) => {
+// Convert Uint8Array buffer to lowercase hexadecimal string
+export const ToHex = (buf) => {
     if (!buf) return '';
     return Array.from(buf).map(b => b.toString(16).padStart(2, '0')).join('');
 };
 
-export const fromHex = (hex) => {
+// Convert hexadecimal string to Uint8Array buffer
+export const FromHex = (hex) => {
     if (!hex || hex.length % 2 !== 0) return new Uint8Array(0);
     const matches = hex.match(/.{1,2}/g);
     if (!matches) return new Uint8Array(0);
     return new Uint8Array(matches.map(b => parseInt(b, 16)));
 };
 
-export const formatBytes = (bytes) => {
+// Format byte count to human-readable size string
+export const FormatBytes = (bytes) => {
     if (bytes === undefined || bytes === null || isNaN(bytes)) return '-';
     if (bytes === 0) return '0 B';
     const k = 1024;
@@ -23,26 +26,30 @@ export const formatBytes = (bytes) => {
     return `${val} ${sizes[i]}`;
 };
 
-export const escapeHtml = (str) => {
+// Escape special HTML characters to prevent XSS attacks
+export const EscapeHtml = (str) => {
     return (str || '')
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 };
 
-export const getObjPid = (key) => {
+// Extract 24-byte object PID from a 44-byte raw cryptographic key slice
+export const GetObjPid = (key) => {
     if (!key || key.length < 44) return '';
-    return toHex(key.slice(32, 44));
+    return ToHex(key.slice(32, 44));
 };
 
-export const getUserPid = (key) => {
+// Compute 16-byte user PID hash from user master key
+export const GetUserPid = (key) => {
     if (!key) return '';
-    return toHex(SHA3256(key).slice(0, 16));
+    return ToHex(SHA3256(key).slice(0, 16));
 };
 
-// Material You Unified Notice Modal
-export const showNotice = (msg, title = 'Notice', icon = 'campaign') => {
+// Display unified Material You notice alert modal
+export const ShowNotice = (msg, title = 'Notice', icon = 'campaign') => {
     const modal = document.getElementById('noticeModal');
     if (!modal) {
         alert(msg);
@@ -83,8 +90,8 @@ export const showNotice = (msg, title = 'Notice', icon = 'campaign') => {
     });
 };
 
-// Smart Alert wrapper
-export const showAlert = (msg) => {
+// Smart Alert wrapper that chooses icon and title based on message content
+export const ShowAlert = (msg) => {
     let title = 'Notice';
     let icon = 'campaign';
     if (typeof msg === 'string') {
@@ -99,11 +106,11 @@ export const showAlert = (msg) => {
             icon = 'check_circle';
         }
     }
-    return showNotice(msg, title, icon);
+    return ShowNotice(msg, title, icon);
 };
 
-// Material You Confirm Modal
-export const showConfirmModal = (msg, title = 'Confirm', icon = 'help', confirmText = 'Confirm', isDanger = false) => {
+// Display confirmation modal with action buttons
+export const ShowConfirmModal = (msg, title = 'Confirm', icon = 'help', confirmText = 'Confirm', isDanger = false) => {
     return new Promise((resolve) => {
         const modal = document.getElementById('confirmModal');
         if (!modal) {
@@ -151,7 +158,8 @@ export const showConfirmModal = (msg, title = 'Confirm', icon = 'help', confirmT
     });
 };
 
-export const disableAllAutocomplete = () => {
+// Disable browser autocomplete and autocorrect on all text inputs
+export const DisableAllAutocomplete = () => {
     document.querySelectorAll('input:not([type="checkbox"]):not([type="file"]):not([type="radio"])').forEach(input => {
         if (!input.hasAttribute('autocomplete') || input.getAttribute('autocomplete') !== 'new-password') {
             input.setAttribute('autocomplete', 'off');

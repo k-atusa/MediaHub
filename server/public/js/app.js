@@ -2,18 +2,17 @@
 import { SafeSession } from './core/session.js';
 import { router } from './core/router.js';
 import { driveService } from './services/drive.js';
-import { uploadService } from './services/upload.js';
 import { loginView } from './views/login.js';
 import { driveView } from './views/drive.js';
 import { viewerView } from './views/viewer.js';
-import { showNotice, showAlert, disableAllAutocomplete, getObjPid } from './core/utils.js';
+import { ShowNotice, ShowAlert, DisableAllAutocomplete, GetObjPid } from './core/utils.js';
 
-// Expose notice & cancelUpload globally for backward safety & inline compatibility
-window.showNotice = showNotice;
-window.alert = showAlert;
-window.cancelUpload = (idx) => uploadService.cancelUpload(idx);
+// Expose notice & cancelUpload globally for template modal and inline button access
+window.showNotice = ShowNotice;
+window.alert = ShowAlert;
+window.cancelUpload = (idx) => driveService.CancelUpload(idx);
 
-// View switcher helper
+// Switch active view DOM container visibility
 function activateView(viewId) {
     document.querySelectorAll('.view-container').forEach(el => {
         el.classList.remove('active');
@@ -24,9 +23,10 @@ function activateView(viewId) {
     }
 }
 
+// Bootstrap master application, initialize session and register History API routes
 async function bootstrap() {
-    await SafeSession.init();
-    const hasAuth = await driveService.initSession();
+    await SafeSession.Init();
+    await driveService.InitSession();
 
     // Theme initialization
     const savedTheme = localStorage.getItem('theme') || 'system';
@@ -36,25 +36,25 @@ async function bootstrap() {
         document.documentElement.removeAttribute('data-theme');
     }
 
-    // System dark mode listener
+    // System dark mode preference change listener
     window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
         if ((localStorage.getItem("theme") || "system") === "system") {
-            driveView.updateThemeUI();
+            driveView.UpdateThemeUI();
         }
     });
 
-    // Navigation Guards
-    router.beforeEach(async (path, query) => {
-        const isAuth = Boolean(SafeSession.getItem("userHash") && SafeSession.getItem("userKey"));
+    // Navigation Guards for authentication checking
+    router.BeforeEach(async (path, query) => {
+        const isAuth = Boolean(SafeSession.GetItem("userHash") && SafeSession.GetItem("userKey"));
 
-        // If not logged in and attempting to access drive/viewer
+        // If not authenticated and attempting to access protected views
         if (!isAuth && path !== '/login') {
-            const redirectUrl = path + (window.location.hash.includes('?') ? '?' + window.location.hash.split('?')[1] : '');
-            SafeSession.setItem("redirectAfterLogin", redirectUrl);
+            const redirectUrl = window.location.pathname + window.location.search;
+            SafeSession.SetItem("redirectAfterLogin", redirectUrl);
             return '/login';
         }
 
-        // If logged in and attempting to access login page
+        // If authenticated and attempting to access login view
         if (isAuth && path === '/login') {
             return '/drive';
         }
@@ -62,49 +62,69 @@ async function bootstrap() {
         return null;
     });
 
-    // Register Routes
-    router.on('/login', async () => {
+    // Register View: Login
+    router.On('/login', async () => {
         activateView('view-login');
-        loginView.mount();
+        await loginView.Mount();
     });
 
-    router.on('/drive/:folderName', async ({ params, query }) => {
+    // Register View: Drive Workspace
+    router.On('/drive', async ({ query }) => {
         activateView('view-drive');
-        await driveView.mount(params.folderName);
-        if (query.file) {
-            driveView.openFileInViewer(query.file);
-        }
-    });
 
-    router.on('/drive', async ({ query }) => {
-        activateView('view-drive');
-        let targetFolder = "";
-        if (query.folder) {
-            targetFolder = query.folder;
+        let targetFolderName = "";
+        const fldPid = query.f;
+        const filePid = query.p;
+
+        if (fldPid) {
             for (const [name, key] of Object.entries(driveService.fldMap)) {
-                if (getObjPid(key) === query.folder || name === query.folder) {
-                    targetFolder = name;
+                const raw = driveService.UnmaskKey(key);
+                if (GetObjPid(raw) === fldPid) {
+                    targetFolderName = name;
+                    raw.fill(0);
                     break;
                 }
+                raw.fill(0);
             }
         }
-        await driveView.mount(targetFolder);
-        if (query.file) {
-            driveView.openFileInViewer(query.file);
+
+        await driveView.Mount(targetFolderName);
+
+        // Handle file deep link restoration
+        if (filePid && targetFolderName) {
+            const opened = await driveView.openFileByPid(filePid);
+            if (opened) {
+                await router.Replace('/viewer');
+                return;
+            }
+        }
+
+        // Normalize URL if parameters were present
+        if (fldPid || filePid) {
+            window.history.replaceState(null, '', '/drive');
         }
     });
 
-    router.on('/viewer', async ({ query }) => {
+    // Register View: Media Viewer
+    router.On('/viewer', async ({ query }) => {
         activateView('view-viewer');
-        await viewerView.mount(query);
+
+        if (query.f || query.p) {
+            await viewerView.MountWithQuery(query);
+            window.history.replaceState(null, '', '/viewer');
+            return;
+        }
+
+        await viewerView.Mount();
     });
 
-    disableAllAutocomplete();
+    DisableAllAutocomplete();
 
-    // Start router
-    await router.init();
+    // Start router and handle initial document path
+    await router.Init();
 }
 
+// Start application after DOM is ready
 if (document.readyState === 'loading') {
     window.addEventListener('DOMContentLoaded', bootstrap);
 } else {

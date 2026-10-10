@@ -1,10 +1,7 @@
-// MediaHub Drive Explorer View Controller
 import { driveService } from '../services/drive.js';
-import { uploadService } from '../services/upload.js';
-import { makeToken, loadToken } from '../core/media.js';
 import { SafeSession } from '../core/session.js';
 import { router } from '../core/router.js';
-import { showNotice, showConfirmModal, formatBytes, toHex, fromHex, getObjPid } from '../core/utils.js';
+import { ShowNotice, ShowConfirmModal, FormatBytes, EscapeHtml, ToHex, FromHex, GetObjPid } from '../core/utils.js';
 
 const RING_CIRCUMFERENCE = 56.548;
 
@@ -216,7 +213,7 @@ export class DriveView {
         if (accountMenuItemLogout) {
             accountMenuItemLogout.addEventListener("click", async () => {
                 driveService.clearSession();
-                router.navigate('/login');
+                router.Navigate('/login');
             });
         }
     }
@@ -295,7 +292,10 @@ export class DriveView {
         const logoWrap = document.querySelector(".logo-wrap");
         const breadcrumbLink = document.querySelector(".breadcrumb-link");
 
-        const navRoot = () => router.navigate('/drive');
+        const navRoot = async () => {
+            await this.mount("");
+            await router.Navigate('/drive');
+        };
         if (sidebarMyDriveHeader) sidebarMyDriveHeader.addEventListener("click", navRoot);
         if (logoWrap) logoWrap.addEventListener("click", navRoot);
         if (breadcrumbLink) breadcrumbLink.addEventListener("click", navRoot);
@@ -954,7 +954,7 @@ export class DriveView {
         const btnCancel = document.getElementById("btnCancelShare");
 
         if (descEl) {
-            descEl.innerHTML = `Set a password to encrypt this folder's share token for "<strong>${folderName.replace(/</g, "&lt;")}</strong>". Anyone with the token file and password can access the folder.`;
+            descEl.innerHTML = `Set a password to encrypt this folder's share token for "<strong>${escapeHtml(folderName)}</strong>". Anyone with the token file and password can access the folder.`;
         }
         if (pwInput) pwInput.value = "";
         if (errText) errText.style.display = "none";
@@ -979,8 +979,7 @@ export class DriveView {
             cleanup();
             modal?.close();
 
-            const maskedKey = driveService.fldMap[folderName];
-            const token = await makeToken(folderName, maskedKey, pw);
+            const token = await driveService.ExportShareToken(folderName, pw);
             if (!token) return;
 
             const blob = new Blob([token], { type: "text/plain" });
@@ -1034,9 +1033,9 @@ export class DriveView {
                 cleanup();
                 modal?.close();
 
-                const info = await loadToken(fileText, pw);
+                const info = await driveService.ImportShareToken(fileText, pw);
                 if (!info) {
-                    return showNotice("Invalid token or incorrect password.", "Error", "error");
+                    return ShowNotice("Invalid token or incorrect password.", "Error", "error");
                 }
 
                 const effectiveName = info.name;
@@ -1075,7 +1074,7 @@ export class DriveView {
 
     async openUnlinkFolderModal(folderName) {
         const ok = await showConfirmModal(
-            `Are you sure you want to remove folder "<strong>${folderName.replace(/</g, "&lt;")}</strong>" from your account? The folder will remain accessible for other users sharing it.`,
+            `Are you sure you want to remove folder "<strong>${escapeHtml(folderName)}</strong>" from your account? The folder will remain accessible for other users sharing it.`,
             "Remove Folder?",
             "link_off",
             "Remove"
@@ -1085,7 +1084,8 @@ export class DriveView {
             await driveService.unlinkFolder(folderName);
             this.renderSidebarFolderList();
             if (driveService.currentFolderName === folderName) {
-                router.navigate('/drive');
+                await this.mount("");
+                await router.Navigate('/drive');
             } else {
                 this.renderRootFolderGrid();
             }
@@ -1097,7 +1097,7 @@ export class DriveView {
 
     async openDeleteFolderModal(folderName) {
         const ok = await showConfirmModal(
-            `Are you sure you want to delete "<strong>${folderName.replace(/</g, "&lt;")}</strong>" permanently? All files and encrypted metadata inside it will be permanently deleted from the server for ALL users.`,
+            `Are you sure you want to delete "<strong>${escapeHtml(folderName)}</strong>" permanently? All files and encrypted metadata inside it will be permanently deleted from the server for ALL users.`,
             "Delete Permanently?",
             "delete_forever",
             "Delete Permanently",
@@ -1108,7 +1108,8 @@ export class DriveView {
             await driveService.deleteFolderPermanently(folderName);
             this.renderSidebarFolderList();
             if (driveService.currentFolderName === folderName) {
-                router.navigate('/drive');
+                await this.mount("");
+                await router.Navigate('/drive');
             } else {
                 this.renderRootFolderGrid();
             }
@@ -1207,7 +1208,7 @@ export class DriveView {
             if (!e.dataTransfer) return;
             const files = Array.from(e.dataTransfer.files || []);
             if (files.length > 0) {
-                const prepared = uploadService.prepareFiles(files);
+                const prepared = driveService.PrepareFiles(files);
                 this.executeUpload(prepared);
             }
         });
@@ -1235,7 +1236,7 @@ export class DriveView {
         if (confirmedFiles.length === 0) return;
 
         try {
-            await uploadService.uploadFiles(confirmedFiles, {
+            await driveService.UploadFiles(confirmedFiles, {
                 onStart: (fls) => this.showUploadProgressWidget(fls),
                 onFileProgress: (idx, percent, total) => this.updateFileProgress(idx, percent, total),
                 onFileComplete: (idx, name) => this.markFileUploaded(idx, name),
@@ -1289,7 +1290,7 @@ export class DriveView {
             });
             uploadProgressWidget.addEventListener("mouseleave", () => {
                 this.isWidgetHovered = false;
-                if (!uploadService.isUploading && !uploadProgressWidget.classList.contains("hidden")) {
+                if (!driveService.isUploading && !uploadProgressWidget.classList.contains("hidden")) {
                     this.uploadDismissTimer = setTimeout(() => {
                         uploadProgressWidget.classList.add("hidden");
                     }, 4000);
@@ -1328,7 +1329,7 @@ export class DriveView {
                 item.dataset.fileName = f.name;
                 item.innerHTML = `
                     <span class="material-symbols-outlined upload-item-type-icon" style="color: ${info.color};">${info.icon}</span>
-                    <span class="upload-item-name" title="${f.name}">${f.name}</span>
+                    <span class="upload-item-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
                     <div class="upload-item-status" id="uploadItemStatus_${idx}">
                         ${idx === 0 ? this.createProgressRingHtml(idx, 0) : '<span class="material-symbols-outlined" style="font-size: 18px; color: var(--g-text-muted);">schedule</span>'}
                     </div>
@@ -1440,7 +1441,7 @@ export class DriveView {
             const ok = await driveService.selectFolder(folderName);
             if (!ok) {
                 showNotice("Folder not found", "Notice", "warning");
-                return router.navigate('/drive');
+                return router.Navigate('/drive');
             }
             this.updateFolderHeader(folderName);
             this.page = 1;
@@ -1508,27 +1509,39 @@ export class DriveView {
             const item = document.createElement("div");
             item.className = "nav-folder-item" + (name === driveService.currentFolderName ? " active" : "");
             item.dataset.folderName = name;
-            item.innerHTML = `
-                <span class="material-symbols-outlined nav-folder-icon">folder</span>
-                <span class="folder-name-label" title="${name}">${name}</span>
-                <button type="button" class="folder-more-btn" title="More options" aria-label="More options">
-                    <span class="material-symbols-outlined">more_vert</span>
-                </button>
-            `;
-            item.addEventListener("click", () => {
+
+            const iconSpan = document.createElement("span");
+            iconSpan.className = "material-symbols-outlined nav-folder-icon";
+            iconSpan.textContent = "folder";
+
+            const nameSpan = document.createElement("span");
+            nameSpan.className = "folder-name-label";
+            nameSpan.textContent = name;
+            nameSpan.title = name;
+
+            const moreBtn = document.createElement("button");
+            moreBtn.type = "button";
+            moreBtn.className = "folder-more-btn";
+            moreBtn.title = "More options";
+            moreBtn.setAttribute("aria-label", "More options");
+            moreBtn.innerHTML = '<span class="material-symbols-outlined">more_vert</span>';
+
+            item.appendChild(iconSpan);
+            item.appendChild(nameSpan);
+            item.appendChild(moreBtn);
+
+            item.addEventListener("click", async () => {
                 if (window.innerWidth <= 768) {
                     document.querySelector(".drive-sidebar")?.classList.remove("mobile-open");
                     document.getElementById("sidebarBackdrop")?.classList.remove("active");
                 }
-                router.navigate(`/drive/${encodeURIComponent(name)}`);
+                await this.mount(name);
+                await router.Navigate('/drive');
             });
-            const moreBtn = item.querySelector(".folder-more-btn");
-            if (moreBtn) {
-                moreBtn.addEventListener("click", (e) => {
-                    e.stopPropagation();
-                    this.openFolderContextMenu(e, name, moreBtn);
-                });
-            }
+            moreBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                this.openFolderContextMenu(e, name, moreBtn);
+            });
             sidebarFolderList.appendChild(item);
         });
     }
@@ -1557,23 +1570,35 @@ export class DriveView {
             folders.forEach(name => {
                 const card = document.createElement("div");
                 card.className = "root-folder-card";
-                card.innerHTML = `
-                    <span class="material-symbols-outlined">folder</span>
-                    <span class="root-folder-card-name">${name}</span>
-                    <button type="button" class="folder-more-btn" title="More options" aria-label="More options">
-                        <span class="material-symbols-outlined">more_vert</span>
-                    </button>
-                `;
-                card.addEventListener("click", () => {
-                    router.navigate(`/drive/${encodeURIComponent(name)}`);
+
+                const icon = document.createElement("span");
+                icon.className = "material-symbols-outlined";
+                icon.textContent = "folder";
+
+                const nameSpan = document.createElement("span");
+                nameSpan.className = "root-folder-card-name";
+                nameSpan.textContent = name;
+                nameSpan.title = name;
+
+                const moreBtn = document.createElement("button");
+                moreBtn.type = "button";
+                moreBtn.className = "folder-more-btn";
+                moreBtn.title = "More options";
+                moreBtn.setAttribute("aria-label", "More options");
+                moreBtn.innerHTML = '<span class="material-symbols-outlined">more_vert</span>';
+
+                card.appendChild(icon);
+                card.appendChild(nameSpan);
+                card.appendChild(moreBtn);
+
+                card.addEventListener("click", async () => {
+                    await this.mount(name);
+                    await router.Navigate('/drive');
                 });
-                const moreBtn = card.querySelector(".folder-more-btn");
-                if (moreBtn) {
-                    moreBtn.addEventListener("click", (e) => {
-                        e.stopPropagation();
-                        this.openFolderContextMenu(e, name, moreBtn);
-                    });
-                }
+                moreBtn.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    this.openFolderContextMenu(e, name, moreBtn);
+                });
                 rootFolderGrid.appendChild(card);
             });
             return;
@@ -1618,16 +1643,31 @@ export class DriveView {
             matchingFolders.forEach(name => {
                 const card = document.createElement("div");
                 card.className = "root-folder-card";
-                card.innerHTML = `
-                    <span class="material-symbols-outlined">folder</span>
-                    <span class="root-folder-card-name">${name}</span>
-                    <button type="button" class="folder-more-btn" title="More options">
-                        <span class="material-symbols-outlined">more_vert</span>
-                    </button>
-                `;
-                card.addEventListener("click", () => router.navigate(`/drive/${encodeURIComponent(name)}`));
-                const moreBtn = card.querySelector(".folder-more-btn");
-                if (moreBtn) moreBtn.addEventListener("click", (e) => { e.stopPropagation(); this.openFolderContextMenu(e, name, moreBtn); });
+
+                const icon = document.createElement("span");
+                icon.className = "material-symbols-outlined";
+                icon.textContent = "folder";
+
+                const nameSpan = document.createElement("span");
+                nameSpan.className = "root-folder-card-name";
+                nameSpan.textContent = name;
+                nameSpan.title = name;
+
+                const moreBtn = document.createElement("button");
+                moreBtn.type = "button";
+                moreBtn.className = "folder-more-btn";
+                moreBtn.title = "More options";
+                moreBtn.innerHTML = '<span class="material-symbols-outlined">more_vert</span>';
+
+                card.appendChild(icon);
+                card.appendChild(nameSpan);
+                card.appendChild(moreBtn);
+
+                card.addEventListener("click", async () => {
+                    await this.mount(name);
+                    await router.Navigate('/drive');
+                });
+                moreBtn.addEventListener("click", (e) => { e.stopPropagation(); this.openFolderContextMenu(e, name, moreBtn); });
                 rootFolderGrid.appendChild(card);
             });
         }
@@ -1663,7 +1703,7 @@ export class DriveView {
 
                 const folderChip = document.createElement("div");
                 folderChip.className = "file-folder-chip";
-                folderChip.innerHTML = `<span class="material-symbols-outlined">folder</span><span>${file.folderName}</span>`;
+                folderChip.innerHTML = `<span class="material-symbols-outlined">folder</span><span>${escapeHtml(file.folderName)}</span>`;
 
                 card.appendChild(img);
                 card.appendChild(title);
@@ -1928,7 +1968,7 @@ export class DriveView {
             item.innerHTML = `
                 <div class="filter-item-left">
                     <input type="checkbox" class="filter-item-checkbox" ${isChecked ? "checked" : ""}>
-                    <span class="filter-item-name">${kw}</span>
+                    <span class="filter-item-name">${escapeHtml(kw)}</span>
                 </div>
                 <span class="filter-item-count">${count}</span>
             `;
@@ -1965,7 +2005,7 @@ export class DriveView {
                 driveService.selectKeywords.forEach(kw => {
                     const chip = document.createElement("span");
                     chip.className = "filter-chip";
-                    chip.innerHTML = `<span>${kw}</span><button type="button" class="chip-remove-btn"><span class="material-symbols-outlined" style="font-size: 14px;">close</span></button>`;
+                    chip.innerHTML = `<span>${escapeHtml(kw)}</span><button type="button" class="chip-remove-btn"><span class="material-symbols-outlined" style="font-size: 14px;">close</span></button>`;
                     chip.querySelector(".chip-remove-btn").addEventListener("click", (e) => {
                         e.stopPropagation();
                         driveService.selectKeywords.delete(kw);
@@ -1990,24 +2030,46 @@ export class DriveView {
 
         if (!flKey || !fldId || !fldKey) return;
 
+        const rawFK = driveService.unmaskKey(flKey);
+        const rawFldK = driveService.unmaskKey(fldKey);
+
         SafeSession.setItem("currentFileName", name);
-        SafeSession.setItem("currentFileKey", toHex(flKey));
+        SafeSession.setItem("currentFileKey", ToHex(rawFK));
         SafeSession.setItem("currentFolderId", fldId);
-        SafeSession.setItem("currentFolderKey", toHex(fldKey));
+        SafeSession.setItem("currentFolderKey", ToHex(rawFldK));
         SafeSession.setItem("oldFold", fldName);
+        rawFK.fill(0);
+        rawFldK.fill(0);
         SafeSession.save();
 
-        router.navigate(`/viewer?folder=${encodeURIComponent(fldId)}&file=${encodeURIComponent(name)}`);
+        router.Navigate('/viewer');
+    }
+
+    async openFileByPid(filePid) {
+        if (!filePid || !driveService.currentFolderId) return false;
+        for (const [name, key] of Object.entries(driveService.flsMap)) {
+            const rawFK = driveService.unmaskKey(key);
+            const pid = GetObjPid(rawFK.slice(0, 44));
+            rawFK.fill(0);
+            if (pid === filePid) {
+                this.openFileInViewer(name);
+                return true;
+            }
+        }
+        return false;
     }
 
     async shareFile(name) {
         const fileKey = driveService.flsMap[name];
         if (!fileKey || !driveService.currentFolderId) return;
-        const pid = getObjPid(fileKey.slice(0, 44));
-        const url = `${window.location.origin}/#drive/${encodeURIComponent(driveService.currentFolderName)}?file=${encodeURIComponent(pid)}`;
+        const rawFK = driveService.unmaskKey(fileKey);
+        const pid = GetObjPid(rawFK.slice(0, 44));
+        rawFK.fill(0);
+
+        const url = `${window.location.origin}/drive?f=${encodeURIComponent(driveService.currentFolderId)}&p=${encodeURIComponent(pid)}`;
         try {
             await navigator.clipboard.writeText(url);
-            showNotice("Link copied to clipboard.", "Share", "check_circle");
+            showNotice("Deep link copied to clipboard.", "Share", "check_circle");
         } catch {
             prompt("Copy link:", url);
         }
@@ -2024,7 +2086,7 @@ export class DriveView {
 
     async deleteFile(name) {
         const ok = await showConfirmModal(
-            `Are you sure you want to delete "<strong>${name.replace(/</g, "&lt;")}</strong>"?`,
+            `Are you sure you want to delete "<strong>${escapeHtml(name)}</strong>"?`,
             "Delete file?",
             "delete",
             "Delete",
@@ -2041,8 +2103,8 @@ export class DriveView {
     }
 
     syncUserProfileUI() {
-        const username = SafeSession.getItem("username") || "User";
-        const usrHsh = SafeSession.getItem("userHash") || "";
+        const username = SafeSession.GetItem("username") || "User";
+        const usrHsh = SafeSession.GetItem("userHash") || "";
         const initial = (username.slice(0, 2) || "TE").toUpperCase();
 
         const headerAvatar = document.getElementById("headerAvatar");
@@ -2057,6 +2119,10 @@ export class DriveView {
             menuUserHashShort.textContent = usrHsh ? `ID: ${usrHsh.slice(0, 8)}...${usrHsh.slice(-4)}` : "E2EE Account";
         }
     }
+
+    Init() { return this.init(); }
+    Mount(folderName) { return this.mount(folderName); }
+    UpdateThemeUI() { return this.updateThemeUI(); }
 }
 
 export const driveView = new DriveView();

@@ -1,13 +1,9 @@
-// MediaHub Media Viewer View Controller
-import { SymMaster, Masker } from '../engine/Bencrypt.js';
-import { DecodeCfg, DecodeInt, EncodeInt } from '../engine/Opsec.js';
-import { NetSrc } from '../core/media.js';
+// MediaHub Media Viewer View Controller (Pure UI)
 import { SafeSession } from '../core/session.js';
 import { router } from '../core/router.js';
 import { driveService } from '../services/drive.js';
-import { showNotice, showConfirmModal, formatBytes, escapeHtml, toHex, fromHex, getObjPid } from '../core/utils.js';
-
-const mask = new Masker();
+import { adapter } from '../adapter.js';
+import { ShowNotice, ShowConfirmModal, FormatBytes, EscapeHtml, ToHex, FromHex, GetObjPid } from '../core/utils.js';
 
 const VIDEO_EXTS = ['mp4', 'webm', 'mov', 'mkv'];
 const AUDIO_EXTS = ['mp3', 'ogg', 'wav', 'm4a', 'aac', 'flac', 'opus', 'wma'];
@@ -23,10 +19,10 @@ const TEXT_EXTS = [
 ];
 
 export class ViewerView {
+    // Initialize ViewerView with DOM container and runtime state
     constructor() {
         this.container = document.getElementById('view-viewer');
         this.initialized = false;
-        this.serverUrl = window.location.origin;
 
         this.fldId = null;
         this.fldKey = null;
@@ -37,19 +33,15 @@ export class ViewerView {
         this.currentBlobUrl = null;
     }
 
-    init() {
+    // Initialize UI controls, toolbar buttons, and context menu event listeners
+    Init() {
         if (this.initialized) return;
         this.initialized = true;
 
         const btnBack = document.getElementById("btnViewerBack");
         if (btnBack) {
             btnBack.addEventListener("click", () => {
-                const oldFold = SafeSession.getItem("oldFold");
-                if (oldFold) {
-                    router.navigate(`/drive/${encodeURIComponent(oldFold)}`);
-                } else {
-                    router.navigate('/drive');
-                }
+                router.Navigate('/drive');
             });
         }
 
@@ -101,7 +93,6 @@ export class ViewerView {
             this.deleteCurrentFile();
         });
 
-        // Rename modal
         const renameFileModal = document.getElementById("renameFileModal");
         const btnConfirmRenameFile = document.getElementById("btnConfirmRenameFile");
         const btnCancelRenameFile = document.getElementById("btnCancelRenameFile");
@@ -129,6 +120,7 @@ export class ViewerView {
         if (btnCancelRenameFile) btnCancelRenameFile.addEventListener("click", () => renameFileModal?.close());
     }
 
+    // Close viewer dropdown action menu
     closeViewerMenu() {
         const viewerActionMenu = document.getElementById("viewerActionMenu");
         const btnViewerMore = document.getElementById("btnViewerMore");
@@ -139,36 +131,35 @@ export class ViewerView {
         if (btnViewerMore) btnViewerMore.classList.remove("open");
     }
 
-    async mount(query = {}) {
-        this.init();
-        this.cleanupCurrentMedia();
+    // Mount viewer from active SafeSession cache
+    async Mount() {
+        this.Init();
+        this.CleanupCurrentMedia();
 
-        this.fldId = SafeSession.getItem("currentFolderId");
-        this.flName = SafeSession.getItem("currentFileName");
+        this.fldId = SafeSession.GetItem("currentFolderId");
+        this.flName = SafeSession.GetItem("currentFileName");
 
-        const rawFK = SafeSession.getItem("currentFolderKey") ? fromHex(SafeSession.getItem("currentFolderKey")) : null;
-        const rawFlK = SafeSession.getItem("currentFileKey") ? fromHex(SafeSession.getItem("currentFileKey")) : null;
+        const rawFkHex = SafeSession.GetItem("currentFolderKey");
+        const rawFlkHex = SafeSession.GetItem("currentFileKey");
 
-        if (rawFK) {
-            this.fldKey = mask.XOR(rawFK);
-            rawFK.fill(0);
+        if (rawFkHex) {
+            this.fldKey = driveService.MaskKey(FromHex(rawFkHex));
         } else {
             this.fldKey = null;
         }
 
-        if (rawFlK) {
-            this.origSize = rawFlK.length >= 52 ? DecodeInt(rawFlK.slice(44, 52)) : 0;
-            const keyPart = rawFlK.slice(0, 44);
-            this.flKey = mask.XOR(keyPart);
-            keyPart.fill(0);
-            rawFlK.fill(0);
+        if (rawFlkHex) {
+            const rawFlk = FromHex(rawFlkHex);
+            this.origSize = driveService.GetEntrySize(rawFlk);
+            this.flKey = driveService.MaskKey(rawFlk);
+            rawFlk.fill(0);
         } else {
             this.flKey = null;
             this.origSize = 0;
         }
 
         if (!this.flKey || !this.flName || !this.fldId || !this.fldKey) {
-            return router.navigate('/drive');
+            return router.Navigate('/drive', true);
         }
 
         const txName = document.getElementById("txName");
@@ -181,7 +172,67 @@ export class ViewerView {
         await this.setupNeighborNavigation();
     }
 
-    cleanupCurrentMedia() {
+    // Mount viewer using deep link query parameters (folder PID & file PID)
+    async MountWithQuery(query = {}) {
+        this.Init();
+        const fldPid = query.f;
+        const filePid = query.p;
+
+        if (!fldPid || !filePid) {
+            return this.Mount();
+        }
+
+        let targetFolderName = "";
+        let targetFolderKey = null;
+        for (const [name, key] of Object.entries(driveService.fldMap)) {
+            const raw = driveService.UnmaskKey(key);
+            if (GetObjPid(raw) === fldPid) {
+                targetFolderName = name;
+                targetFolderKey = key;
+                raw.fill(0);
+                break;
+            }
+            raw.fill(0);
+        }
+
+        if (!targetFolderName || !targetFolderKey) {
+            await ShowNotice("Folder not found or you lack permission to access it.", "Access Denied", "error");
+            return router.Navigate('/drive', true);
+        }
+
+        const filesMap = await adapter.LoadFolderMeta(fldPid, targetFolderKey);
+        let foundFileName = "";
+        let foundFileKey = null;
+
+        for (const [name, key] of Object.entries(filesMap)) {
+            if (GetObjPid(key.slice(0, 44)) === filePid) {
+                foundFileName = name;
+                foundFileKey = key;
+                break;
+            }
+        }
+
+        if (!foundFileName || !foundFileKey) {
+            await ShowNotice("The requested file was not found in this folder.", "File Not Found", "error");
+            return router.Navigate('/drive', true);
+        }
+
+        const rawFldK = driveService.UnmaskKey(targetFolderKey);
+        SafeSession.SetItem("currentFolderName", targetFolderName);
+        SafeSession.SetItem("currentFolderId", fldPid);
+        SafeSession.SetItem("currentFolderKey", ToHex(rawFldK));
+        SafeSession.SetItem("currentFileName", foundFileName);
+        SafeSession.SetItem("currentFileKey", ToHex(foundFileKey));
+        SafeSession.SetItem("oldFold", targetFolderName);
+        rawFldK.fill(0);
+        foundFileKey.fill(0);
+        await SafeSession.Save();
+
+        return this.Mount();
+    }
+
+    // Release current media player, image viewer, and blob URL resources
+    CleanupCurrentMedia() {
         if (window.currentViewer) {
             try { window.currentViewer.destroy(); } catch (_) { }
             window.currentViewer = null;
@@ -193,6 +244,7 @@ export class ViewerView {
         this.rawBuf = null;
     }
 
+    // Determine media category kind based on file extension
     getKind(name) {
         const ext = ((name || '').split('.').pop() || '').toLowerCase();
         if (VIDEO_EXTS.includes(ext)) return 'video';
@@ -203,6 +255,7 @@ export class ViewerView {
         return 'unsupported';
     }
 
+    // Map file extension to standard MIME type
     getMime(name) {
         const ext = ((name || '').split('.').pop() || '').toLowerCase();
         const map = {
@@ -223,10 +276,11 @@ export class ViewerView {
         return map[ext] || 'application/octet-stream';
     }
 
+    // Render file preview using streaming Service Worker or in-memory blob decryption
     async renderFilePreview() {
-        const rawFK = mask.XOR(this.flKey);
-        const flPid = getObjPid(rawFK);
-        rawFK.fill(0);
+        const rawFk = driveService.UnmaskKey(this.flKey);
+        const flPid = GetObjPid(rawFk.slice(0, 44));
+        rawFk.fill(0);
 
         const body = document.getElementById("viewBody");
         if (!body) return;
@@ -239,65 +293,10 @@ export class ViewerView {
         if (kind === 'video' || kind === 'audio') {
             body.innerHTML = `<p style="color:var(--preview-subtext);font-size:13px;margin:20px 0">Preparing ${kind} stream…</p>`;
             try {
-                const reg = await navigator.serviceWorker.register('./sw.js?v=2.5', { updateViaCache: 'none' });
-                try { await reg.update(); } catch (_) { }
-                await navigator.serviceWorker.ready;
+                await adapter.RegisterStreaming(this.fldId, flPid, this.flKey, this.origSize, this.flName);
 
-                if (!navigator.serviceWorker.controller) {
-                    await new Promise(resolve => {
-                        const onCtrl = () => {
-                            navigator.serviceWorker.removeEventListener('controllerchange', onCtrl);
-                            resolve();
-                        };
-                        navigator.serviceWorker.addEventListener('controllerchange', onCtrl);
-                        setTimeout(resolve, 500);
-                    });
-                }
-
-                const rawKey = mask.XOR(this.flKey);
-                const keyHex = toHex(rawKey);
-                rawKey.fill(0);
-
-                const ack = new Promise(resolve => {
-                    const h = (e) => {
-                        if (e.data?.action === 'REGISTERED' && e.data.filePid === flPid) {
-                            navigator.serviceWorker.removeEventListener('message', h);
-                            resolve();
-                        }
-                    };
-                    navigator.serviceWorker.addEventListener('message', h);
-                });
-
-                navigator.serviceWorker.addEventListener('message', (e) => {
-                    if (e.data?.action === 'REQUEST_KEY' && e.data.filePid === flPid) {
-                        const rk = mask.XOR(this.flKey);
-                        reg.active?.postMessage({
-                            action: 'REGISTER',
-                            folderId: this.fldId,
-                            filePid: flPid,
-                            fileKey: toHex(rk),
-                            originalSize: this.origSize,
-                            fileName: this.flName
-                        });
-                        rk.fill(0);
-                    }
-                });
-
-                reg.active?.postMessage({
-                    action: 'REGISTER',
-                    folderId: this.fldId,
-                    filePid: flPid,
-                    fileKey: keyHex,
-                    originalSize: this.origSize,
-                    fileName: this.flName
-                });
-                await ack;
-
-                let fallbackTriggered = false;
                 const fallbackToFullDown = async (reason) => {
-                    if (fallbackTriggered) return;
-                    fallbackTriggered = true;
-                    console.warn(`SW stream failed (${reason}). Falling back to full download...`);
+                    console.warn(`Streaming failed (${reason}). Falling back to full download...`);
                     await this.fullDownloadAndRender(flPid, body);
                 };
 
@@ -326,14 +325,15 @@ export class ViewerView {
         await this.fullDownloadAndRender(flPid, body);
     }
 
+    // Render audio player card
     renderAudioPlayer(srcUrl, body, onError) {
-        const sizeStr = this.origSize > 0 ? formatBytes(this.origSize) : '';
+        const sizeStr = this.origSize > 0 ? FormatBytes(this.origSize) : '';
         body.innerHTML = `
             <div class="audio-player-card">
                 <div class="audio-hero-icon-box">
                     <span class="material-symbols-outlined audio-hero-icon">graphic_eq</span>
                 </div>
-                <div class="audio-title" title="${escapeHtml(this.flName)}">${escapeHtml(this.flName)}</div>
+                <div class="audio-title" title="${EscapeHtml(this.flName)}">${EscapeHtml(this.flName)}</div>
                 <div class="audio-meta">${sizeStr}</div>
                 <audio controls autoplay class="audio-element" id="audioPlayer" src="${srcUrl}"></audio>
             </div>
@@ -343,8 +343,9 @@ export class ViewerView {
         }
     }
 
+    // Render unsupported file preview card with direct download button
     renderUnsupported(body) {
-        const sizeStr = this.origSize > 0 ? formatBytes(this.origSize) : '';
+        const sizeStr = this.origSize > 0 ? FormatBytes(this.origSize) : '';
         body.innerHTML = `
             <div class="unsupported-preview-card">
                 <div class="unsupported-icon-box">
@@ -353,7 +354,7 @@ export class ViewerView {
                 <h2 class="unsupported-title">No preview available</h2>
                 <p class="unsupported-msg">Preview is not supported for this file.</p>
                 <div class="unsupported-meta">
-                    <span class="unsupported-filename" title="${escapeHtml(this.flName)}">${escapeHtml(this.flName)}</span>
+                    <span class="unsupported-filename" title="${EscapeHtml(this.flName)}">${EscapeHtml(this.flName)}</span>
                     ${sizeStr ? `<span class="unsupported-filesize">${sizeStr}</span>` : ''}
                 </div>
                 <button type="button" class="btn-unsupported-download" id="btnUnsupportedDownload">
@@ -365,130 +366,84 @@ export class ViewerView {
         document.getElementById("btnUnsupportedDownload")?.addEventListener("click", () => this.downloadCurrentFile());
     }
 
+    // Download and decrypt entire media file into in-memory blob
     async fullDownloadAndRender(flPid, body) {
-        const head = await fetch(`${this.serverUrl}/api/media/${this.fldId}/${flPid}/dat`, {
-            headers: { 'Range': 'bytes=0-0' }
-        });
-        const contentRange = head.headers.get("Content-Range");
-        if (!head.ok || !contentRange) {
-            body.innerHTML = `
-                <div style="text-align: center; padding: 40px 20px; color: var(--preview-subtext);">
-                    <span class="material-symbols-outlined" style="font-size: 48px; color: var(--preview-danger); margin-bottom: 12px; display: block;">error_outline</span>
-                    <h3 style="margin: 0 0 8px 0; color: var(--preview-text);">Unable to load file</h3>
-                    <p style="margin: 0 0 20px 0; font-size: 14px;">The requested file binary was not found or is corrupted (HTTP ${head.status}).</p>
-                </div>
-            `;
-            return;
-        }
-
-        const totSize = parseInt(contentRange.split('/')[1], 10);
-        let loaded = 0;
-        const chunks = [];
         const prog = document.createElement("div");
         prog.style.position = "fixed";
         prog.style.top = "50%";
         prog.style.width = "100%";
         prog.style.textAlign = "center";
+        prog.textContent = "🔒 Loading & Decrypting…";
         body.appendChild(prog);
 
-        while (loaded < totSize) {
-            try {
-                const res = await fetch(`${this.serverUrl}/api/media/${this.fldId}/${flPid}/dat`, {
-                    headers: { 'Range': `bytes=${loaded}-${totSize - 1}` }
-                });
-                const reader = res.body.getReader();
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    chunks.push(value);
-                    loaded += value.length;
-                    prog.textContent = `📥 ${Math.round((loaded / totSize) * 100)}%`;
-                }
-            } catch (e) {
-                await new Promise(r => setTimeout(r, 1000));
-            }
+        try {
+            const blobUrl = await adapter.LoadMediaBlob(
+                this.fldId,
+                flPid,
+                this.flKey,
+                this.origSize,
+                this.getMime(this.flName)
+            );
+            this.currentBlobUrl = blobUrl;
+            body.removeChild(prog);
+            this.renderDecryptedMedia(blobUrl, body);
+        } catch (e) {
+            if (prog.parentNode) body.removeChild(prog);
+            body.innerHTML = `
+                <div style="text-align: center; padding: 40px 20px; color: var(--preview-subtext);">
+                    <span class="material-symbols-outlined" style="font-size: 48px; color: var(--preview-danger); margin-bottom: 12px; display: block;">error_outline</span>
+                    <h3 style="margin: 0 0 8px 0; color: var(--preview-text);">Unable to load file</h3>
+                    <p style="margin: 0 0 20px 0; font-size: 14px;">${EscapeHtml(e.message || "Failed to load media")}</p>
+                </div>
+            `;
         }
-
-        prog.textContent = "🔒 Decrypting...";
-        const fullBuf = new Uint8Array(loaded);
-        let offset = 0;
-        for (const c of chunks) { fullBuf.set(c, offset); offset += c.length; }
-
-        const rawFK2 = mask.XOR(this.flKey);
-        const smx = new SymMaster("gcmx1", rawFK2.slice(0, 32));
-        rawFK2.fill(0);
-        const ciphSize = smx.AfterSize(this.origSize);
-        const encBuf = fullBuf.slice(0, ciphSize);
-
-        const plnChks = [];
-        await smx.DeFile(new NetSrc(encBuf), encBuf.length, { write: async (c) => plnChks.push(c) });
-        this.rawBuf = new Uint8Array(plnChks.reduce((a, c) => a + c.length, 0));
-        let fOff = 0;
-        for (const c of plnChks) { this.rawBuf.set(c, fOff); fOff += c.length; }
-
-        body.removeChild(prog);
-        this.renderDecryptedBuffer(this.rawBuf, body);
     }
 
-    renderDecryptedBuffer(buf, body) {
-        this.currentBlobUrl = URL.createObjectURL(new Blob([buf], { type: this.getMime(this.flName) }));
+    // Render media element from decrypted blob URL
+    renderDecryptedMedia(blobUrl, body) {
         const kind = this.getKind(this.flName);
         body.innerHTML = "";
 
         if (kind === 'video') {
             const v = document.createElement("video");
             v.controls = true;
-            v.src = this.currentBlobUrl;
+            v.src = blobUrl;
             v.style.width = "100%";
             body.appendChild(v);
         } else if (kind === 'image') {
             const img = document.createElement("img");
-            img.src = this.currentBlobUrl;
+            img.src = blobUrl;
             img.alt = this.flName;
             img.style.display = "none";
             body.appendChild(img);
 
-            window.currentViewer = new window.Viewer(img, {
-                inline: true,
-                button: false,
-                navbar: false,
-                title: false,
-                toolbar: {
-                    zoomIn: 1, zoomOut: 1, oneToOne: 1, reset: 1, prev: 0, play: 0, next: 0,
-                    rotateLeft: 1, rotateRight: 1, flipHorizontal: 1, flipVertical: 1,
-                },
-                tooltip: true,
-                movable: true,
-                zoomable: true,
-                rotatable: true,
-                scalable: true,
-                transition: true,
-                backdrop: false,
-                minZoomRatio: 0.05,
-                maxZoomRatio: 50,
-                zoomRatio: 0.15,
-            });
+            if (window.Viewer) {
+                window.currentViewer = new window.Viewer(img, {
+                    inline: true,
+                    button: false,
+                    navbar: false,
+                    title: false,
+                    toolbar: {
+                        zoomIn: 1, zoomOut: 1, oneToOne: 1, reset: 1, prev: 0, play: 0, next: 0, rotateLeft: 1, rotateRight: 1, flipHorizontal: 1, flipVertical: 1,
+                    },
+                    backdrop: 'static'
+                });
+            }
         } else if (kind === 'audio') {
-            this.renderAudioPlayer(this.currentBlobUrl, body);
+            this.renderAudioPlayer(blobUrl, body);
         } else if (kind === 'pdf') {
-            const f = document.createElement("iframe");
-            f.src = this.currentBlobUrl;
-            f.style.width = "100%";
-            f.style.height = "90vh";
-            body.appendChild(f);
-        } else if (kind === 'text' || buf.length <= 4096) {
-            const t = document.createElement("textarea");
-            t.value = new TextDecoder().decode(buf);
-            t.style.width = "100%";
-            t.style.height = "90vh";
-            t.readOnly = true;
-            t.spellcheck = false;
-            body.appendChild(t);
+            const obj = document.createElement("object");
+            obj.data = blobUrl;
+            obj.type = "application/pdf";
+            obj.style.width = "100%";
+            obj.style.height = "90vh";
+            body.appendChild(obj);
         } else {
             this.renderUnsupported(body);
         }
     }
 
+    // Setup previous/next neighbor navigation buttons within folder
     async setupNeighborNavigation() {
         const btnPrev = document.getElementById("btnPrevFile");
         const btnNext = document.getElementById("btnNextFile");
@@ -496,19 +451,10 @@ export class ViewerView {
         if (btnNext) btnNext.classList.add("hidden");
 
         try {
-            const res = await fetch(`${this.serverUrl}/api/storage/${this.fldId}/names`);
-            if (!res.ok) return;
-
-            const rawSK = mask.XOR(this.fldKey);
-            const sm = new SymMaster("gcm1", rawSK.slice(0, 32));
-            rawSK.fill(0);
-
-            const dec = await sm.DeBin(new Uint8Array(await res.arrayBuffer()));
-            const flsMap = DecodeCfg(dec);
-            dec.fill(0);
-
+            const flsMap = await adapter.LoadFolderMeta(this.fldId, this.fldKey);
             const entries = Object.entries(flsMap).sort((a, b) => a[0].localeCompare(b[0]));
             const idx = entries.findIndex(([name]) => name === this.flName);
+
             if (idx === -1) {
                 for (const [, v] of entries) if (v?.fill) v.fill(0);
                 return;
@@ -518,10 +464,10 @@ export class ViewerView {
                 const [prevNm, prevKy] = entries[idx - 1];
                 btnPrev.classList.remove("hidden");
                 btnPrev.onclick = () => {
-                    SafeSession.setItem("currentFileName", prevNm);
-                    SafeSession.setItem("currentFileKey", toHex(prevKy));
-                    SafeSession.save();
-                    this.mount();
+                    SafeSession.SetItem("currentFileName", prevNm);
+                    SafeSession.SetItem("currentFileKey", ToHex(prevKy));
+                    SafeSession.Save();
+                    this.Mount();
                 };
             }
 
@@ -529,10 +475,10 @@ export class ViewerView {
                 const [nxtNm, nxtKy] = entries[idx + 1];
                 btnNext.classList.remove("hidden");
                 btnNext.onclick = () => {
-                    SafeSession.setItem("currentFileName", nxtNm);
-                    SafeSession.setItem("currentFileKey", toHex(nxtKy));
-                    SafeSession.save();
-                    this.mount();
+                    SafeSession.SetItem("currentFileName", nxtNm);
+                    SafeSession.SetItem("currentFileKey", ToHex(nxtKy));
+                    SafeSession.Save();
+                    this.Mount();
                 };
             }
 
@@ -542,25 +488,23 @@ export class ViewerView {
         }
     }
 
+    // Generate PID-based deep link and copy to clipboard
     async shareCurrentFile() {
         if (!this.fldId || !this.flKey) return;
-        let fileParam = this.flName;
-        try {
-            const rawFK = mask.XOR(this.flKey);
-            fileParam = getObjPid(rawFK);
-            rawFK.fill(0);
-        } catch (_) { }
+        const rawFk = driveService.UnmaskKey(this.flKey);
+        const filePid = GetObjPid(rawFk.slice(0, 44));
+        rawFk.fill(0);
 
-        const oldFold = SafeSession.getItem("oldFold") || "";
-        const url = `${window.location.origin}/#drive/${encodeURIComponent(oldFold)}?file=${encodeURIComponent(fileParam)}`;
+        const url = `${window.location.origin}/drive?f=${encodeURIComponent(this.fldId)}&p=${encodeURIComponent(filePid)}`;
         try {
             await navigator.clipboard.writeText(url);
-            showNotice("Link copied to clipboard.", "Share", "check_circle");
+            ShowNotice("Deep link copied to clipboard.", "Share", "check_circle");
         } catch {
             prompt("Copy link:", url);
         }
     }
 
+    // Open file rename modal dialog
     openRenameModal() {
         const modal = document.getElementById("renameFileModal");
         const input = document.getElementById("modalRenameFileInput");
@@ -575,125 +519,62 @@ export class ViewerView {
         modal?.showModal();
     }
 
+    // Perform file rename through DriveService
     async performRename(newNm) {
         if (!newNm || newNm === this.flName) return false;
         try {
-            const res = await fetch(`${this.serverUrl}/api/storage/${this.fldId}/names`);
-            if (!res.ok) throw new Error("Failed to load folder map");
-
-            const rawSK = mask.XOR(this.fldKey);
-            const sm = new SymMaster("gcm1", rawSK.slice(0, 32));
-            rawSK.fill(0);
-
-            const dec = await sm.DeBin(new Uint8Array(await res.arrayBuffer()));
-            const flsMap = DecodeCfg(dec);
-            dec.fill(0);
-
-            const duplicate = Object.keys(flsMap).find(k => k.normalize('NFC') === newNm.normalize('NFC') && k !== this.flName);
-            if (duplicate) {
-                for (const v of Object.values(flsMap)) if (v?.fill) v.fill(0);
-                throw new Error("Duplicate filename");
-            }
-
-            const rawFK = mask.XOR(this.flKey);
-            const flInfo = new Uint8Array(52);
-            flInfo.set(rawFK, 0);
-            flInfo.set(EncodeInt(this.origSize, 8), 44);
-            rawFK.fill(0);
-
-            flsMap[newNm] = flInfo;
-            delete flsMap[this.flName];
-
-            const encoded = EncodeCfg(flsMap);
-            for (const v of Object.values(flsMap)) if (v?.fill) v.fill(0);
-
-            await fetch(`${this.serverUrl}/api/storage/${this.fldId}/names`, {
-                method: "POST",
-                body: await sm.EnBin(encoded)
-            });
-            encoded.fill(0);
-
-            SafeSession.setItem("currentFileName", newNm);
-            await SafeSession.save();
+            await driveService.RenameFile(this.flName, newNm);
+            SafeSession.SetItem("currentFileName", newNm);
+            await SafeSession.Save();
 
             this.flName = newNm;
             const tx = document.getElementById("txName");
             if (tx) { tx.textContent = newNm; tx.title = newNm; }
-            showNotice(`Renamed to "${newNm}"`, "Success", "check_circle");
+            ShowNotice(`Renamed to "${newNm}"`, "Success", "check_circle");
             return true;
         } catch (e) {
-            showNotice("Rename failed: " + e.message, "Error", "error");
+            ShowNotice("Rename failed: " + e.message, "Error", "error");
             return false;
         }
     }
 
+    // Download current file through blob URL trigger
     async downloadCurrentFile() {
-        if (this.rawBuf) {
+        if (this.currentBlobUrl) {
             const a = document.createElement('a');
-            a.href = URL.createObjectURL(new Blob([this.rawBuf], { type: this.getMime(this.flName) }));
+            a.href = this.currentBlobUrl;
             a.download = this.flName;
             a.click();
             return;
         }
 
-        const rawFK = mask.XOR(this.flKey);
-        const flPid = getObjPid(rawFK);
-        rawFK.fill(0);
+        const rawFk = driveService.UnmaskKey(this.flKey);
+        const flPid = GetObjPid(rawFk.slice(0, 44));
+        rawFk.fill(0);
 
-        showNotice(`Preparing download for "${this.flName}"...`, "Downloading", "download");
-        const prog = document.createElement('div');
-        prog.className = "download-progress-toast";
-        prog.innerHTML = `<span class="material-symbols-outlined spin-icon">sync</span><span id="downloadProgressText">Downloading… 0%</span>`;
-        document.body.appendChild(prog);
-        const progText = document.getElementById("downloadProgressText");
-
+        ShowNotice(`Preparing download for "${this.flName}"...`, "Downloading", "download");
         try {
-            const head = await fetch(`${this.serverUrl}/api/media/${this.fldId}/${flPid}/dat`, { headers: { 'Range': 'bytes=0-0' } });
-            const contentRange = head.headers.get('Content-Range');
-            if (!head.ok || !contentRange) {
-                prog.remove();
-                return showNotice("Download failed: file corrupted or not found.", "Error", "error");
-            }
-            const totSize = parseInt(contentRange.split('/')[1], 10);
-            let loaded = 0; const chunks = [];
-            while (loaded < totSize) {
-                const res = await fetch(`${this.serverUrl}/api/media/${this.fldId}/${flPid}/dat`, { headers: { 'Range': `bytes=${loaded}-${totSize - 1}` } });
-                const reader = res.body.getReader();
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    chunks.push(value);
-                    loaded += value.length;
-                    if (progText) progText.textContent = `Downloading… ${Math.round((loaded / totSize) * 100)}%`;
-                }
-            }
-            if (progText) progText.textContent = 'Decrypting…';
-            const fullBuf = new Uint8Array(loaded); let off = 0;
-            for (const c of chunks) { fullBuf.set(c, off); off += c.length; }
-
-            const rawFK2 = mask.XOR(this.flKey);
-            const smx = new SymMaster('gcmx1', rawFK2.slice(0, 32)); rawFK2.fill(0);
-            const ciphSize = smx.AfterSize(this.origSize);
-            const encBuf = fullBuf.slice(0, ciphSize);
-
-            const plain = []; await smx.DeFile(new NetSrc(encBuf), encBuf.length, { write: async (c) => plain.push(c) });
-            this.rawBuf = new Uint8Array(plain.reduce((a, c) => a + c.length, 0)); let fo = 0;
-            for (const c of plain) { this.rawBuf.set(c, fo); fo += c.length; }
-
-            prog.remove();
+            const blobUrl = await adapter.LoadMediaBlob(
+                this.fldId,
+                flPid,
+                this.flKey,
+                this.origSize,
+                this.getMime(this.flName)
+            );
             const a = document.createElement('a');
-            a.href = URL.createObjectURL(new Blob([this.rawBuf], { type: this.getMime(this.flName) }));
+            a.href = blobUrl;
             a.download = this.flName;
             a.click();
+            URL.revokeObjectURL(blobUrl);
         } catch (e) {
-            prog.remove();
-            showNotice("Download failed: " + e.message, "Error", "error");
+            ShowNotice("Download failed: " + e.message, "Error", "error");
         }
     }
 
+    // Permanently delete current file from folder and return to drive
     async deleteCurrentFile() {
-        const ok = await showConfirmModal(
-            `Are you sure you want to delete "<strong>${escapeHtml(this.flName)}</strong>"? This action cannot be undone.`,
+        const ok = await ShowConfirmModal(
+            `Are you sure you want to delete "<strong>${EscapeHtml(this.flName)}</strong>"?`,
             "Delete file?",
             "delete",
             "Delete",
@@ -702,38 +583,14 @@ export class ViewerView {
         if (!ok) return;
 
         try {
-            const rawFK = mask.XOR(this.flKey);
-            const flPid = getObjPid(rawFK);
-            rawFK.fill(0);
-
-            await fetch(`${this.serverUrl}/api/media/${this.fldId}/${flPid}/dat`, { method: "DELETE" });
-            await fetch(`${this.serverUrl}/api/media/${this.fldId}/${flPid}/thumb`, { method: "DELETE" });
-
-            const res = await fetch(`${this.serverUrl}/api/storage/${this.fldId}/names`);
-            const rawSK = mask.XOR(this.fldKey);
-            const sm = new SymMaster("gcm1", rawSK.slice(0, 32));
-            rawSK.fill(0);
-
-            const dec = await sm.DeBin(new Uint8Array(await res.arrayBuffer()));
-            const flsMap = DecodeCfg(dec);
-            dec.fill(0);
-            if (flsMap[this.flName]?.fill) flsMap[this.flName].fill(0);
-            delete flsMap[this.flName];
-
-            const encoded = EncodeCfg(flsMap);
-            for (const v of Object.values(flsMap)) if (v?.fill) v.fill(0);
-
-            await fetch(`${this.serverUrl}/api/storage/${this.fldId}/names`, { method: "POST", body: await sm.EnBin(encoded) });
-            encoded.fill(0);
-
-            const oldFold = SafeSession.getItem("oldFold");
-            if (oldFold) router.navigate(`/drive/${encodeURIComponent(oldFold)}`);
-            else router.navigate('/drive');
-            showNotice(`Deleted "${this.flName}"`, "Success", "check_circle");
+            await driveService.DeleteFile(this.flName);
+            ShowNotice(`Deleted "${this.flName}"`, "Success", "check_circle");
+            router.Navigate('/drive');
         } catch (e) {
-            showNotice("Delete failed: " + e.message, "Error", "error");
+            ShowNotice("Delete failed: " + e.message, "Error", "error");
         }
     }
 }
 
+// Global viewer view singleton instance
 export const viewerView = new ViewerView();
