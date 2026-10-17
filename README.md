@@ -89,9 +89,10 @@ public/
 - [Go](https://go.dev/) 1.22 or higher
 
 ### Quick Build (Recommended)
-Run the root build script. It automatically detects your current operating system and CPU architecture, compiling a single standalone Go binary with the embedded Web client (`server/public`):
+Run the server build script. It automatically detects your current operating system and CPU architecture, compiling a single standalone Go binary with the embedded Web client (`server/public`):
 
 ```bash
+cd server
 ./build.sh
 ```
 

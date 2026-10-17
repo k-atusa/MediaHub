@@ -1,25 +1,24 @@
-// MediaHub Lightweight SPA History API Router
+// History API SPA client router
 export class Router {
-    // Initialize router instance with routes, navigation guards, and history listener
+    // Initialize router instance and bind popstate event
     constructor() {
         this.routes = [];
         this.beforeHooks = [];
         this.currentPath = '';
         this.isNavigating = false;
 
-        // Listen to browser forward and back popstate events
         window.addEventListener('popstate', () => this.handleRoute());
     }
 
-    // Register a navigation guard executed before each transition
+    // Register navigation guard hook
     BeforeEach(hook) {
         this.beforeHooks.push(hook);
     }
 
-    // Register a route pattern with an associated handler function
+    // Register route handler pattern
     On(pattern, handler) {
         const paramNames = [];
-        const regexStr = pattern.replace(/:([a-zA-Z0-9_]+)/g, (_, paramName) => {
+        const regexStr = pattern.replace(/:([a-zA-Z0-9_]+)/g, (match, paramName) => {
             paramNames.push(paramName);
             return '([^/?]+)';
         });
@@ -28,7 +27,7 @@ export class Router {
         return this;
     }
 
-    // Parse current location pathname and search query parameters
+    // Parse current window path and query parameters
     ParseUrl() {
         let path = window.location.pathname;
         if (!path || path === '/') {
@@ -45,29 +44,29 @@ export class Router {
         return { path, query, fullPath: path + search };
     }
 
-    // Navigate to a new route using HTML5 History pushState
+    // Navigate to path and update browser history
     async Navigate(targetUrl, replace = false) {
-        let cleanUrl = targetUrl;
-        if (cleanUrl.startsWith('#')) cleanUrl = cleanUrl.slice(1);
-        if (!cleanUrl.startsWith('/')) cleanUrl = '/' + cleanUrl;
+        let url = targetUrl;
+        if (url.startsWith('#')) url = url.slice(1);
+        if (!url.startsWith('/')) url = '/' + url;
 
-        const currentFull = window.location.pathname + window.location.search;
-        if (currentFull !== cleanUrl) {
+        const current = window.location.pathname + window.location.search;
+        if (current !== url) {
             if (replace) {
-                window.history.replaceState(null, '', cleanUrl);
+                window.history.replaceState(null, '', url);
             } else {
-                window.history.pushState(null, '', cleanUrl);
+                window.history.pushState(null, '', url);
             }
         }
         await this.handleRoute();
     }
 
-    // Replace current history entry without pushing a new history state
+    // Replace current path without creating history entry
     async Replace(targetUrl) {
         return this.Navigate(targetUrl, true);
     }
 
-    // Execute route matching, navigation guards, and target view handler
+    // Execute route match and trigger navigation guards
     async handleRoute() {
         if (this.isNavigating) return;
         this.isNavigating = true;
@@ -75,7 +74,6 @@ export class Router {
         try {
             const { path, query } = this.ParseUrl();
 
-            // Run registered beforeEach navigation guards
             for (const hook of this.beforeHooks) {
                 const redirect = await hook(path, query);
                 if (redirect && redirect !== path) {
@@ -86,7 +84,6 @@ export class Router {
 
             this.currentPath = path;
 
-            // Find matching route pattern and execute handler
             let matched = false;
             for (const route of this.routes) {
                 const match = path.match(route.regex);
@@ -101,7 +98,6 @@ export class Router {
                 }
             }
 
-            // Fallback to /drive if no route matches
             if (!matched && path !== '/drive') {
                 return this.Navigate('/drive', true);
             }
@@ -110,11 +106,11 @@ export class Router {
         }
     }
 
-    // Initialize router and trigger handler for initial document URL
+    // Start router on initial page load
     Init() {
         return this.handleRoute();
     }
 }
 
 // Global router singleton instance
-export const router = new Router();
+export const AppRouter = new Router();

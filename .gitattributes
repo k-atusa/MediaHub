@@ -1,0 +1,4 @@
+# GitHub Linguist Language Statistics Overrides
+# Exclude crypto/external engine bundles from repository language breakdown
+server/public/js/engine/** linguist-vendored
+server/public/js/engine/** linguist-detectable=false

@@ -1,31 +1,16 @@
-import { driveService } from '../services/drive.js';
-import { SafeSession } from '../core/session.js';
-import { router } from '../core/router.js';
-import { ShowNotice, ShowConfirmModal, FormatBytes, EscapeHtml, ToHex, FromHex, GetObjPid } from '../core/utils.js';
+// Drive workspace UI view controller
+import { Drive } from '../core/drive.js';
+import { AppRouter } from '../core/router.js';
+import {
+    SafeSession, ShowNotice, ShowConfirmModal, FormatBytes, EscapeHtml,
+    ToHex, FromHex, GetObjPid, GetGoogleFileIcon
+} from '../core/utils.js';
 
-const RING_CIRCUMFERENCE = 56.548;
+const ringCircumference = 56.548;
 
-function getGoogleFileIcon(filename) {
-    const ext = (filename.split('.').pop() || '').toLowerCase();
-    if (['mp4', 'mkv', 'avi', 'mov', 'webm', 'ts', 'm4v', '3gp', 'flv'].includes(ext)) {
-        return { icon: 'movie', color: '#e06d53' };
-    }
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'heic', 'avif'].includes(ext)) {
-        return { icon: 'image', color: '#ea4335' };
-    }
-    if (['mp3', 'wav', 'flac', 'm4a', 'aac', 'ogg', 'wma'].includes(ext)) {
-        return { icon: 'audiotrack', color: '#f29900' };
-    }
-    if (['pdf'].includes(ext)) {
-        return { icon: 'picture_as_pdf', color: '#ea4335' };
-    }
-    if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) {
-        return { icon: 'folder_zip', color: '#5f6368' };
-    }
-    return { icon: 'description', color: '#4285f4' };
-}
-
-export class DriveView {
+// Drive workspace view controller
+class DriveViewService {
+    // Initialize view state, pagination, and upload status
     constructor() {
         this.container = document.getElementById('view-drive');
         this.initialized = false;
@@ -38,12 +23,12 @@ export class DriveView {
         this.fileBeingRenamed = null;
         this.folderBeingRenamed = null;
 
-        // Upload widget state
         this.activeUploadFiles = [];
         this.uploadDismissTimer = null;
         this.isWidgetHovered = false;
     }
 
+    // Bind all UI components and event listeners
     init() {
         if (this.initialized) return;
         this.initialized = true;
@@ -57,7 +42,7 @@ export class DriveView {
         this.bindUploadWidget();
     }
 
-    // 1. Header bindings
+    // Bind header buttons, search input, and profile menu
     bindHeader() {
         const btnToggleSidebar = document.getElementById("btnToggleSidebar");
         const btnCloseSidebarDrawer = document.getElementById("btnCloseSidebarDrawer");
@@ -91,7 +76,6 @@ export class DriveView {
             document.body.classList.add("sidebar-collapsed");
         }
 
-        // Top Search Input
         const topSearchInput = document.getElementById("topSearchInput");
         const btnSearchClear = document.getElementById("btnSearchClear");
         const btnMobileSearchToggle = document.getElementById("btnMobileSearchToggle");
@@ -107,7 +91,7 @@ export class DriveView {
                 }
                 clearTimeout(debounce);
                 debounce = setTimeout(() => {
-                    if (!driveService.currentFolderName) {
+                    if (!Drive.currentFolderName) {
                         this.renderRootFolderGrid();
                     } else {
                         this.page = 1;
@@ -135,7 +119,7 @@ export class DriveView {
                     topSearchInput.value = "";
                     btnSearchClear.style.display = "none";
                     topSearchInput.focus();
-                    if (!driveService.currentFolderName) {
+                    if (!Drive.currentFolderName) {
                         this.renderRootFolderGrid();
                     } else {
                         this.page = 1;
@@ -146,35 +130,36 @@ export class DriveView {
         }
 
         if (btnMobileSearchToggle) {
-            btnMobileSearchToggle.addEventListener("click", (e) => {
-                e.stopPropagation();
+            btnMobileSearchToggle.addEventListener("click", () => {
                 if (driveHeader) {
                     driveHeader.classList.add("mobile-search-active");
-                    topSearchInput?.focus();
+                    setTimeout(() => topSearchInput?.focus(), 50);
                 }
             });
         }
 
         if (btnMobileSearchClose) {
-            btnMobileSearchClose.addEventListener("click", (e) => {
-                e.stopPropagation();
+            btnMobileSearchClose.addEventListener("click", () => {
                 if (driveHeader) driveHeader.classList.remove("mobile-search-active");
                 if (topSearchInput) {
                     topSearchInput.value = "";
                     if (btnSearchClear) btnSearchClear.style.display = "none";
-                    if (!driveService.currentFolderName) this.renderRootFolderGrid();
-                    else { this.page = 1; this.renderFiles(false); }
+                    if (!Drive.currentFolderName) this.renderRootFolderGrid();
+                    else {
+                        this.page = 1;
+                        this.renderFiles(false);
+                    }
                 }
             });
         }
 
-        // Account Menu Dropdown
         const btnAccountMenu = document.getElementById("btnAccountMenu");
         const accountDropdownMenu = document.getElementById("accountDropdownMenu");
         const accountMenuWrapper = document.getElementById("accountMenuWrapper");
         const accountMenuItemTheme = document.getElementById("accountMenuItemTheme");
         const accountMenuItemPassword = document.getElementById("accountMenuItemPassword");
         const accountMenuItemLogout = document.getElementById("accountMenuItemLogout");
+        const pwModal = document.getElementById("pwModal");
 
         if (btnAccountMenu && accountDropdownMenu) {
             btnAccountMenu.addEventListener("click", (e) => {
@@ -194,6 +179,7 @@ export class DriveView {
 
         if (accountMenuItemTheme) {
             accountMenuItemTheme.addEventListener("click", () => {
+                accountDropdownMenu?.classList.remove("open");
                 const current = localStorage.getItem("theme") || "system";
                 const next = current === "system" ? "dark" : current === "dark" ? "light" : "system";
                 this.setTheme(next);
@@ -203,21 +189,25 @@ export class DriveView {
         if (accountMenuItemPassword) {
             accountMenuItemPassword.addEventListener("click", () => {
                 accountDropdownMenu?.classList.remove("open");
-                const pwModal = document.getElementById("pwModal");
-                document.getElementById("newPassword").value = "";
-                document.getElementById("newPasswordConfirm").value = "";
+                const p1 = document.getElementById("newPassword");
+                const p2 = document.getElementById("newPasswordConfirm");
+                if (p1) p1.value = "";
+                if (p2) p2.value = "";
                 if (pwModal) pwModal.showModal();
+                p1?.focus();
             });
         }
 
         if (accountMenuItemLogout) {
-            accountMenuItemLogout.addEventListener("click", async () => {
-                driveService.clearSession();
-                router.Navigate('/login');
+            accountMenuItemLogout.addEventListener("click", () => {
+                accountDropdownMenu?.classList.remove("open");
+                Drive.ClearSession();
+                AppRouter.Navigate('/login');
             });
         }
     }
 
+    // Set theme mode and update DOM attributes
     setTheme(mode) {
         if (mode === "system") {
             localStorage.setItem("theme", "system");
@@ -226,10 +216,11 @@ export class DriveView {
             localStorage.setItem("theme", mode);
             document.documentElement.setAttribute("data-theme", mode);
         }
-        this.updateThemeUI();
+        this.UpdateThemeUI();
     }
 
-    updateThemeUI() {
+    // Update account menu theme icon and text
+    UpdateThemeUI() {
         const mode = localStorage.getItem("theme") || "system";
         const accountMenuThemeLabel = document.getElementById("accountMenuThemeLabel");
         const accountMenuThemeIcon = document.getElementById("accountMenuThemeIcon");
@@ -245,7 +236,7 @@ export class DriveView {
         }
     }
 
-    // 2. Sidebar bindings
+    // Bind sidebar navigation and new button dropdowns
     bindSidebar() {
         const btnNewDropdown = document.getElementById("btnNewDropdown");
         const newDriveMenu = document.getElementById("newDriveMenu");
@@ -287,23 +278,21 @@ export class DriveView {
             });
         }
 
-        // Navigation to Root
         const sidebarMyDriveHeader = document.getElementById("sidebarMyDriveHeader");
         const logoWrap = document.querySelector(".logo-wrap");
         const breadcrumbLink = document.querySelector(".breadcrumb-link");
 
         const navRoot = async () => {
-            await this.mount("");
-            await router.Navigate('/drive');
+            await this.Mount("");
+            await AppRouter.Navigate('/drive');
         };
         if (sidebarMyDriveHeader) sidebarMyDriveHeader.addEventListener("click", navRoot);
         if (logoWrap) logoWrap.addEventListener("click", navRoot);
         if (breadcrumbLink) breadcrumbLink.addEventListener("click", navRoot);
     }
 
-    // 3. Workspace top bar actions
+    // Bind view mode, sort, and keyword filter controls
     bindWorkspaceActions() {
-        // View options
         const btnViewMenu = document.getElementById("btnViewMenu");
         const viewDropdownMenu = document.getElementById("viewDropdownMenu");
         const viewActionWrapper = document.getElementById("viewActionWrapper");
@@ -335,7 +324,6 @@ export class DriveView {
 
         this.applyViewMode(localStorage.getItem("driveViewMode") || "medium");
 
-        // Sort options
         const btnSortMenu = document.getElementById("btnSortMenu");
         const sortDropdownMenu = document.getElementById("sortDropdownMenu");
         const sortActionWrapper = document.getElementById("sortActionWrapper");
@@ -365,9 +353,8 @@ export class DriveView {
             });
         });
 
-        this.updateSortMenuUI(driveService.sortMode);
+        this.updateSortMenuUI(Drive.sortMode);
 
-        // Keyword filter
         const btnKeywordFilter = document.getElementById("btnKeywordFilter");
         const filterDropdownMenu = document.getElementById("filterDropdownMenu");
         const filterActionWrapper = document.getElementById("filterActionWrapper");
@@ -405,7 +392,7 @@ export class DriveView {
         }
 
         const clearKeywords = () => {
-            driveService.selectKeywords.clear();
+            Drive.selectKeywords.clear();
             this.page = 1;
             this.renderFiles(false);
             this.updateKeywordFilterUI();
@@ -414,18 +401,16 @@ export class DriveView {
         if (btnClearActiveChips) btnClearActiveChips.addEventListener("click", clearKeywords);
         if (btnClearAllKeywords) btnClearAllKeywords.addEventListener("click", clearKeywords);
 
-        // Current Folder More button
         const btnCurrentFolderMore = document.getElementById("btnCurrentFolderMore");
         if (btnCurrentFolderMore) {
             btnCurrentFolderMore.addEventListener("click", (e) => {
                 e.stopPropagation();
-                if (driveService.currentFolderName) {
-                    this.openFolderContextMenu(e, driveService.currentFolderName, btnCurrentFolderMore);
+                if (Drive.currentFolderName) {
+                    this.openFolderContextMenu(e, Drive.currentFolderName, btnCurrentFolderMore);
                 }
             });
         }
 
-        // Infinite scroll
         const mediaContainer = document.getElementById("mediaContainer");
         if (mediaContainer) {
             mediaContainer.addEventListener("scroll", () => {
@@ -436,6 +421,7 @@ export class DriveView {
         }
     }
 
+    // Close all open dropdown menus
     closeAllDropdowns() {
         document.querySelectorAll(".account-dropdown-menu, .new-drive-menu, .view-dropdown-menu, .sort-dropdown-menu, .filter-dropdown-menu").forEach(menu => {
             menu.classList.remove("open");
@@ -445,6 +431,7 @@ export class DriveView {
         });
     }
 
+    // Apply grid or list view mode styling
     applyViewMode(mode) {
         let cleanMode = mode;
         if (cleanMode === "grid") cleanMode = "medium";
@@ -489,14 +476,16 @@ export class DriveView {
         }
     }
 
+    // Apply sorting mode to file list
     applySortMode(mode) {
-        driveService.sortMode = mode;
+        Drive.sortMode = mode;
         localStorage.setItem("mediahub_sort", mode);
         this.updateSortMenuUI(mode);
         this.page = 1;
         this.renderFiles(false);
     }
 
+    // Update active sort option in menu
     updateSortMenuUI(mode) {
         const sortModeText = document.getElementById("sortModeText");
         const sortModeIcon = document.getElementById("sortModeIcon");
@@ -522,7 +511,7 @@ export class DriveView {
         }
     }
 
-    // 4. Context menus & listeners
+    // Bind action listeners for folder and file context menus
     bindContextMenuListeners() {
         const folderActionMenu = document.getElementById("folderActionMenu");
         const fileActionMenu = document.getElementById("fileActionMenu");
@@ -604,6 +593,7 @@ export class DriveView {
         });
     }
 
+    // Close folder context menu dropdown
     closeFolderContextMenu() {
         const folderActionMenu = document.getElementById("folderActionMenu");
         if (folderActionMenu) {
@@ -616,6 +606,7 @@ export class DriveView {
         }
     }
 
+    // Position and open context menu for folder
     openFolderContextMenu(e, folderName, btn) {
         const folderActionMenu = document.getElementById("folderActionMenu");
         if (!folderActionMenu) return;
@@ -657,6 +648,7 @@ export class DriveView {
         folderActionMenu.classList.add("open");
     }
 
+    // Close file context menu dropdown
     closeFileContextMenu() {
         const fileActionMenu = document.getElementById("fileActionMenu");
         if (fileActionMenu) {
@@ -669,6 +661,7 @@ export class DriveView {
         }
     }
 
+    // Position and open context menu for file
     openFileContextMenu(e, fileName, btn) {
         const fileActionMenu = document.getElementById("fileActionMenu");
         if (!fileActionMenu) return;
@@ -710,9 +703,8 @@ export class DriveView {
         fileActionMenu.classList.add("open");
     }
 
-    // 5. Modals & Dialog handling
+    // Bind modal actions for folder creation, rename, and password change
     bindModals() {
-        // New folder modal
         const newFolderModal = document.getElementById("newFolderModal");
         const btnConfirmNewFolder = document.getElementById("btnConfirmNewFolder");
         const btnCancelNewFolder = document.getElementById("btnCancelNewFolder");
@@ -722,13 +714,13 @@ export class DriveView {
             const name = modalFolderNameInput?.value.trim();
             if (!name) return;
             try {
-                await driveService.createFolder(name);
+                await Drive.CreateFolder(name);
                 newFolderModal?.close();
                 this.renderSidebarFolderList();
                 this.renderRootFolderGrid();
-                showNotice(`Folder "${name}" created successfully.`, "Success", "check_circle");
+                ShowNotice(`Folder "${name}" created successfully.`, "Success", "check_circle");
             } catch (err) {
-                showNotice("Failed to create folder: " + err.message, "Error", "error");
+                ShowNotice("Failed to create folder: " + err.message, "Error", "error");
             }
         };
 
@@ -743,7 +735,6 @@ export class DriveView {
             });
         }
 
-        // Rename folder modal
         const renameFolderModal = document.getElementById("renameFolderModal");
         const btnConfirmRenameFolder = document.getElementById("btnConfirmRenameFolder");
         const btnCancelRenameFolder = document.getElementById("btnCancelRenameFolder");
@@ -761,15 +752,15 @@ export class DriveView {
                 return;
             }
             try {
-                await driveService.renameFolder(this.folderBeingRenamed, newName);
+                await Drive.RenameFolder(this.folderBeingRenamed, newName);
                 renameFolderModal?.close();
                 this.renderSidebarFolderList();
-                if (driveService.currentFolderName === newName) {
+                if (Drive.currentFolderName === newName) {
                     this.updateFolderHeader(newName);
                 } else {
                     this.renderRootFolderGrid();
                 }
-                showNotice(`Folder renamed to "${newName}"`, "Success", "check_circle");
+                ShowNotice(`Folder renamed to "${newName}"`, "Success", "check_circle");
             } catch (err) {
                 if (renameFolderErrorText) {
                     renameFolderErrorText.textContent = err.message || "Failed to rename folder.";
@@ -792,7 +783,6 @@ export class DriveView {
             });
         }
 
-        // Rename file modal
         const renameFileModal = document.getElementById("renameFileModal");
         const btnConfirmRenameFile = document.getElementById("btnConfirmRenameFile");
         const btnCancelRenameFile = document.getElementById("btnCancelRenameFile");
@@ -810,10 +800,10 @@ export class DriveView {
                 return;
             }
             try {
-                await driveService.renameFile(this.fileBeingRenamed, newName);
+                await Drive.RenameFile(this.fileBeingRenamed, newName);
                 renameFileModal?.close();
                 this.renderFiles(false);
-                showNotice(`Renamed to "${newName}"`, "Success", "check_circle");
+                ShowNotice(`Renamed to "${newName}"`, "Success", "check_circle");
             } catch (err) {
                 if (renameFileErrorText) {
                     renameFileErrorText.textContent = err.message || "Failed to rename file.";
@@ -836,7 +826,6 @@ export class DriveView {
             });
         }
 
-        // Password change modal
         const pwModal = document.getElementById("pwModal");
         const btnConfirmPw = document.getElementById("btnConfirmPw");
         const btnCancelPw = document.getElementById("btnCancelPw");
@@ -845,22 +834,21 @@ export class DriveView {
             btnConfirmPw.addEventListener("click", async () => {
                 const newPw = document.getElementById("newPassword").value;
                 const confirmPw = document.getElementById("newPasswordConfirm").value;
-                if (!newPw) return showNotice("Please enter a new password.", "Notice", "warning");
-                if (newPw !== confirmPw) return showNotice("Passwords do not match.", "Notice", "warning");
+                if (!newPw) return ShowNotice("Please enter a new password.", "Notice", "warning");
+                if (newPw !== confirmPw) return ShowNotice("Passwords do not match.", "Notice", "warning");
 
                 try {
-                    await driveService.changePassword(newPw);
+                    await Drive.ChangePassword(newPw);
                     pwModal?.close();
                     this.syncUserProfileUI();
-                    showNotice("Password changed successfully.", "Success", "check_circle");
-                } catch (e) {
-                    showNotice("Failed to change password: " + e.message, "Error", "error");
+                    ShowNotice("Password changed successfully.", "Success", "check_circle");
+                } catch (err) {
+                    ShowNotice("Failed to change password: " + err.message, "Error", "error");
                 }
             });
         }
         if (btnCancelPw) btnCancelPw.addEventListener("click", () => pwModal?.close());
 
-        // Trim modal
         const trimFolderModal = document.getElementById("trimFolderModal");
         const btnConfirmTrimFolder = document.getElementById("btnConfirmTrimFolder");
         const btnCancelTrimFolder = document.getElementById("btnCancelTrimFolder");
@@ -880,7 +868,7 @@ export class DriveView {
                 if (actions) actions.style.display = "none";
 
                 try {
-                    const res = await driveService.trimFolder(folderName);
+                    const res = await Drive.TrimFolder(folderName);
                     if (statusArea) statusArea.style.display = "none";
                     if (resultText) {
                         resultText.style.display = "block";
@@ -891,7 +879,7 @@ export class DriveView {
                         if (actions) actions.style.display = "flex";
                         if (desc) desc.style.display = "block";
                         if (resultText) resultText.style.display = "none";
-                        if (driveService.currentFolderName === folderName) {
+                        if (Drive.currentFolderName === folderName) {
                             this.renderFiles(false);
                         }
                     }, 1200);
@@ -907,7 +895,6 @@ export class DriveView {
         }
         if (btnCancelTrimFolder) btnCancelTrimFolder.addEventListener("click", () => trimFolderModal?.close());
 
-        // Backdrop click close for dialogs
         document.querySelectorAll("dialog").forEach(dialog => {
             dialog.addEventListener("click", (e) => {
                 const rect = dialog.getBoundingClientRect();
@@ -917,6 +904,7 @@ export class DriveView {
         });
     }
 
+    // Open rename dialog for selected folder
     openRenameFolderModal(folderName) {
         this.folderBeingRenamed = folderName;
         const modal = document.getElementById("renameFolderModal");
@@ -930,6 +918,7 @@ export class DriveView {
         if (modal) modal.showModal();
     }
 
+    // Open rename dialog for selected file
     openRenameFileModal(fileName) {
         this.fileBeingRenamed = fileName;
         const modal = document.getElementById("renameFileModal");
@@ -945,6 +934,7 @@ export class DriveView {
         if (modal) modal.showModal();
     }
 
+    // Open password prompt modal to export folder share token
     async openShareFolderModal(folderName) {
         const modal = document.getElementById("shareModal");
         const descEl = document.getElementById("shareModalDesc");
@@ -954,7 +944,7 @@ export class DriveView {
         const btnCancel = document.getElementById("btnCancelShare");
 
         if (descEl) {
-            descEl.innerHTML = `Set a password to encrypt this folder's share token for "<strong>${escapeHtml(folderName)}</strong>". Anyone with the token file and password can access the folder.`;
+            descEl.innerHTML = `Set a password to encrypt this folder's share token for "<strong>${EscapeHtml(folderName)}</strong>". Anyone with the token file and password can access the folder.`;
         }
         if (pwInput) pwInput.value = "";
         if (errText) errText.style.display = "none";
@@ -979,7 +969,7 @@ export class DriveView {
             cleanup();
             modal?.close();
 
-            const token = await driveService.ExportShareToken(folderName, pw);
+            const token = await Drive.ExportShareToken(folderName, pw);
             if (!token) return;
 
             const blob = new Blob([token], { type: "text/plain" });
@@ -990,13 +980,14 @@ export class DriveView {
             a.download = `${safeName}_share.txt`;
             a.click();
             URL.revokeObjectURL(url);
-            showNotice("Share token downloaded successfully.", "Share Folder", "check_circle");
+            ShowNotice("Share token downloaded successfully.", "Share Folder", "check_circle");
         };
 
         btnConfirm?.addEventListener("click", onConfirm);
         btnCancel?.addEventListener("click", onCancel);
     }
 
+    // File picker prompt to import and decrypt folder share token
     async handleImportShare() {
         const input = document.createElement("input");
         input.type = "file";
@@ -1033,14 +1024,14 @@ export class DriveView {
                 cleanup();
                 modal?.close();
 
-                const info = await driveService.ImportShareToken(fileText, pw);
+                const info = await Drive.ImportShareToken(fileText, pw);
                 if (!info) {
                     return ShowNotice("Invalid token or incorrect password.", "Error", "error");
                 }
 
                 const effectiveName = info.name;
-                if (driveService.fldMap[effectiveName]) {
-                    const overwrite = await showConfirmModal(
+                if (Drive.fldMap[effectiveName]) {
+                    const overwrite = await ShowConfirmModal(
                         `A folder named "${effectiveName}" already exists. Overwrite?`,
                         "Overwrite Folder?",
                         "warning",
@@ -1050,12 +1041,12 @@ export class DriveView {
                     if (!overwrite) return;
                 }
 
-                driveService.fldMap[effectiveName] = info.key;
-                await driveService.saveUser();
-                await driveService.loadUser();
+                Drive.fldMap[effectiveName] = info.key;
+                await Drive.SaveUser();
+                await Drive.LoadUser();
                 this.renderSidebarFolderList();
                 this.renderRootFolderGrid();
-                showNotice(`Folder "${effectiveName}" imported successfully.`, "Success", "check_circle");
+                ShowNotice(`Folder "${effectiveName}" imported successfully.`, "Success", "check_circle");
             };
 
             btnConfirm?.addEventListener("click", onConfirm);
@@ -1064,6 +1055,7 @@ export class DriveView {
         input.click();
     }
 
+    // Open orphan file trim confirmation modal
     openTrimFolderModal(folderName) {
         const modal = document.getElementById("trimFolderModal");
         if (modal) {
@@ -1072,32 +1064,34 @@ export class DriveView {
         }
     }
 
+    // Unlink folder from current user catalog
     async openUnlinkFolderModal(folderName) {
-        const ok = await showConfirmModal(
-            `Are you sure you want to remove folder "<strong>${escapeHtml(folderName)}</strong>" from your account? The folder will remain accessible for other users sharing it.`,
+        const ok = await ShowConfirmModal(
+            `Are you sure you want to remove folder "<strong>${EscapeHtml(folderName)}</strong>" from your account? The folder will remain accessible for other users sharing it.`,
             "Remove Folder?",
             "link_off",
             "Remove"
         );
         if (!ok) return;
         try {
-            await driveService.unlinkFolder(folderName);
+            await Drive.UnlinkFolder(folderName);
             this.renderSidebarFolderList();
-            if (driveService.currentFolderName === folderName) {
-                await this.mount("");
-                await router.Navigate('/drive');
+            if (Drive.currentFolderName === folderName) {
+                await this.Mount("");
+                await AppRouter.Navigate('/drive');
             } else {
                 this.renderRootFolderGrid();
             }
-            showNotice(`Removed "${folderName}" from your account.`, "Success", "check_circle");
-        } catch (e) {
-            showNotice("Failed to remove folder: " + e.message, "Error", "error");
+            ShowNotice(`Removed "${folderName}" from your account.`, "Success", "check_circle");
+        } catch (err) {
+            ShowNotice("Failed to remove folder: " + err.message, "Error", "error");
         }
     }
 
+    // Permanently delete folder and all contents on server
     async openDeleteFolderModal(folderName) {
-        const ok = await showConfirmModal(
-            `Are you sure you want to delete "<strong>${escapeHtml(folderName)}</strong>" permanently? All files and encrypted metadata inside it will be permanently deleted from the server for ALL users.`,
+        const ok = await ShowConfirmModal(
+            `Are you sure you want to delete "<strong>${EscapeHtml(folderName)}</strong>" permanently? All files and encrypted metadata inside it will be permanently deleted from the server for ALL users.`,
             "Delete Permanently?",
             "delete_forever",
             "Delete Permanently",
@@ -1105,21 +1099,21 @@ export class DriveView {
         );
         if (!ok) return;
         try {
-            await driveService.deleteFolderPermanently(folderName);
+            await Drive.DeleteFolder(folderName);
             this.renderSidebarFolderList();
-            if (driveService.currentFolderName === folderName) {
-                await this.mount("");
-                await router.Navigate('/drive');
+            if (Drive.currentFolderName === folderName) {
+                await this.Mount("");
+                await AppRouter.Navigate('/drive');
             } else {
                 this.renderRootFolderGrid();
             }
-            showNotice(`Folder "${folderName}" permanently deleted.`, "Deleted", "delete");
-        } catch (e) {
-            showNotice("Failed to delete folder: " + e.message, "Error", "error");
+            ShowNotice(`Folder "${folderName}" permanently deleted.`, "Deleted", "delete");
+        } catch (err) {
+            ShowNotice("Failed to delete folder: " + err.message, "Error", "error");
         }
     }
 
-    // 6. Upload & Drag and Drop
+    // Bind file selection and full-window drag & drop handlers
     bindUploadAndDragDrop() {
         const fileInput = document.getElementById("fileInput");
         const folderInput = document.getElementById("folderInput");
@@ -1129,16 +1123,16 @@ export class DriveView {
 
         const triggerFile = () => {
             this.closeAllDropdowns();
-            if (!driveService.currentFolderName) {
-                return showNotice("Please select or create a folder first to upload files.", "Select Folder", "warning");
+            if (!Drive.currentFolderName) {
+                return ShowNotice("Please select or create a folder first to upload files.", "Select Folder", "warning");
             }
             if (fileInput) { fileInput.value = ""; fileInput.click(); }
         };
 
         const triggerFolder = () => {
             this.closeAllDropdowns();
-            if (!driveService.currentFolderName) {
-                return showNotice("Please select or create a folder first to upload files.", "Select Folder", "warning");
+            if (!Drive.currentFolderName) {
+                return ShowNotice("Please select or create a folder first to upload files.", "Select Folder", "warning");
             }
             if (folderInput) { folderInput.value = ""; folderInput.click(); }
         };
@@ -1150,7 +1144,7 @@ export class DriveView {
         if (fileInput) {
             fileInput.addEventListener("change", () => {
                 if (fileInput.files.length > 0) {
-                    const prepared = uploadService.prepareFiles(fileInput.files);
+                    const prepared = Drive.PrepareFiles(fileInput.files);
                     this.executeUpload(prepared);
                 }
             });
@@ -1159,13 +1153,12 @@ export class DriveView {
         if (folderInput) {
             folderInput.addEventListener("change", () => {
                 if (folderInput.files.length > 0) {
-                    const prepared = uploadService.prepareFiles(folderInput.files);
+                    const prepared = Drive.PrepareFiles(folderInput.files);
                     this.executeUpload(prepared);
                 }
             });
         }
 
-        // Full window Drag & Drop
         const dragDropOverlay = document.getElementById("dragDropOverlay");
         const dragDropSubtitle = document.getElementById("dragDropSubtitle");
         let dragCounter = 0;
@@ -1175,7 +1168,7 @@ export class DriveView {
             if (e.dataTransfer && e.dataTransfer.types && Array.from(e.dataTransfer.types).includes("Files")) {
                 dragCounter++;
                 if (dragCounter === 1 && dragDropOverlay) {
-                    const cur = driveService.currentFolderName;
+                    const cur = Drive.currentFolderName;
                     if (dragDropSubtitle) dragDropSubtitle.textContent = cur ? `Upload to "${cur}"` : "Please select a folder first";
                     dragDropOverlay.classList.add("active");
                 }
@@ -1201,27 +1194,27 @@ export class DriveView {
             dragCounter = 0;
             dragDropOverlay?.classList.remove("active");
 
-            if (!driveService.currentFolderName) {
-                return showNotice("Please select or create a folder first before uploading files.", "Select Folder", "warning");
+            if (!Drive.currentFolderName) {
+                return ShowNotice("Please select or create a folder first before uploading files.", "Select Folder", "warning");
             }
 
             if (!e.dataTransfer) return;
             const files = Array.from(e.dataTransfer.files || []);
             if (files.length > 0) {
-                const prepared = driveService.PrepareFiles(files);
+                const prepared = Drive.PrepareFiles(files);
                 this.executeUpload(prepared);
             }
         });
     }
 
+    // Execute upload workflow with conflict confirmation
     async executeUpload(files) {
         if (!files || files.length === 0) return;
 
-        // Check for overwrites
         const confirmedFiles = [];
         for (const file of files) {
-            if (driveService.flsMap[file.name]) {
-                const overwrite = await showConfirmModal(
+            if (Drive.flsMap[file.name]) {
+                const overwrite = await ShowConfirmModal(
                     `File "${file.name}" already exists. Overwrite?`,
                     "File Exists",
                     "warning",
@@ -1236,7 +1229,7 @@ export class DriveView {
         if (confirmedFiles.length === 0) return;
 
         try {
-            await driveService.UploadFiles(confirmedFiles, {
+            await Drive.UploadFiles(confirmedFiles, {
                 onStart: (fls) => this.showUploadProgressWidget(fls),
                 onFileProgress: (idx, percent, total) => this.updateFileProgress(idx, percent, total),
                 onFileComplete: (idx, name) => this.markFileUploaded(idx, name),
@@ -1247,12 +1240,12 @@ export class DriveView {
                 },
                 onCancel: (idx) => this.markUploadCancelled(idx)
             });
-        } catch (e) {
-            showNotice("Upload failed: " + e.message, "Upload Error", "error");
+        } catch (err) {
+            ShowNotice("Upload failed: " + err.message, "Upload Error", "error");
         }
     }
 
-    // 7. Upload progress widget UI
+    // Bind upload floating widget collapse and hover listeners
     bindUploadWidget() {
         const uploadProgressWidget = document.getElementById("uploadProgressWidget");
         const uploadWidgetHeader = document.getElementById("uploadWidgetHeader");
@@ -1290,7 +1283,7 @@ export class DriveView {
             });
             uploadProgressWidget.addEventListener("mouseleave", () => {
                 this.isWidgetHovered = false;
-                if (!driveService.isUploading && !uploadProgressWidget.classList.contains("hidden")) {
+                if (!Drive.isUploading && !uploadProgressWidget.classList.contains("hidden")) {
                     this.uploadDismissTimer = setTimeout(() => {
                         uploadProgressWidget.classList.add("hidden");
                     }, 4000);
@@ -1299,6 +1292,7 @@ export class DriveView {
         }
     }
 
+    // Display floating upload progress widget
     showUploadProgressWidget(files) {
         clearTimeout(this.uploadDismissTimer);
         this.activeUploadFiles = files || [];
@@ -1322,14 +1316,14 @@ export class DriveView {
         if (uploadFileList) {
             uploadFileList.innerHTML = "";
             this.activeUploadFiles.forEach((f, idx) => {
-                const info = getGoogleFileIcon(f.name);
+                const info = GetGoogleFileIcon(f.name);
                 const item = document.createElement("div");
                 item.className = "upload-file-item";
                 item.id = `uploadItem_${idx}`;
                 item.dataset.fileName = f.name;
                 item.innerHTML = `
                     <span class="material-symbols-outlined upload-item-type-icon" style="color: ${info.color};">${info.icon}</span>
-                    <span class="upload-item-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</span>
+                    <span class="upload-item-name" title="${EscapeHtml(f.name)}">${EscapeHtml(f.name)}</span>
                     <div class="upload-item-status" id="uploadItemStatus_${idx}">
                         ${idx === 0 ? this.createProgressRingHtml(idx, 0) : '<span class="material-symbols-outlined" style="font-size: 18px; color: var(--g-text-muted);">schedule</span>'}
                     </div>
@@ -1339,19 +1333,21 @@ export class DriveView {
         }
     }
 
+    // Render circular progress ring SVG button
     createProgressRingHtml(idx, percent = 0) {
-        const offset = RING_CIRCUMFERENCE - (RING_CIRCUMFERENCE * Math.max(0, Math.min(100, percent)) / 100);
+        const offset = ringCircumference - (ringCircumference * Math.max(0, Math.min(100, percent)) / 100);
         return `
             <button type="button" class="upload-progress-btn" id="uploadProgressBtn_${idx}" title="Cancel upload">
                 <svg class="progress-ring-svg" viewBox="0 0 24 24">
                     <circle class="progress-ring-bg" cx="12" cy="12" r="9"></circle>
-                    <circle class="progress-ring-circle" cx="12" cy="12" r="9" style="stroke-dasharray: ${RING_CIRCUMFERENCE}; stroke-dashoffset: ${offset};"></circle>
+                    <circle class="progress-ring-circle" cx="12" cy="12" r="9" style="stroke-dasharray: ${ringCircumference}; stroke-dashoffset: ${offset};"></circle>
                 </svg>
                 <span class="material-symbols-outlined progress-cancel-icon">close</span>
             </button>
         `;
     }
 
+    // Update progress ring and status text for uploading item
     updateFileProgress(fileIdx, percent, totalFiles) {
         const total = totalFiles || this.activeUploadFiles.length || 1;
         const statusEl = document.getElementById(`uploadItemStatus_${fileIdx}`);
@@ -1365,11 +1361,11 @@ export class DriveView {
                     circle = statusEl.querySelector(".progress-ring-circle");
                     statusEl.querySelector(".upload-progress-btn")?.addEventListener("click", (e) => {
                         e.stopPropagation();
-                        uploadService.cancelUpload(fileIdx);
+                        Drive.CancelUpload(fileIdx);
                     });
                 }
                 if (circle) {
-                    const offset = RING_CIRCUMFERENCE - (RING_CIRCUMFERENCE * Math.max(0, Math.min(100, percent)) / 100);
+                    const offset = ringCircumference - (ringCircumference * Math.max(0, Math.min(100, percent)) / 100);
                     circle.style.strokeDashoffset = `${offset}`;
                 }
             }
@@ -1380,6 +1376,7 @@ export class DriveView {
         }
     }
 
+    // Mark single file status completed
     markFileUploaded(idx, name) {
         const statusEl = document.getElementById(`uploadItemStatus_${idx}`);
         if (statusEl) {
@@ -1387,11 +1384,13 @@ export class DriveView {
         }
     }
 
+    // Update widget title to metadata sync phase
     setUploadSyncingState() {
         const uploadWidgetTitle = document.getElementById("uploadWidgetTitle");
         if (uploadWidgetTitle) uploadWidgetTitle.textContent = "Syncing with MediaHub...";
     }
 
+    // Finalize upload widget state and schedule dismiss
     markUploadComplete() {
         const total = this.activeUploadFiles.length || 1;
         const uploadWidgetTitle = document.getElementById("uploadWidgetTitle");
@@ -1399,7 +1398,7 @@ export class DriveView {
 
         const uploadFileList = document.getElementById("uploadFileList");
         if (uploadFileList) {
-            uploadFileList.querySelectorAll(".upload-file-item").forEach((item, idx) => {
+            uploadFileList.querySelectorAll(".upload-file-item").forEach((item) => {
                 const name = item.dataset.fileName;
                 item.classList.add("completed");
                 item.onclick = () => {
@@ -1417,6 +1416,7 @@ export class DriveView {
         }, 7000);
     }
 
+    // Mark canceled status on upload item
     markUploadCancelled(fileIdx) {
         const uploadWidgetTitle = document.getElementById("uploadWidgetTitle");
         if (uploadWidgetTitle) uploadWidgetTitle.textContent = "Upload cancelled";
@@ -1426,22 +1426,22 @@ export class DriveView {
         }
     }
 
-    // 8. Workspace Rendering
-    async mount(folderName = "") {
+    // Mount drive view, load user catalog, and render folder or root
+    async Mount(folderName = "") {
         this.init();
         this.syncUserProfileUI();
-        await driveService.loadUser();
+        await Drive.LoadUser();
         this.renderSidebarFolderList();
 
         if (!folderName) {
-            driveService.selectFolder("");
+            Drive.SelectFolder("");
             this.updateFolderHeader("");
             this.renderRootFolderGrid();
         } else {
-            const ok = await driveService.selectFolder(folderName);
+            const ok = await Drive.SelectFolder(folderName);
             if (!ok) {
-                showNotice("Folder not found", "Notice", "warning");
-                return router.Navigate('/drive');
+                ShowNotice("Folder not found", "Notice", "warning");
+                return AppRouter.Navigate('/drive');
             }
             this.updateFolderHeader(folderName);
             this.page = 1;
@@ -1449,6 +1449,7 @@ export class DriveView {
         }
     }
 
+    // Update breadcrumb and toolbar headers according to active folder
     updateFolderHeader(folderName) {
         const breadcrumbName = document.getElementById("breadcrumbFolderName");
         const breadcrumbSeparator = document.getElementById("breadcrumbSeparator");
@@ -1494,12 +1495,13 @@ export class DriveView {
         }
     }
 
+    // Render folder items in left navigation sidebar
     renderSidebarFolderList() {
         const sidebarFolderList = document.getElementById("sidebarFolderList");
         if (!sidebarFolderList) return;
         sidebarFolderList.innerHTML = "";
 
-        const folders = Object.keys(driveService.fldMap);
+        const folders = Object.keys(Drive.fldMap);
         if (folders.length === 0) {
             sidebarFolderList.innerHTML = '<div style="padding: 10px 14px; font-size: 13px; color: var(--g-text-muted);">No folders</div>';
             return;
@@ -1507,7 +1509,7 @@ export class DriveView {
 
         folders.forEach(name => {
             const item = document.createElement("div");
-            item.className = "nav-folder-item" + (name === driveService.currentFolderName ? " active" : "");
+            item.className = "nav-folder-item" + (name === Drive.currentFolderName ? " active" : "");
             item.dataset.folderName = name;
 
             const iconSpan = document.createElement("span");
@@ -1535,8 +1537,8 @@ export class DriveView {
                     document.querySelector(".drive-sidebar")?.classList.remove("mobile-open");
                     document.getElementById("sidebarBackdrop")?.classList.remove("active");
                 }
-                await this.mount(name);
-                await router.Navigate('/drive');
+                await this.Mount(name);
+                await AppRouter.Navigate('/drive');
             });
             moreBtn.addEventListener("click", (e) => {
                 e.stopPropagation();
@@ -1546,6 +1548,7 @@ export class DriveView {
         });
     }
 
+    // Render root catalog folder grid and global search results
     async renderRootFolderGrid() {
         const rootFolderGrid = document.getElementById("rootFolderGrid");
         if (!rootFolderGrid) return;
@@ -1555,7 +1558,7 @@ export class DriveView {
 
         if (!query) {
             rootFolderGrid.innerHTML = "";
-            const folders = Object.keys(driveService.fldMap);
+            const folders = Object.keys(Drive.fldMap);
             if (folders.length === 0) {
                 rootFolderGrid.innerHTML = `
                     <div style="grid-column: 1 / -1; padding: 40px; text-align: center; color: var(--g-text-muted);">
@@ -1592,8 +1595,8 @@ export class DriveView {
                 card.appendChild(moreBtn);
 
                 card.addEventListener("click", async () => {
-                    await this.mount(name);
-                    await router.Navigate('/drive');
+                    await this.Mount(name);
+                    await AppRouter.Navigate('/drive');
                 });
                 moreBtn.addEventListener("click", (e) => {
                     e.stopPropagation();
@@ -1604,7 +1607,6 @@ export class DriveView {
             return;
         }
 
-        // Global search across root folders and all files
         const thisReq = ++this.rootSearchCounter;
         rootFolderGrid.innerHTML = `
             <div style="grid-column: 1 / -1; padding: 36px 20px; text-align: center; color: var(--g-text-muted);">
@@ -1613,10 +1615,10 @@ export class DriveView {
             </div>
         `;
 
-        const allFiles = await driveService.fetchAllFoldersAndFiles();
+        const allFiles = await Drive.FetchAllFiles();
         if (thisReq !== this.rootSearchCounter) return;
 
-        const folders = Object.keys(driveService.fldMap);
+        const folders = Object.keys(Drive.fldMap);
         const matchingFolders = folders.filter(f => f.normalize('NFC').toLowerCase().includes(query));
         const matchingFiles = allFiles.filter(f => f.fileName.normalize('NFC').toLowerCase().includes(query));
 
@@ -1664,8 +1666,8 @@ export class DriveView {
                 card.appendChild(moreBtn);
 
                 card.addEventListener("click", async () => {
-                    await this.mount(name);
-                    await router.Navigate('/drive');
+                    await this.Mount(name);
+                    await AppRouter.Navigate('/drive');
                 });
                 moreBtn.addEventListener("click", (e) => { e.stopPropagation(); this.openFolderContextMenu(e, name, moreBtn); });
                 rootFolderGrid.appendChild(card);
@@ -1695,7 +1697,7 @@ export class DriveView {
                 const rawFK = file.fileKey.slice();
                 const fkSlice = rawFK.slice(0, 44);
                 const ext = file.fileName.split('.').pop().toUpperCase();
-                driveService.loadThumbnail(file.folderId, getObjPid(fkSlice), ext, img, fkSlice);
+                Drive.LoadThumbnail(file.folderId, GetObjPid(fkSlice), ext, img, fkSlice);
 
                 const title = document.createElement("div");
                 title.className = "file-title";
@@ -1703,7 +1705,7 @@ export class DriveView {
 
                 const folderChip = document.createElement("div");
                 folderChip.className = "file-folder-chip";
-                folderChip.innerHTML = `<span class="material-symbols-outlined">folder</span><span>${escapeHtml(file.folderName)}</span>`;
+                folderChip.innerHTML = `<span class="material-symbols-outlined">folder</span><span>${EscapeHtml(file.folderName)}</span>`;
 
                 card.appendChild(img);
                 card.appendChild(title);
@@ -1718,6 +1720,7 @@ export class DriveView {
         }
     }
 
+    // Render paginated file cards for active folder
     async renderFiles(isAppend = false) {
         const grid = document.getElementById("mediaGrid");
         const emptyState = document.getElementById("emptyStateContainer");
@@ -1725,49 +1728,45 @@ export class DriveView {
 
         if (!isAppend) grid.innerHTML = "";
 
-        let entries = Object.entries(driveService.flsMap);
+        let entries = Object.entries(Drive.flsMap);
 
-        // Search query filter
         const searchInput = document.getElementById("topSearchInput");
         const query = (searchInput ? searchInput.value || "" : "").normalize('NFC').trim().toLowerCase();
         if (query) {
             entries = entries.filter(([name]) => name.normalize('NFC').toLowerCase().includes(query));
         }
 
-        // Keyword filter
-        if (driveService.selectKeywords.size > 0) {
-            if (!driveService.keywordsBuilt) driveService.buildKeywords();
+        if (Drive.selectKeywords.size > 0) {
+            if (!Drive.keywordsBuilt) Drive.BuildKeywords();
             entries = entries.filter(([name]) => {
-                const tokens = driveService.tokenCache.get(name);
+                const tokens = Drive.tokenCache.get(name);
                 if (!tokens) return false;
-                for (const kw of driveService.selectKeywords) {
+                for (const kw of Drive.selectKeywords) {
                     if (!tokens.has(kw)) return false;
                 }
                 return true;
             });
         }
 
-        // Sorting
-        const sortMode = driveService.sortMode;
+        const sortMode = Drive.sortMode;
         if (sortMode === "name-desc") {
             entries.sort((a, b) => b[0].localeCompare(a[0], undefined, { numeric: true, sensitivity: 'base' }));
         } else if (sortMode === "size-asc") {
             entries.sort((a, b) => {
-                const szA = driveService.getEntrySize(a[1]);
-                const szB = driveService.getEntrySize(b[1]);
+                const szA = Drive.GetEntrySize(a[1]);
+                const szB = Drive.GetEntrySize(b[1]);
                 return (szA - szB) || a[0].localeCompare(b[0], undefined, { numeric: true, sensitivity: 'base' });
             });
         } else if (sortMode === "size-desc") {
             entries.sort((a, b) => {
-                const szA = driveService.getEntrySize(a[1]);
-                const szB = driveService.getEntrySize(b[1]);
+                const szA = Drive.GetEntrySize(a[1]);
+                const szB = Drive.GetEntrySize(b[1]);
                 return (szB - szA) || a[0].localeCompare(b[0], undefined, { numeric: true, sensitivity: 'base' });
             });
         } else {
             entries.sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true, sensitivity: 'base' }));
         }
 
-        // Empty state check
         if (entries.length === 0) {
             if (emptyState) emptyState.style.display = "flex";
             const emptyTitle = document.getElementById("emptyStateTitle");
@@ -1780,14 +1779,14 @@ export class DriveView {
                 if (emptyTitle) emptyTitle.textContent = "No matching files found";
                 if (emptySubtitle) emptySubtitle.textContent = `No files matching "${query}".`;
                 if (emptyBtn) emptyBtn.style.display = "none";
-            } else if (driveService.selectKeywords.size > 0) {
+            } else if (Drive.selectKeywords.size > 0) {
                 if (emptyIcon) emptyIcon.textContent = "filter_list_off";
                 if (emptyTitle) emptyTitle.textContent = "No files match selected keywords";
                 if (emptySubtitle) emptySubtitle.textContent = "Try unchecking some keywords or click clear to reset.";
                 if (emptyBtn) {
                     emptyBtn.style.display = "inline-flex";
                     emptyBtn.innerHTML = `<span class="material-symbols-outlined">filter_alt_off</span><span>Clear filter</span>`;
-                    emptyBtn.onclick = () => { driveService.selectKeywords.clear(); this.renderFiles(false); this.updateKeywordFilterUI(); };
+                    emptyBtn.onclick = () => { Drive.selectKeywords.clear(); this.renderFiles(false); this.updateKeywordFilterUI(); };
                 }
             } else {
                 if (emptyIcon) emptyIcon.textContent = "cloud_upload";
@@ -1820,7 +1819,7 @@ export class DriveView {
             const rawFK = fileKey.slice();
             const fkSlice = rawFK.slice(0, 44);
             const ext = name.split('.').pop().toUpperCase();
-            driveService.loadThumbnail(driveService.currentFolderId, getObjPid(fkSlice), ext, img, fkSlice);
+            Drive.LoadThumbnail(Drive.currentFolderId, GetObjPid(fkSlice), ext, img, fkSlice);
 
             const title = document.createElement("div");
             title.className = "file-title";
@@ -1852,6 +1851,7 @@ export class DriveView {
         this.updateKeywordFilterUI();
     }
 
+    // Enhance grid cards with size and list layout columns
     async enhanceCardsForListView() {
         const mode = localStorage.getItem("driveViewMode");
         if (mode !== "details") return;
@@ -1865,7 +1865,6 @@ export class DriveView {
                 const img = card.querySelector(".thumb-img");
                 const title = card.querySelector(".file-title");
                 const moreBtn = card.querySelector(".file-more-btn");
-                const fileName = card.dataset.fileName;
 
                 const nameCol = document.createElement("div");
                 nameCol.className = "list-col-name";
@@ -1885,16 +1884,16 @@ export class DriveView {
             }
         });
 
-        const currentFolder = driveService.currentFolderName;
+        const currentFolder = Drive.currentFolderName;
         if (currentFolder) {
-            const sizes = await driveService.fetchFolderFileSizes(currentFolder);
+            const sizes = await Drive.FetchFolderFileSizes(currentFolder);
             cards.forEach(card => {
                 const titleEl = card.querySelector(".file-title");
                 const sizeEl = card.querySelector(".list-col-size");
                 if (titleEl && sizeEl) {
                     const fn = titleEl.textContent;
                     if (sizes && sizes[fn] !== undefined) {
-                        sizeEl.textContent = formatBytes(sizes[fn]);
+                        sizeEl.textContent = FormatBytes(sizes[fn]);
                     } else {
                         sizeEl.textContent = "-";
                     }
@@ -1903,15 +1902,16 @@ export class DriveView {
         }
     }
 
+    // Fetch next page when scrolling near bottom of grid
     handleInfiniteScroll() {
-        if (this.isInfiniteLoading || !driveService.currentFolderName) return;
+        if (this.isInfiniteLoading || !Drive.currentFolderName) return;
         const mediaContainer = document.getElementById("mediaContainer");
         const infiniteScrollLoader = document.getElementById("infiniteScrollLoader");
         if (!mediaContainer) return;
 
         const remaining = mediaContainer.scrollHeight - mediaContainer.scrollTop - mediaContainer.clientHeight;
         if (remaining <= 320) {
-            const total = Object.keys(driveService.flsMap).length;
+            const total = Object.keys(Drive.flsMap).length;
             const maxPage = Math.ceil(total / this.limit);
             if (this.page < maxPage) {
                 this.isInfiniteLoading = true;
@@ -1926,6 +1926,7 @@ export class DriveView {
         }
     }
 
+    // Render keyword items inside filter dropdown
     renderKeywordDropdownItems(filterQuery = "") {
         const keywordListContainer = document.getElementById("keywordListContainer");
         const keywordEmptyMessage = document.getElementById("keywordEmptyMessage");
@@ -1934,7 +1935,7 @@ export class DriveView {
         const filterMenuHeader = document.getElementById("filterMenuHeader");
         if (!keywordListContainer) return;
 
-        const { availKeywords, keywordCounts, selectKeywords } = driveService;
+        const { availKeywords, keywordCounts, selectKeywords } = Drive;
         keywordListContainer.innerHTML = "";
 
         const query = (filterQuery || "").normalize('NFC').trim().toLowerCase();
@@ -1968,15 +1969,15 @@ export class DriveView {
             item.innerHTML = `
                 <div class="filter-item-left">
                     <input type="checkbox" class="filter-item-checkbox" ${isChecked ? "checked" : ""}>
-                    <span class="filter-item-name">${escapeHtml(kw)}</span>
+                    <span class="filter-item-name">${EscapeHtml(kw)}</span>
                 </div>
                 <span class="filter-item-count">${count}</span>
             `;
             const chk = item.querySelector(".filter-item-checkbox");
             item.addEventListener("click", (e) => {
                 if (e.target !== chk) chk.checked = !chk.checked;
-                if (driveService.selectKeywords.has(kw)) driveService.selectKeywords.delete(kw);
-                else driveService.selectKeywords.add(kw);
+                if (Drive.selectKeywords.has(kw)) Drive.selectKeywords.delete(kw);
+                else Drive.selectKeywords.add(kw);
                 this.page = 1;
                 this.renderFiles(false);
                 this.updateKeywordFilterUI();
@@ -1985,13 +1986,14 @@ export class DriveView {
         });
     }
 
+    // Update active keyword filter chips bar
     updateKeywordFilterUI() {
         const btnKeywordFilter = document.getElementById("btnKeywordFilter");
         const filterCountBadge = document.getElementById("filterCountBadge");
         const activeFilterChipsBar = document.getElementById("activeFilterChipsBar");
         const activeChipsList = document.getElementById("activeChipsList");
 
-        const count = driveService.selectKeywords.size;
+        const count = Drive.selectKeywords.size;
         if (btnKeywordFilter) btnKeywordFilter.classList.toggle("active-filter", count > 0);
         if (filterCountBadge) {
             filterCountBadge.style.display = count > 0 ? "inline-flex" : "none";
@@ -2002,13 +2004,13 @@ export class DriveView {
             if (count > 0) {
                 activeFilterChipsBar.style.display = "flex";
                 activeChipsList.innerHTML = "";
-                driveService.selectKeywords.forEach(kw => {
+                Drive.selectKeywords.forEach(kw => {
                     const chip = document.createElement("span");
                     chip.className = "filter-chip";
-                    chip.innerHTML = `<span>${escapeHtml(kw)}</span><button type="button" class="chip-remove-btn"><span class="material-symbols-outlined" style="font-size: 14px;">close</span></button>`;
+                    chip.innerHTML = `<span>${EscapeHtml(kw)}</span><button type="button" class="chip-remove-btn"><span class="material-symbols-outlined" style="font-size: 14px;">close</span></button>`;
                     chip.querySelector(".chip-remove-btn").addEventListener("click", (e) => {
                         e.stopPropagation();
-                        driveService.selectKeywords.delete(kw);
+                        Drive.selectKeywords.delete(kw);
                         this.page = 1;
                         this.renderFiles(false);
                         this.updateKeywordFilterUI();
@@ -2022,33 +2024,35 @@ export class DriveView {
         }
     }
 
+    // Save active file credentials to session and open viewer route
     openFileInViewer(name, customFlKey, customFldId, customFldKey, customFldName) {
-        let fldId = customFldId || driveService.currentFolderId;
-        let fldName = customFldName || driveService.currentFolderName;
-        let fldKey = customFldKey || driveService.currentFolderKey;
-        let flKey = customFlKey || driveService.flsMap[name];
+        let fldId = customFldId || Drive.currentFolderId;
+        let fldName = customFldName || Drive.currentFolderName;
+        let fldKey = customFldKey || Drive.currentFolderKey;
+        let flKey = customFlKey || Drive.flsMap[name];
 
         if (!flKey || !fldId || !fldKey) return;
 
-        const rawFK = driveService.unmaskKey(flKey);
-        const rawFldK = driveService.unmaskKey(fldKey);
+        const rawFK = Drive.UnmaskKey(flKey);
+        const rawFldK = Drive.UnmaskKey(fldKey);
 
-        SafeSession.setItem("currentFileName", name);
-        SafeSession.setItem("currentFileKey", ToHex(rawFK));
-        SafeSession.setItem("currentFolderId", fldId);
-        SafeSession.setItem("currentFolderKey", ToHex(rawFldK));
-        SafeSession.setItem("oldFold", fldName);
+        SafeSession.SetItem("currentFileName", name);
+        SafeSession.SetItem("currentFileKey", ToHex(rawFK));
+        SafeSession.SetItem("currentFolderId", fldId);
+        SafeSession.SetItem("currentFolderKey", ToHex(rawFldK));
+        SafeSession.SetItem("oldFold", fldName);
         rawFK.fill(0);
         rawFldK.fill(0);
-        SafeSession.save();
+        SafeSession.Save();
 
-        router.Navigate('/viewer');
+        AppRouter.Navigate('/viewer');
     }
 
-    async openFileByPid(filePid) {
-        if (!filePid || !driveService.currentFolderId) return false;
-        for (const [name, key] of Object.entries(driveService.flsMap)) {
-            const rawFK = driveService.unmaskKey(key);
+    // Locate file by PID and open in viewer
+    async OpenFileByPid(filePid) {
+        if (!filePid || !Drive.currentFolderId) return false;
+        for (const [name, key] of Object.entries(Drive.flsMap)) {
+            const rawFK = Drive.UnmaskKey(key);
             const pid = GetObjPid(rawFK.slice(0, 44));
             rawFK.fill(0);
             if (pid === filePid) {
@@ -2059,34 +2063,35 @@ export class DriveView {
         return false;
     }
 
+    // Generate deep link for file and copy to clipboard
     async shareFile(name) {
-        const fileKey = driveService.flsMap[name];
-        if (!fileKey || !driveService.currentFolderId) return;
-        const rawFK = driveService.unmaskKey(fileKey);
+        const fileKey = Drive.flsMap[name];
+        if (!fileKey || !Drive.currentFolderId) return;
+        const rawFK = Drive.UnmaskKey(fileKey);
         const pid = GetObjPid(rawFK.slice(0, 44));
         rawFK.fill(0);
 
-        const url = `${window.location.origin}/drive?f=${encodeURIComponent(driveService.currentFolderId)}&p=${encodeURIComponent(pid)}`;
+        const url = `${window.location.origin}/drive?f=${encodeURIComponent(Drive.currentFolderId)}&p=${encodeURIComponent(pid)}`;
         try {
             await navigator.clipboard.writeText(url);
-            showNotice("Deep link copied to clipboard.", "Share", "check_circle");
+            ShowNotice("Deep link copied to clipboard.", "Share", "check_circle");
         } catch {
             prompt("Copy link:", url);
         }
     }
 
+    // Trigger file download via viewer helper
     async downloadFile(name) {
-        showNotice(`Preparing download for "${name}"...`, "Downloading", "download");
-        // Direct download using view viewer helper or fullDown logic
-        // We will delegate to viewer view or drive download
-        const fileKey = driveService.flsMap[name];
+        ShowNotice(`Preparing download for "${name}"...`, "Downloading", "download");
+        const fileKey = Drive.flsMap[name];
         if (!fileKey) return;
         this.openFileInViewer(name);
     }
 
+    // Delete file and refresh grid
     async deleteFile(name) {
-        const ok = await showConfirmModal(
-            `Are you sure you want to delete "<strong>${escapeHtml(name)}</strong>"?`,
+        const ok = await ShowConfirmModal(
+            `Are you sure you want to delete "<strong>${EscapeHtml(name)}</strong>"?`,
             "Delete file?",
             "delete",
             "Delete",
@@ -2094,14 +2099,15 @@ export class DriveView {
         );
         if (!ok) return;
         try {
-            await driveService.deleteFile(name);
+            await Drive.DeleteFile(name);
             this.renderFiles(false);
-            showNotice(`Deleted "${name}"`, "Success", "check_circle");
-        } catch (e) {
-            showNotice("Delete failed: " + e.message, "Error", "error");
+            ShowNotice(`Deleted "${name}"`, "Success", "check_circle");
+        } catch (err) {
+            ShowNotice("Delete failed: " + err.message, "Error", "error");
         }
     }
 
+    // Update avatar and username display in header and account menu
     syncUserProfileUI() {
         const username = SafeSession.GetItem("username") || "User";
         const usrHsh = SafeSession.GetItem("userHash") || "";
@@ -2119,10 +2125,7 @@ export class DriveView {
             menuUserHashShort.textContent = usrHsh ? `ID: ${usrHsh.slice(0, 8)}...${usrHsh.slice(-4)}` : "E2EE Account";
         }
     }
-
-    Init() { return this.init(); }
-    Mount(folderName) { return this.mount(folderName); }
-    UpdateThemeUI() { return this.updateThemeUI(); }
 }
 
-export const driveView = new DriveView();
+// Global drive view instance
+export const DriveView = new DriveViewService();

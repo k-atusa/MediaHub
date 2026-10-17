@@ -1,18 +1,15 @@
-// MediaHub SPA Master Application Entry
-import { SafeSession } from './core/session.js';
-import { router } from './core/router.js';
-import { driveService } from './services/drive.js';
-import { loginView } from './views/login.js';
-import { driveView } from './views/drive.js';
-import { viewerView } from './views/viewer.js';
-import { ShowNotice, ShowAlert, DisableAllAutocomplete, GetObjPid } from './core/utils.js';
+// Single page application entry point and routing orchestration
+import { AppRouter } from './core/router.js';
+import { Drive } from './core/drive.js';
+import { LoginView } from './views/login.js';
+import { DriveView } from './views/drive.js';
+import { ViewerView } from './views/viewer.js';
+import { SafeSession, ShowNotice, ShowAlert, DisableAllAutocomplete, GetObjPid } from './core/utils.js';
 
-// Expose notice & cancelUpload globally for template modal and inline button access
-window.showNotice = ShowNotice;
 window.alert = ShowAlert;
-window.cancelUpload = (idx) => driveService.CancelUpload(idx);
+window.cancelUpload = (idx) => Drive.CancelUpload(idx);
 
-// Switch active view DOM container visibility
+// Toggle visibility of target view container
 function activateView(viewId) {
     document.querySelectorAll('.view-container').forEach(el => {
         el.classList.remove('active');
@@ -23,12 +20,11 @@ function activateView(viewId) {
     }
 }
 
-// Bootstrap master application, initialize session and register History API routes
+// Bootstrap application, session state, and route handlers
 async function bootstrap() {
     await SafeSession.Init();
-    await driveService.InitSession();
+    await Drive.InitSession();
 
-    // Theme initialization
     const savedTheme = localStorage.getItem('theme') || 'system';
     if (savedTheme === 'dark' || savedTheme === 'light') {
         document.documentElement.setAttribute('data-theme', savedTheme);
@@ -36,25 +32,21 @@ async function bootstrap() {
         document.documentElement.removeAttribute('data-theme');
     }
 
-    // System dark mode preference change listener
     window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
         if ((localStorage.getItem("theme") || "system") === "system") {
-            driveView.UpdateThemeUI();
+            DriveView.UpdateThemeUI();
         }
     });
 
-    // Navigation Guards for authentication checking
-    router.BeforeEach(async (path, query) => {
+    AppRouter.BeforeEach(async (path) => {
         const isAuth = Boolean(SafeSession.GetItem("userHash") && SafeSession.GetItem("userKey"));
 
-        // If not authenticated and attempting to access protected views
         if (!isAuth && path !== '/login') {
             const redirectUrl = window.location.pathname + window.location.search;
             SafeSession.SetItem("redirectAfterLogin", redirectUrl);
             return '/login';
         }
 
-        // If authenticated and attempting to access login view
         if (isAuth && path === '/login') {
             return '/drive';
         }
@@ -62,14 +54,12 @@ async function bootstrap() {
         return null;
     });
 
-    // Register View: Login
-    router.On('/login', async () => {
+    AppRouter.On('/login', async () => {
         activateView('view-login');
-        await loginView.Mount();
+        await LoginView.Mount();
     });
 
-    // Register View: Drive Workspace
-    router.On('/drive', async ({ query }) => {
+    AppRouter.On('/drive', async ({ query }) => {
         activateView('view-drive');
 
         let targetFolderName = "";
@@ -77,8 +67,8 @@ async function bootstrap() {
         const filePid = query.p;
 
         if (fldPid) {
-            for (const [name, key] of Object.entries(driveService.fldMap)) {
-                const raw = driveService.UnmaskKey(key);
+            for (const [name, key] of Object.entries(Drive.fldMap)) {
+                const raw = Drive.UnmaskKey(key);
                 if (GetObjPid(raw) === fldPid) {
                     targetFolderName = name;
                     raw.fill(0);
@@ -88,43 +78,37 @@ async function bootstrap() {
             }
         }
 
-        await driveView.Mount(targetFolderName);
+        await DriveView.Mount(targetFolderName);
 
-        // Handle file deep link restoration
         if (filePid && targetFolderName) {
-            const opened = await driveView.openFileByPid(filePid);
+            const opened = await DriveView.OpenFileByPid(filePid);
             if (opened) {
-                await router.Replace('/viewer');
+                await AppRouter.Replace('/viewer');
                 return;
             }
         }
 
-        // Normalize URL if parameters were present
         if (fldPid || filePid) {
             window.history.replaceState(null, '', '/drive');
         }
     });
 
-    // Register View: Media Viewer
-    router.On('/viewer', async ({ query }) => {
+    AppRouter.On('/viewer', async ({ query }) => {
         activateView('view-viewer');
 
         if (query.f || query.p) {
-            await viewerView.MountWithQuery(query);
+            await ViewerView.MountWithQuery(query);
             window.history.replaceState(null, '', '/viewer');
             return;
         }
 
-        await viewerView.Mount();
+        await ViewerView.Mount();
     });
 
     DisableAllAutocomplete();
-
-    // Start router and handle initial document path
-    await router.Init();
+    await AppRouter.Init();
 }
 
-// Start application after DOM is ready
 if (document.readyState === 'loading') {
     window.addEventListener('DOMContentLoaded', bootstrap);
 } else {

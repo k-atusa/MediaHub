@@ -1,19 +1,19 @@
-// MediaHub Login & Registration View Controller (Pure UI)
-import { SafeSession } from '../core/session.js';
-import { router } from '../core/router.js';
-import { ShowNotice, ToHex } from '../core/utils.js';
-import { driveService } from '../services/drive.js';
-import { adapter } from '../adapter.js';
+// User authentication and account registration view controller
+import { AppRouter } from '../core/router.js';
+import { SafeSession, ShowNotice, ToHex } from '../core/utils.js';
+import { Drive } from '../core/drive.js';
+import { Adapter } from '../core/adapter.js';
 
-export class LoginView {
-    // Initialize LoginView with root container and state
+// Authentication view controller
+class LoginViewService {
+    // Initialize container reference and event flag
     constructor() {
         this.container = document.getElementById('view-login');
         this.initialized = false;
     }
 
-    // Bind UI button clicks and keyboard enter events
-    Init() {
+    // Attach click and enter key handlers
+    init() {
         if (this.initialized) return;
         this.initialized = true;
 
@@ -43,9 +43,9 @@ export class LoginView {
         }
     }
 
-    // Save authenticated user credentials to SafeSession and transition to drive view
+    // Persist session tokens and redirect to target route
     async setSession(userHash, maskedKey, username) {
-        const rawUk = driveService.UnmaskKey(maskedKey);
+        const rawUk = Drive.UnmaskKey(maskedKey);
         const redirectUrl = SafeSession.GetItem("redirectAfterLogin");
 
         SafeSession.Clear();
@@ -55,17 +55,17 @@ export class LoginView {
         rawUk.fill(0);
 
         await SafeSession.Save();
-        await driveService.InitSession();
+        await Drive.InitSession();
 
         if (redirectUrl) {
             SafeSession.RemoveItem("redirectAfterLogin");
-            await router.Navigate(redirectUrl);
+            await AppRouter.Navigate(redirectUrl);
         } else {
-            await router.Navigate('/drive');
+            await AppRouter.Navigate('/drive');
         }
     }
 
-    // Handle user sign-in action with credential validation and adapter authentication
+    // Authenticate user credentials and sign in
     async handleLogin() {
         const username = document.getElementById("username")?.value.trim() || "";
         const password = document.getElementById("password")?.value || "";
@@ -83,20 +83,18 @@ export class LoginView {
         }
 
         try {
-            // Derive authentication credentials through backend adapter
-            const { userHash, maskedKey } = await adapter.DeriveKeys(username, password);
+            const { userHash, maskedKey } = await Adapter.DeriveKeys(username, password);
 
-            // Verify if user account exists
-            const exists = await adapter.CheckUserExists(userHash);
+            const exists = await Adapter.CheckUserExists(userHash);
             if (!exists) {
                 await ShowNotice("Invalid username or password.", "Login Failed", "error");
                 return;
             }
 
-            // Persist session and navigate
             await this.setSession(userHash, maskedKey, username);
-        } catch (e) {
-            await ShowNotice("Login failed: " + (e.message || "Unknown error"), "Login Failed", "error");
+            await Adapter.SaveCredentials(username, password);
+        } catch (err) {
+            await ShowNotice("Login failed: " + (err.message || "Unknown error"), "Login Failed", "error");
         } finally {
             if (btnLogin) {
                 btnLogin.disabled = false;
@@ -105,7 +103,7 @@ export class LoginView {
         }
     }
 
-    // Handle new account registration dialog and submission
+    // Handle registration dialog and account creation
     async handleRegister() {
         const username = document.getElementById("username")?.value.trim() || "";
         const password = document.getElementById("password")?.value || "";
@@ -116,11 +114,9 @@ export class LoginView {
         }
 
         try {
-            // Derive keys through backend adapter
-            const { userHash, maskedKey } = await adapter.DeriveKeys(username, password);
+            const { userHash, maskedKey } = await Adapter.DeriveKeys(username, password);
 
-            // Check if already registered
-            const exists = await adapter.CheckUserExists(userHash);
+            const exists = await Adapter.CheckUserExists(userHash);
             if (exists) {
                 await ShowNotice("This account is already registered.", "Already Registered", "warning");
                 return;
@@ -138,12 +134,11 @@ export class LoginView {
                 const inviteCode = inviteCodeInput.value.trim();
                 inviteModal.close();
                 try {
-                    // Register account through backend adapter
-                    await adapter.RegisterUser(userHash, inviteCode);
+                    await Adapter.RegisterUser(userHash, inviteCode);
                     await ShowNotice("Account registered successfully.", "Success", "check_circle");
                     await this.setSession(userHash, maskedKey, username);
-                } catch (e) {
-                    await ShowNotice("Registration failed: " + (e.message || "Unknown error"), "Registration Failed", "error");
+                } catch (err) {
+                    await ShowNotice("Registration failed: " + (err.message || "Unknown error"), "Registration Failed", "error");
                 }
             };
 
@@ -157,32 +152,40 @@ export class LoginView {
             document.getElementById("btnCancelInvite").onclick = () => {
                 inviteModal.close();
             };
-        } catch (e) {
-            await ShowNotice("Registration failed: " + (e.message || "Unknown error"), "Registration Failed", "error");
+        } catch (err) {
+            await ShowNotice("Registration failed: " + (err.message || "Unknown error"), "Registration Failed", "error");
         }
     }
 
-    // Fetch and display optional system notice modal if not previously acknowledged
+    // Check server notification and show modal if unread
     async checkNotice() {
         try {
-            const notice = await adapter.FetchNotice();
+            const notice = await Adapter.FetchNotice();
             if (notice && notice.trim() !== "" && !SafeSession.GetItem("noticeShown")) {
                 await ShowNotice(notice, "Notice", "campaign");
                 SafeSession.SetItem("noticeShown", "true");
             }
-        } catch (e) {
-            console.error("Failed to load notice:", e);
+        } catch (err) {
+            console.error("Failed to load notice:", err);
         }
     }
 
-    // Mount login view, clear password field, and trigger notice check
-    Mount() {
-        this.Init();
-        const pwdInput = document.getElementById("password");
-        if (pwdInput) pwdInput.value = "";
+    // Mount view and restore saved credentials
+    async Mount() {
+        this.init();
+        const creds = await Adapter.GetSavedCredentials();
+        if (creds && creds.username && creds.password) {
+            const userInput = document.getElementById("username");
+            const pwdInput = document.getElementById("password");
+            if (userInput) userInput.value = creds.username;
+            if (pwdInput) pwdInput.value = creds.password;
+        } else {
+            const pwdInput = document.getElementById("password");
+            if (pwdInput) pwdInput.value = "";
+        }
         this.checkNotice();
     }
 }
 
-// Global login view singleton instance
-export const loginView = new LoginView();
+// Global login view instance
+export const LoginView = new LoginViewService();

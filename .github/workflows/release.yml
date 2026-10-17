@@ -85,35 +85,7 @@ jobs:
 
       - name: Build Multi-Platform Binaries
         run: |
-          set -euo pipefail
-          mkdir -p build
-          VERSION="${{ steps.meta.outputs.version }}"
-
-          PLATFORMS=(
-            "windows/amd64/mediahub-server-${VERSION}-windows-amd64.exe"
-            "windows/arm64/mediahub-server-${VERSION}-windows-arm64.exe"
-            "darwin/arm64/mediahub-server-${VERSION}-darwin-arm64"
-            "linux/amd64/mediahub-server-${VERSION}-linux-amd64"
-            "linux/arm64/mediahub-server-${VERSION}-linux-arm64"
-          )
-
-          cd server
-          for ITEM in "${PLATFORMS[@]}"; do
-            IFS="/" read -r OS ARCH OUT_NAME <<< "${ITEM}"
-            echo "==> Building ${OS}/${ARCH} -> build/${OUT_NAME}..."
-            CGO_ENABLED=0 GOOS="${OS}" GOARCH="${ARCH}" go build \
-              -ldflags="-s -w" \
-              -trimpath \
-              -o "../build/${OUT_NAME}" \
-              server.go
-          done
-          cd ..
-
-          echo "==> Generating SHA256 Checksums..."
-          cd build
-          sha256sum mediahub-server-* > checksums.txt
-          cat checksums.txt
-          cd ..
+          bash server/build.sh "${{ steps.meta.outputs.version }}"
 
       # ---- Attach Binaries to Release ----
       - name: Attach Binaries to GitHub Release

@@ -1,47 +1,36 @@
-// MediaHub Media Viewer View Controller (Pure UI)
-import { SafeSession } from '../core/session.js';
-import { router } from '../core/router.js';
-import { driveService } from '../services/drive.js';
-import { adapter } from '../adapter.js';
-import { ShowNotice, ShowConfirmModal, FormatBytes, EscapeHtml, ToHex, FromHex, GetObjPid } from '../core/utils.js';
+// Media viewer view controller for streaming and full download playback
+import { AppRouter } from '../core/router.js';
+import { Drive } from '../core/drive.js';
+import { Adapter } from '../core/adapter.js';
+import {
+    SafeSession, ShowNotice, ShowConfirmModal, FormatBytes, EscapeHtml,
+    ToHex, FromHex, GetObjPid, GetKind, GetMime
+} from '../core/utils.js';
 
-const VIDEO_EXTS = ['mp4', 'webm', 'mov', 'mkv'];
-const AUDIO_EXTS = ['mp3', 'ogg', 'wav', 'm4a', 'aac', 'flac', 'opus', 'wma'];
-const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico'];
-const PDF_EXTS = ['pdf'];
-const TEXT_EXTS = [
-    'txt', 'log', 'md', 'json', 'csv', 'xml', 'html', 'css', 'js', 'ts', 'jsx', 'tsx',
-    'yaml', 'yml', 'sh', 'py', 'sql', 'ini', 'conf', 'c', 'cpp', 'h', 'hpp', 'go', 'rs',
-    'java', 'kt', 'kts', 'swift', 'rb', 'php', 'cs', 'scala', 'dart', 'lua', 'r',
-    'bat', 'cmd', 'ps1', 'zsh', 'bash', 'toml', 'env', 'properties', 'graphql', 'gql',
-    'proto', 'diff', 'patch', 'vue', 'svelte', 'lock', 'json5',
-    'readme', 'license', 'makefile', 'dockerfile'
-];
-
-export class ViewerView {
-    // Initialize ViewerView with DOM container and runtime state
+// Media viewer view controller
+class ViewerViewService {
+    // Initialize container reference and runtime media state
     constructor() {
         this.container = document.getElementById('view-viewer');
         this.initialized = false;
 
-        this.fldId = null;
-        this.fldKey = null;
-        this.flKey = null;
-        this.flName = null;
+        this.folderId = null;
+        this.folderKey = null;
+        this.fileKey = null;
+        this.fileName = null;
         this.origSize = 0;
-        this.rawBuf = null;
         this.currentBlobUrl = null;
     }
 
-    // Initialize UI controls, toolbar buttons, and context menu event listeners
-    Init() {
+    // Attach toolbar and menu action listeners
+    init() {
         if (this.initialized) return;
         this.initialized = true;
 
         const btnBack = document.getElementById("btnViewerBack");
         if (btnBack) {
             btnBack.addEventListener("click", () => {
-                router.Navigate('/drive');
+                AppRouter.Navigate('/drive');
             });
         }
 
@@ -120,7 +109,7 @@ export class ViewerView {
         if (btnCancelRenameFile) btnCancelRenameFile.addEventListener("click", () => renameFileModal?.close());
     }
 
-    // Close viewer dropdown action menu
+    // Hide viewer action dropdown
     closeViewerMenu() {
         const viewerActionMenu = document.getElementById("viewerActionMenu");
         const btnViewerMore = document.getElementById("btnViewerMore");
@@ -131,62 +120,62 @@ export class ViewerView {
         if (btnViewerMore) btnViewerMore.classList.remove("open");
     }
 
-    // Mount viewer from active SafeSession cache
+    // Mount viewer and restore state from session
     async Mount() {
-        this.Init();
+        this.init();
         this.CleanupCurrentMedia();
 
-        this.fldId = SafeSession.GetItem("currentFolderId");
-        this.flName = SafeSession.GetItem("currentFileName");
+        this.folderId = SafeSession.GetItem("currentFolderId");
+        this.fileName = SafeSession.GetItem("currentFileName");
 
-        const rawFkHex = SafeSession.GetItem("currentFolderKey");
-        const rawFlkHex = SafeSession.GetItem("currentFileKey");
+        const rawFolderKeyHex = SafeSession.GetItem("currentFolderKey");
+        const rawFileKeyHex = SafeSession.GetItem("currentFileKey");
 
-        if (rawFkHex) {
-            this.fldKey = driveService.MaskKey(FromHex(rawFkHex));
+        if (rawFolderKeyHex) {
+            this.folderKey = Drive.MaskKey(FromHex(rawFolderKeyHex));
         } else {
-            this.fldKey = null;
+            this.folderKey = null;
         }
 
-        if (rawFlkHex) {
-            const rawFlk = FromHex(rawFlkHex);
-            this.origSize = driveService.GetEntrySize(rawFlk);
-            this.flKey = driveService.MaskKey(rawFlk);
-            rawFlk.fill(0);
+        if (rawFileKeyHex) {
+            const rawFileKey = FromHex(rawFileKeyHex);
+            this.origSize = Drive.GetEntrySize(rawFileKey);
+            this.fileKey = Drive.MaskKey(rawFileKey);
+            rawFileKey.fill(0);
         } else {
-            this.flKey = null;
+            this.fileKey = null;
             this.origSize = 0;
         }
 
-        if (!this.flKey || !this.flName || !this.fldId || !this.fldKey) {
-            return router.Navigate('/drive', true);
+        if (!this.fileKey || !this.fileName || !this.folderId || !this.folderKey) {
+            return AppRouter.Navigate('/drive', true);
         }
 
         const txName = document.getElementById("txName");
         if (txName) {
-            txName.textContent = this.flName;
-            txName.title = this.flName;
+            txName.textContent = this.fileName;
+            txName.title = this.fileName;
         }
 
         await this.renderFilePreview();
         await this.setupNeighborNavigation();
     }
 
-    // Mount viewer using deep link query parameters (folder PID & file PID)
+    // Mount viewer with URL deep-link query parameters
     async MountWithQuery(query = {}) {
-        this.Init();
-        const fldPid = query.f;
+        this.init();
+        const folderPid = query.f;
         const filePid = query.p;
 
-        if (!fldPid || !filePid) {
+        if (!folderPid || !filePid) {
             return this.Mount();
         }
 
         let targetFolderName = "";
         let targetFolderKey = null;
-        for (const [name, key] of Object.entries(driveService.fldMap)) {
-            const raw = driveService.UnmaskKey(key);
-            if (GetObjPid(raw) === fldPid) {
+        for (const [name, key] of Object.entries(Drive.fldMap)) {
+            const raw = Drive.UnmaskKey(key);
+            if (GetObjPid(raw) === folderPid) {
                 targetFolderName = name;
                 targetFolderKey = key;
                 raw.fill(0);
@@ -197,10 +186,10 @@ export class ViewerView {
 
         if (!targetFolderName || !targetFolderKey) {
             await ShowNotice("Folder not found or you lack permission to access it.", "Access Denied", "error");
-            return router.Navigate('/drive', true);
+            return AppRouter.Navigate('/drive', true);
         }
 
-        const filesMap = await adapter.LoadFolderMeta(fldPid, targetFolderKey);
+        const filesMap = await Adapter.LoadFolderMeta(folderPid, targetFolderKey);
         let foundFileName = "";
         let foundFileKey = null;
 
@@ -214,77 +203,44 @@ export class ViewerView {
 
         if (!foundFileName || !foundFileKey) {
             await ShowNotice("The requested file was not found in this folder.", "File Not Found", "error");
-            return router.Navigate('/drive', true);
+            return AppRouter.Navigate('/drive', true);
         }
 
-        const rawFldK = driveService.UnmaskKey(targetFolderKey);
+        const rawFolderKey = Drive.UnmaskKey(targetFolderKey);
         SafeSession.SetItem("currentFolderName", targetFolderName);
-        SafeSession.SetItem("currentFolderId", fldPid);
-        SafeSession.SetItem("currentFolderKey", ToHex(rawFldK));
+        SafeSession.SetItem("currentFolderId", folderPid);
+        SafeSession.SetItem("currentFolderKey", ToHex(rawFolderKey));
         SafeSession.SetItem("currentFileName", foundFileName);
         SafeSession.SetItem("currentFileKey", ToHex(foundFileKey));
         SafeSession.SetItem("oldFold", targetFolderName);
-        rawFldK.fill(0);
+        rawFolderKey.fill(0);
         foundFileKey.fill(0);
         await SafeSession.Save();
 
         return this.Mount();
     }
 
-    // Release current media player, image viewer, and blob URL resources
+    // Clean up active player instance and revoke blob URL
     CleanupCurrentMedia() {
         if (window.currentViewer) {
-            try { window.currentViewer.destroy(); } catch (_) { }
+            try { window.currentViewer.destroy(); } catch { }
             window.currentViewer = null;
         }
         if (this.currentBlobUrl) {
-            try { URL.revokeObjectURL(this.currentBlobUrl); } catch (_) { }
+            try { URL.revokeObjectURL(this.currentBlobUrl); } catch { }
             this.currentBlobUrl = null;
         }
-        this.rawBuf = null;
     }
 
-    // Determine media category kind based on file extension
-    getKind(name) {
-        const ext = ((name || '').split('.').pop() || '').toLowerCase();
-        if (VIDEO_EXTS.includes(ext)) return 'video';
-        if (AUDIO_EXTS.includes(ext)) return 'audio';
-        if (IMAGE_EXTS.includes(ext)) return 'image';
-        if (PDF_EXTS.includes(ext)) return 'pdf';
-        if (TEXT_EXTS.includes(ext)) return 'text';
-        return 'unsupported';
-    }
-
-    // Map file extension to standard MIME type
-    getMime(name) {
-        const ext = ((name || '').split('.').pop() || '').toLowerCase();
-        const map = {
-            'pdf': 'application/pdf',
-            'txt': 'text/plain;charset=utf-8',
-            'log': 'text/plain;charset=utf-8',
-            'md': 'text/markdown;charset=utf-8',
-            'json': 'application/json',
-            'csv': 'text/csv;charset=utf-8',
-            'xml': 'application/xml',
-            'html': 'text/html;charset=utf-8',
-            'css': 'text/css;charset=utf-8',
-            'js': 'text/javascript;charset=utf-8',
-            'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png', 'gif': 'image/gif', 'webp': 'image/webp', 'svg': 'image/svg+xml',
-            'mp4': 'video/mp4', 'webm': 'video/webm', 'mov': 'video/quicktime', 'mkv': 'video/x-matroska',
-            'mp3': 'audio/mpeg', 'ogg': 'audio/ogg', 'wav': 'audio/wav', 'm4a': 'audio/mp4', 'aac': 'audio/aac', 'flac': 'audio/flac'
-        };
-        return map[ext] || 'application/octet-stream';
-    }
-
-    // Render file preview using streaming Service Worker or in-memory blob decryption
+    // Render media preview using streaming or download fallback
     async renderFilePreview() {
-        const rawFk = driveService.UnmaskKey(this.flKey);
-        const flPid = GetObjPid(rawFk.slice(0, 44));
-        rawFk.fill(0);
+        const rawKey = Drive.UnmaskKey(this.fileKey);
+        const filePid = GetObjPid(rawKey.slice(0, 44));
+        rawKey.fill(0);
 
         const body = document.getElementById("viewBody");
         if (!body) return;
-        const kind = this.getKind(this.flName);
+        const kind = GetKind(this.fileName);
 
         if (kind === 'unsupported' && this.origSize > 4096) {
             return this.renderUnsupported(body);
@@ -293,36 +249,36 @@ export class ViewerView {
         if (kind === 'video' || kind === 'audio') {
             body.innerHTML = `<p style="color:var(--preview-subtext);font-size:13px;margin:20px 0">Preparing ${kind} stream…</p>`;
             try {
-                await adapter.RegisterStreaming(this.fldId, flPid, this.flKey, this.origSize, this.flName);
+                const streamUrl = await Adapter.GetStreamUrl(this.folderId, filePid, this.fileKey, this.origSize, this.fileName);
 
                 const fallbackToFullDown = async (reason) => {
                     console.warn(`Streaming failed (${reason}). Falling back to full download...`);
-                    await this.fullDownloadAndRender(flPid, body);
+                    await this.fullDownloadAndRender(filePid, body);
                 };
 
                 body.innerHTML = '';
                 if (kind === 'audio') {
-                    this.renderAudioPlayer(`/sw-stream/${this.fldId}/${flPid}`, body, fallbackToFullDown);
+                    this.renderAudioPlayer(streamUrl, body, fallbackToFullDown);
                 } else {
-                    const v = document.createElement('video');
-                    v.controls = true;
-                    v.crossOrigin = 'anonymous';
-                    v.playsInline = true;
-                    v.preload = 'metadata';
-                    v.style.width = '100%';
-                    v.src = `/sw-stream/${this.fldId}/${flPid}`;
-                    v.addEventListener('error', () => fallbackToFullDown(v.error ? `Code ${v.error.code}` : "Video error"));
-                    body.appendChild(v);
+                    const video = document.createElement('video');
+                    video.controls = true;
+                    video.crossOrigin = 'anonymous';
+                    video.playsInline = true;
+                    video.preload = 'metadata';
+                    video.style.width = '100%';
+                    video.src = streamUrl;
+                    video.addEventListener('error', () => fallbackToFullDown(video.error ? `Code ${video.error.code}` : "Video error"));
+                    body.appendChild(video);
                 }
                 return;
-            } catch (e) {
-                console.warn('SW streaming error, fallback to full download:', e);
-                await this.fullDownloadAndRender(flPid, body);
+            } catch (err) {
+                console.warn('Streaming error, fallback to full download:', err);
+                await this.fullDownloadAndRender(filePid, body);
                 return;
             }
         }
 
-        await this.fullDownloadAndRender(flPid, body);
+        await this.fullDownloadAndRender(filePid, body);
     }
 
     // Render audio player card
@@ -333,7 +289,7 @@ export class ViewerView {
                 <div class="audio-hero-icon-box">
                     <span class="material-symbols-outlined audio-hero-icon">graphic_eq</span>
                 </div>
-                <div class="audio-title" title="${EscapeHtml(this.flName)}">${EscapeHtml(this.flName)}</div>
+                <div class="audio-title" title="${EscapeHtml(this.fileName)}">${EscapeHtml(this.fileName)}</div>
                 <div class="audio-meta">${sizeStr}</div>
                 <audio controls autoplay class="audio-element" id="audioPlayer" src="${srcUrl}"></audio>
             </div>
@@ -343,7 +299,7 @@ export class ViewerView {
         }
     }
 
-    // Render unsupported file preview card with direct download button
+    // Render card for unsupported file type with download trigger
     renderUnsupported(body) {
         const sizeStr = this.origSize > 0 ? FormatBytes(this.origSize) : '';
         body.innerHTML = `
@@ -354,7 +310,7 @@ export class ViewerView {
                 <h2 class="unsupported-title">No preview available</h2>
                 <p class="unsupported-msg">Preview is not supported for this file.</p>
                 <div class="unsupported-meta">
-                    <span class="unsupported-filename" title="${EscapeHtml(this.flName)}">${EscapeHtml(this.flName)}</span>
+                    <span class="unsupported-filename" title="${EscapeHtml(this.fileName)}">${EscapeHtml(this.fileName)}</span>
                     ${sizeStr ? `<span class="unsupported-filesize">${sizeStr}</span>` : ''}
                 </div>
                 <button type="button" class="btn-unsupported-download" id="btnUnsupportedDownload">
@@ -366,8 +322,8 @@ export class ViewerView {
         document.getElementById("btnUnsupportedDownload")?.addEventListener("click", () => this.downloadCurrentFile());
     }
 
-    // Download and decrypt entire media file into in-memory blob
-    async fullDownloadAndRender(flPid, body) {
+    // Download entire ciphertext and decrypt in memory
+    async fullDownloadAndRender(filePid, body) {
         const prog = document.createElement("div");
         prog.style.position = "fixed";
         prog.style.top = "50%";
@@ -377,43 +333,43 @@ export class ViewerView {
         body.appendChild(prog);
 
         try {
-            const blobUrl = await adapter.LoadMediaBlob(
-                this.fldId,
-                flPid,
-                this.flKey,
+            const blobUrl = await Adapter.LoadMediaBlob(
+                this.folderId,
+                filePid,
+                this.fileKey,
                 this.origSize,
-                this.getMime(this.flName)
+                GetMime(this.fileName)
             );
             this.currentBlobUrl = blobUrl;
             body.removeChild(prog);
             this.renderDecryptedMedia(blobUrl, body);
-        } catch (e) {
+        } catch (err) {
             if (prog.parentNode) body.removeChild(prog);
             body.innerHTML = `
                 <div style="text-align: center; padding: 40px 20px; color: var(--preview-subtext);">
                     <span class="material-symbols-outlined" style="font-size: 48px; color: var(--preview-danger); margin-bottom: 12px; display: block;">error_outline</span>
                     <h3 style="margin: 0 0 8px 0; color: var(--preview-text);">Unable to load file</h3>
-                    <p style="margin: 0 0 20px 0; font-size: 14px;">${EscapeHtml(e.message || "Failed to load media")}</p>
+                    <p style="margin: 0 0 20px 0; font-size: 14px;">${EscapeHtml(err.message || "Failed to load media")}</p>
                 </div>
             `;
         }
     }
 
-    // Render media element from decrypted blob URL
+    // Mount decrypted blob into corresponding media DOM element
     renderDecryptedMedia(blobUrl, body) {
-        const kind = this.getKind(this.flName);
+        const kind = GetKind(this.fileName);
         body.innerHTML = "";
 
         if (kind === 'video') {
-            const v = document.createElement("video");
-            v.controls = true;
-            v.src = blobUrl;
-            v.style.width = "100%";
-            body.appendChild(v);
+            const video = document.createElement("video");
+            video.controls = true;
+            video.src = blobUrl;
+            video.style.width = "100%";
+            body.appendChild(video);
         } else if (kind === 'image') {
             const img = document.createElement("img");
             img.src = blobUrl;
-            img.alt = this.flName;
+            img.alt = this.fileName;
             img.style.display = "none";
             body.appendChild(img);
 
@@ -443,7 +399,7 @@ export class ViewerView {
         }
     }
 
-    // Setup previous/next neighbor navigation buttons within folder
+    // Configure next and previous navigation within current folder
     async setupNeighborNavigation() {
         const btnPrev = document.getElementById("btnPrevFile");
         const btnNext = document.getElementById("btnNextFile");
@@ -451,9 +407,9 @@ export class ViewerView {
         if (btnNext) btnNext.classList.add("hidden");
 
         try {
-            const flsMap = await adapter.LoadFolderMeta(this.fldId, this.fldKey);
-            const entries = Object.entries(flsMap).sort((a, b) => a[0].localeCompare(b[0]));
-            const idx = entries.findIndex(([name]) => name === this.flName);
+            const filesMap = await Adapter.LoadFolderMeta(this.folderId, this.folderKey);
+            const entries = Object.entries(filesMap).sort((a, b) => a[0].localeCompare(b[0]));
+            const idx = entries.findIndex(([name]) => name === this.fileName);
 
             if (idx === -1) {
                 for (const [, v] of entries) if (v?.fill) v.fill(0);
@@ -461,41 +417,41 @@ export class ViewerView {
             }
 
             if (idx > 0 && btnPrev) {
-                const [prevNm, prevKy] = entries[idx - 1];
+                const [prevName, prevKey] = entries[idx - 1];
                 btnPrev.classList.remove("hidden");
                 btnPrev.onclick = () => {
-                    SafeSession.SetItem("currentFileName", prevNm);
-                    SafeSession.SetItem("currentFileKey", ToHex(prevKy));
+                    SafeSession.SetItem("currentFileName", prevName);
+                    SafeSession.SetItem("currentFileKey", ToHex(prevKey));
                     SafeSession.Save();
                     this.Mount();
                 };
             }
 
             if (idx < entries.length - 1 && btnNext) {
-                const [nxtNm, nxtKy] = entries[idx + 1];
+                const [nextName, nextKey] = entries[idx + 1];
                 btnNext.classList.remove("hidden");
                 btnNext.onclick = () => {
-                    SafeSession.SetItem("currentFileName", nxtNm);
-                    SafeSession.SetItem("currentFileKey", ToHex(nxtKy));
+                    SafeSession.SetItem("currentFileName", nextName);
+                    SafeSession.SetItem("currentFileKey", ToHex(nextKey));
                     SafeSession.Save();
                     this.Mount();
                 };
             }
 
             for (const [, v] of entries) if (v?.fill) v.fill(0);
-        } catch (e) {
-            console.error("Neighbor navigation error:", e);
+        } catch (err) {
+            console.error("Neighbor navigation error:", err);
         }
     }
 
-    // Generate PID-based deep link and copy to clipboard
+    // Copy file deep link URL to clipboard
     async shareCurrentFile() {
-        if (!this.fldId || !this.flKey) return;
-        const rawFk = driveService.UnmaskKey(this.flKey);
-        const filePid = GetObjPid(rawFk.slice(0, 44));
-        rawFk.fill(0);
+        if (!this.folderId || !this.fileKey) return;
+        const rawKey = Drive.UnmaskKey(this.fileKey);
+        const filePid = GetObjPid(rawKey.slice(0, 44));
+        rawKey.fill(0);
 
-        const url = `${window.location.origin}/drive?f=${encodeURIComponent(this.fldId)}&p=${encodeURIComponent(filePid)}`;
+        const url = `${window.location.origin}/drive?f=${encodeURIComponent(this.folderId)}&p=${encodeURIComponent(filePid)}`;
         try {
             await navigator.clipboard.writeText(url);
             ShowNotice("Deep link copied to clipboard.", "Share", "check_circle");
@@ -511,70 +467,70 @@ export class ViewerView {
         const errText = document.getElementById("renameFileErrorText");
         if (errText) errText.style.display = "none";
         if (input) {
-            input.value = this.flName;
-            const lastDot = this.flName.lastIndexOf('.');
+            input.value = this.fileName;
+            const lastDot = this.fileName.lastIndexOf('.');
             if (lastDot > 0) input.setSelectionRange(0, lastDot);
             else input.select();
         }
         modal?.showModal();
     }
 
-    // Perform file rename through DriveService
-    async performRename(newNm) {
-        if (!newNm || newNm === this.flName) return false;
+    // Rename active file on backend and update session
+    async performRename(newName) {
+        if (!newName || newName === this.fileName) return false;
         try {
-            await driveService.RenameFile(this.flName, newNm);
-            SafeSession.SetItem("currentFileName", newNm);
+            await Drive.RenameFile(this.fileName, newName);
+            SafeSession.SetItem("currentFileName", newName);
             await SafeSession.Save();
 
-            this.flName = newNm;
+            this.fileName = newName;
             const tx = document.getElementById("txName");
-            if (tx) { tx.textContent = newNm; tx.title = newNm; }
-            ShowNotice(`Renamed to "${newNm}"`, "Success", "check_circle");
+            if (tx) { tx.textContent = newName; tx.title = newName; }
+            ShowNotice(`Renamed to "${newName}"`, "Success", "check_circle");
             return true;
-        } catch (e) {
-            ShowNotice("Rename failed: " + e.message, "Error", "error");
+        } catch (err) {
+            ShowNotice("Rename failed: " + err.message, "Error", "error");
             return false;
         }
     }
 
-    // Download current file through blob URL trigger
+    // Trigger download of decrypted media blob
     async downloadCurrentFile() {
         if (this.currentBlobUrl) {
             const a = document.createElement('a');
             a.href = this.currentBlobUrl;
-            a.download = this.flName;
+            a.download = this.fileName;
             a.click();
             return;
         }
 
-        const rawFk = driveService.UnmaskKey(this.flKey);
-        const flPid = GetObjPid(rawFk.slice(0, 44));
-        rawFk.fill(0);
+        const rawKey = Drive.UnmaskKey(this.fileKey);
+        const filePid = GetObjPid(rawKey.slice(0, 44));
+        rawKey.fill(0);
 
-        ShowNotice(`Preparing download for "${this.flName}"...`, "Downloading", "download");
+        ShowNotice(`Preparing download for "${this.fileName}"...`, "Downloading", "download");
         try {
-            const blobUrl = await adapter.LoadMediaBlob(
-                this.fldId,
-                flPid,
-                this.flKey,
+            const blobUrl = await Adapter.LoadMediaBlob(
+                this.folderId,
+                filePid,
+                this.fileKey,
                 this.origSize,
-                this.getMime(this.flName)
+                GetMime(this.fileName)
             );
             const a = document.createElement('a');
             a.href = blobUrl;
-            a.download = this.flName;
+            a.download = this.fileName;
             a.click();
             URL.revokeObjectURL(blobUrl);
-        } catch (e) {
-            ShowNotice("Download failed: " + e.message, "Error", "error");
+        } catch (err) {
+            ShowNotice("Download failed: " + err.message, "Error", "error");
         }
     }
 
-    // Permanently delete current file from folder and return to drive
+    // Delete active file and return to drive view
     async deleteCurrentFile() {
         const ok = await ShowConfirmModal(
-            `Are you sure you want to delete "<strong>${EscapeHtml(this.flName)}</strong>"?`,
+            `Are you sure you want to delete "<strong>${EscapeHtml(this.fileName)}</strong>"?`,
             "Delete file?",
             "delete",
             "Delete",
@@ -583,14 +539,14 @@ export class ViewerView {
         if (!ok) return;
 
         try {
-            await driveService.DeleteFile(this.flName);
-            ShowNotice(`Deleted "${this.flName}"`, "Success", "check_circle");
-            router.Navigate('/drive');
-        } catch (e) {
-            ShowNotice("Delete failed: " + e.message, "Error", "error");
+            await Drive.DeleteFile(this.fileName);
+            ShowNotice(`Deleted "${this.fileName}"`, "Success", "check_circle");
+            AppRouter.Navigate('/drive');
+        } catch (err) {
+            ShowNotice("Delete failed: " + err.message, "Error", "error");
         }
     }
 }
 
-// Global viewer view singleton instance
-export const viewerView = new ViewerView();
+// Global viewer view instance
+export const ViewerView = new ViewerViewService();

@@ -11,12 +11,6 @@ certs/
 server/certs/
 .mediahub_credentials.json
 
-# ViewerJS External Bundles
-viewerjs.min.js
-viewerjs.min.css
-**/viewerjs.min.js
-**/viewerjs.min.css
-
 # Server Runtime Data & Binaries
 config/
 server/config/
@@ -27,3 +21,4 @@ server/data/
 server/server
 server/*.exe
 server/mediahub-server-*
+build/

@@ -1,53 +1,44 @@
-// MediaHub Backend & Cryptographic Adapter
-// Encapsulates all network communications (fetch/XHR) and client-side E2EE cryptography
-import { SHA3256, SymMaster, Random, Masker, HashMaster } from './engine/Bencrypt.js';
-import { EncodeCfg, DecodeCfg, EncodeInt, DecodeInt, PadLen, Opsec } from './engine/Opsec.js';
-import { NormPW, Encode64, Decode64 } from './engine/Bencode.js';
-import { ToHex, FromHex, GetObjPid, GetUserPid } from './core/utils.js';
+// Backend network communication and client-side encryption adapter
+import { SHA3256, SymMaster, Random, Masker, HashMaster } from '../engine/Bencrypt.js';
+import { EncodeCfg, DecodeCfg, EncodeInt, DecodeInt, PadLen, Opsec } from '../engine/Opsec.js';
+import { NormPW, Encode64, Decode64 } from '../engine/Bencode.js';
+import { ToHex, FromHex, GetObjPid } from './utils.js';
+
+// Derive 16-byte user public identifier from store key
+const getUserPid = (key) => {
+    if (!key) return '';
+    return ToHex(SHA3256(key).slice(0, 16));
+};
 
 const mask = new Masker();
-const SECRET_PEPPER = "_PROJECT_WHY_MEDIAHUB_PEPPER_2026_!@#$";
+const secretPepper = "_PROJECT_WHY_MEDIAHUB_PEPPER_2026_!@#$";
 
-// In-memory data chunk provider for streaming decryption
-export class NetSrc {
-    constructor(buf) {
-        this.buf = buf;
-        this.ptr = 0;
-    }
-    // Read specified byte chunk slice from buffer
-    async read(size) {
-        if (this.ptr >= this.buf.length) return new Uint8Array(0);
-        const chunk = this.buf.slice(this.ptr, this.ptr + size);
-        this.ptr += chunk.length;
-        return chunk;
-    }
-}
-
-export class Adapter {
-    // Initialize Adapter with server origin
+// Web platform backend adapter service
+export class AdapterService {
+    // Initialize adapter with window origin
     constructor() {
         this.serverUrl = window.location.origin;
     }
 
-    // Derive deterministic user authentication hash and user master key using Argon2id/KDF
+    // Derive deterministic authentication user hash and masked master key
     async DeriveKeys(username, password) {
         const pwBytes = NormPW(password);
-        const saltBytes = SHA3256(new TextEncoder().encode(username + SECRET_PEPPER));
+        const saltBytes = SHA3256(new TextEncoder().encode(username + secretPepper));
         const hm = new HashMaster("arg2st");
         const [storeKey, userKey] = await hm.KDF(pwBytes, saltBytes);
-        const userHash = GetUserPid(storeKey);
+        const userHash = getUserPid(storeKey);
         const maskedKey = mask.XOR(userKey);
         userKey.fill(0);
         return { userHash, maskedKey };
     }
 
-    // Check if user account exists on server by verifying status of userdata endpoint
+    // Check if user account exists on server
     async CheckUserExists(userHash) {
         const res = await fetch(`${this.serverUrl}/api/userdata/${userHash}`);
         return res.status !== 404;
     }
 
-    // Register a new user account with an optional invite code
+    // Register user account on server with optional invite code
     async RegisterUser(userHash, inviteCode = "") {
         const res = await fetch(`${this.serverUrl}/api/userdata/${userHash}`, {
             method: "POST",
@@ -60,19 +51,19 @@ export class Adapter {
         }
     }
 
-    // Fetch public server announcement banner text
+    // Fetch server notification banner text
     async FetchNotice() {
         try {
             const res = await fetch(`${this.serverUrl}/api/notice`);
             if (!res.ok) return "";
             const data = await res.json();
             return data.notice || "";
-        } catch (_) {
+        } catch {
             return "";
         }
     }
 
-    // Load and decrypt user folder catalog from server
+    // Fetch and decrypt user folder map from server
     async LoadUserData(userHash, maskedUserKey) {
         const res = await fetch(`${this.serverUrl}/api/userdata/${userHash}`);
         if (res.status === 404) return {};
@@ -91,13 +82,13 @@ export class Adapter {
         return map;
     }
 
-    // Encrypt and save user folder catalog to server
-    async SaveUserData(userHash, rawFldMap, maskedUserKey, oldHash = "") {
+    // Encrypt and persist user folder map to server
+    async SaveUserData(userHash, rawFolderMap, maskedUserKey, oldHash = "") {
         const rawUk = mask.XOR(maskedUserKey);
         const sm = new SymMaster("gcm1", rawUk);
         rawUk.fill(0);
 
-        const bin = EncodeCfg(rawFldMap);
+        const bin = EncodeCfg(rawFolderMap);
         const enc = await sm.EnBin(bin);
         bin.fill(0);
 
@@ -114,7 +105,7 @@ export class Adapter {
         if (!res.ok) throw new Error(`Failed to save userdata (HTTP ${res.status})`);
     }
 
-    // Load and decrypt folder file catalog from server
+    // Fetch and decrypt folder file map from server
     async LoadFolderMeta(folderId, maskedFolderKey) {
         const res = await fetch(`${this.serverUrl}/api/storage/${folderId}/names`);
         if (res.status === 404) return {};
@@ -133,13 +124,13 @@ export class Adapter {
         return map;
     }
 
-    // Encrypt and save folder file catalog to server
-    async SaveFolderMeta(folderId, rawFlsMap, maskedFolderKey, userHash = "") {
+    // Encrypt and persist folder file map to server
+    async SaveFolderMeta(folderId, rawFilesMap, maskedFolderKey, userHash = "") {
         const rawFk = mask.XOR(maskedFolderKey);
         const sm = new SymMaster("gcm1", rawFk.slice(0, 32));
         rawFk.fill(0);
 
-        const bin = EncodeCfg(rawFlsMap);
+        const bin = EncodeCfg(rawFilesMap);
         const enc = await sm.EnBin(bin);
         bin.fill(0);
 
@@ -156,7 +147,7 @@ export class Adapter {
         if (!res.ok) throw new Error(`Failed to save folder map (HTTP ${res.status})`);
     }
 
-    // Delete folder metadata from server storage
+    // Delete folder catalog entry on server
     async DeleteFolderMeta(folderId, userHash = "") {
         const headers = {};
         if (userHash) headers["X-User-Hash"] = userHash;
@@ -170,7 +161,7 @@ export class Adapter {
         }
     }
 
-    // Trim orphaned files in folder storage on server
+    // Trim orphan files from folder storage
     async TrimFolder(folderId, activePids, userHash = "") {
         const headers = { "Content-Type": "application/json" };
         if (userHash) headers["X-User-Hash"] = userHash;
@@ -184,7 +175,7 @@ export class Adapter {
         return await res.text();
     }
 
-    // Load and decrypt thumbnail image, returning an object URL
+    // Load and decrypt thumbnail blob URL
     async LoadThumbnailUrl(folderId, filePid, maskedFileKey) {
         const res = await fetch(`${this.serverUrl}/api/media/${folderId}/${filePid}/thumb`);
         if (!res.ok) return null;
@@ -200,7 +191,7 @@ export class Adapter {
         return URL.createObjectURL(blob);
     }
 
-    // Load and decrypt media file into in-memory decrypted Blob URL
+    // Download and decrypt media payload to blob URL
     async LoadMediaBlob(folderId, filePid, maskedFileKey, origSize = 0, mimeType = "application/octet-stream") {
         const res = await fetch(`${this.serverUrl}/api/media/${folderId}/${filePid}`);
         if (!res.ok) throw new Error(`Failed to download media (HTTP ${res.status})`);
@@ -260,7 +251,21 @@ export class Adapter {
         });
     }
 
-    // Encrypt folder share token with user password
+    // Register streaming credentials and return SW stream endpoint URL
+    async GetStreamUrl(folderId, filePid, maskedFileKey, origSize, fileName) {
+        await this.RegisterStreaming(folderId, filePid, maskedFileKey, origSize, fileName);
+        return `/sw-stream/${folderId}/${filePid}`;
+    }
+
+    // Retrieve saved user credentials
+    async GetSavedCredentials() {
+        return null;
+    }
+
+    // Persist user credentials
+    async SaveCredentials(username, password) { }
+
+    // Export password-encrypted folder share token
     async ExportShareToken(folderName, maskedKey, password) {
         if (!password) return null;
         const rawKey = mask.XOR(maskedKey);
@@ -272,7 +277,7 @@ export class Adapter {
         return Encode64(head, '#');
     }
 
-    // Decrypt folder share token with user password
+    // Import and decrypt password-protected folder share token
     async ImportShareToken(tokenText, password) {
         try {
             if (!password || !tokenText) return null;
@@ -289,7 +294,7 @@ export class Adapter {
         }
     }
 
-    // Generate JPEG thumbnail blob from image File object
+    // Generate JPEG thumbnail blob from image File
     async MakeImageThumb(file) {
         try {
             const bmp = await createImageBitmap(file);
@@ -318,7 +323,7 @@ export class Adapter {
         }
     }
 
-    // Generate JPEG thumbnail blob from video File object
+    // Generate JPEG thumbnail blob from video File
     MakeVideoThumb(file) {
         return new Promise((resolve) => {
             const video = document.createElement('video');
@@ -353,4 +358,4 @@ export class Adapter {
 }
 
 // Global adapter singleton instance
-export const adapter = new Adapter();
+export const Adapter = new AdapterService();

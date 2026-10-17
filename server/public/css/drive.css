@@ -1310,10 +1310,6 @@
         }
 
 
-        /* Pagination Bar (Hidden in favor of smooth infinite scroll) */
-        .pagination-container {
-            display: none !important;
-        }
 
         /* Material You (M3) Circular Progress Indicator for Infinite Scroll */
         .infinite-scroll-loader {

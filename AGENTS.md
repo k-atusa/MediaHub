@@ -63,7 +63,7 @@ Vanilla Web 클라이언트(`server/public`)가 임베딩(`//go:embed all:public
    - **서버 바이너리 직접 실행 금지**: AI Agent는 `./server` 등의 서버 바이너리를 직접 백그라운드로 실행하지 않습니다. 사용자가 직접 터미널에서 실행합니다.
    - **브라우저 서브에이전트 제어 금지**: `browser_subagent` 도구를 사용하지 않으며, 사용자가 직접 브라우저에서 확인하도록 안내합니다.
 2. **빌드 명령**:
-   - 프로젝트 루트의 `./build.sh`를 실행하여 Go 바이너리(`server/server`) 컴파일을 수행합니다. Node.js 의존성 없이 순수 Go 툴체인만으로 빌드됩니다.
+   - `server/build.sh` (또는 `cd server && ./build.sh`)를 실행하여 Go 바이너리(`server/server`) 컴파일을 수행합니다. Node.js 의존성 없이 순수 Go 툴체인만으로 빌드됩니다.
 3. **암호화 라이브러리 보존**:
    - `Bencrypt.js`, `Bencode.js`, `Opsec.js`는 MediaHub의 핵심 암호 엔진이므로 임의로 내부 로직을 변형하지 않습니다.
 4. **종단간 암호화(E2EE) 및 스트리밍 파이프라인**:
