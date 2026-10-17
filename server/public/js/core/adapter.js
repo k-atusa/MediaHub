@@ -193,14 +193,50 @@ export class AdapterService {
 
     // Download and decrypt media payload to blob URL
     async LoadMediaBlob(folderId, filePid, maskedFileKey, origSize = 0, mimeType = "application/octet-stream") {
-        const res = await fetch(`${this.serverUrl}/api/media/${folderId}/${filePid}/dat`);
-        if (!res.ok) throw new Error(`Failed to download media (HTTP ${res.status})`);
+        const downloadChunkSize = 16 * 1024 * 1024;
+        const url = `${this.serverUrl}/api/media/${folderId}/${filePid}/dat`;
 
+        // Fetch first chunk to determine total file size from Content-Range
+        const firstRes = await fetch(url, {
+            headers: { 'Range': `bytes=0-${downloadChunkSize - 1}` }
+        });
+        if (!firstRes.ok && firstRes.status !== 206) {
+            throw new Error(`Failed to download media (HTTP ${firstRes.status})`);
+        }
+
+        const firstChunk = new Uint8Array(await firstRes.arrayBuffer());
+
+        // Parse total size from Content-Range header or use first chunk length
+        let totalSize = firstChunk.length;
+        const contentRange = firstRes.headers.get('Content-Range');
+        if (contentRange) {
+            const sizeMatch = contentRange.match(/\/(\d+)/);
+            if (sizeMatch) totalSize = parseInt(sizeMatch[1], 10);
+        }
+
+        // Assemble full ciphertext buffer from range chunks
+        const enc = new Uint8Array(totalSize);
+        enc.set(firstChunk, 0);
+        let downloaded = firstChunk.length;
+
+        while (downloaded < totalSize) {
+            const rangeEnd = Math.min(downloaded + downloadChunkSize, totalSize) - 1;
+            const chunkRes = await fetch(url, {
+                headers: { 'Range': `bytes=${downloaded}-${rangeEnd}` }
+            });
+            if (!chunkRes.ok && chunkRes.status !== 206) {
+                throw new Error(`Failed to download media chunk (HTTP ${chunkRes.status})`);
+            }
+            const chunk = new Uint8Array(await chunkRes.arrayBuffer());
+            enc.set(chunk, downloaded);
+            downloaded += chunk.length;
+        }
+
+        // Decrypt assembled ciphertext
         const rawFk = mask.XOR(maskedFileKey);
         const sm = new SymMaster("gcm1", rawFk.slice(0, 32));
         rawFk.fill(0);
 
-        const enc = new Uint8Array(await res.arrayBuffer());
         const dec = await sm.DeBin(enc);
         const unpadded = (origSize > 0 && dec.length >= origSize) ? dec.slice(0, origSize) : dec;
         const blob = new Blob([unpadded], { type: mimeType });
