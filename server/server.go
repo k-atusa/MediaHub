@@ -135,31 +135,36 @@ func serveUser(w http.ResponseWriter, r *http.Request) {
 			isNewUser = true
 		}
 
-		if isNewUser && cfg.InviteCode != "" {
-			// check if user is changing PW
+		if isNewUser {
 			oldHash := r.Header.Get("X-Old-Hash")
-			oldPath := ""
-			if oldHash != "" && !strings.Contains(oldHash, "/") && !strings.Contains(oldHash, "\\") {
-				oldPath = filepath.Join(cfg.StorageDir, "users", filepath.Clean(oldHash))
-			}
-
-			// check old account or invite code
-			if oldPath != "" {
+			if oldHash != "" { // check if user is changing PW (verify old user exists)
+				if strings.Contains(oldHash, "/") || strings.Contains(oldHash, "\\") {
+					postError(w, "Invalid Old User", http.StatusBadRequest)
+					return
+				}
+				oldPath := filepath.Join(cfg.StorageDir, "users", filepath.Clean(oldHash))
 				if info, err := os.Stat(oldPath); err != nil || info.IsDir() {
 					postError(w, "Invalid Old User", http.StatusForbidden)
 					return
 				}
-			} else {
+			} else if cfg.InviteCode != "" { // new registration (check invite code)
 				if r.Header.Get("X-Invite-Code") != cfg.InviteCode {
 					postError(w, "Invalid Invite Code", http.StatusForbidden)
 					return
 				}
+			}
+		} else {
+			if !authUser(w, r) {
+				return
 			}
 		}
 
 		os.MkdirAll(filepath.Dir(path), 0700)
 		save(w, r, path)
 	case http.MethodDelete: // delete userdata
+		if !authUser(w, r) {
+			return
+		}
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			time.Sleep(1500 * time.Millisecond)
 		} else {
@@ -186,17 +191,9 @@ func serveMeta(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// check if folder creation
+	// Folder creation, update or deletion needs user validation
 	path := filepath.Join(cfg.StorageDir, "data", filepath.Clean(folderID), "names")
-	isCreation := false
-	if r.Method == http.MethodPost {
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			isCreation = true
-		}
-	}
-
-	// Folder creation or deletion needs user validation
-	if r.Method == http.MethodDelete || isCreation {
+	if r.Method == http.MethodDelete || r.Method == http.MethodPost {
 		if !authUser(w, r) {
 			return
 		}
@@ -247,6 +244,9 @@ func serveMedia(w http.ResponseWriter, r *http.Request) {
 		os.MkdirAll(filepath.Dir(path), 0755)
 		save(w, r, path)
 	case http.MethodDelete: // delete media file
+		if !authUser(w, r) {
+			return
+		}
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			time.Sleep(1500 * time.Millisecond)
 		} else {

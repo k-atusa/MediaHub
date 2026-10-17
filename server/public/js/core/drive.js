@@ -601,7 +601,10 @@ export class DriveService {
         await Adapter.SaveUserData(newHash, rawMap, maskedNewKey, this.usrHsh);
         for (const v of Object.values(rawMap)) if (v?.fill) v.fill(0);
 
-        await fetch(`${this.serverUrl}/api/userdata/${this.usrHsh}`, { method: "DELETE" });
+        await fetch(`${this.serverUrl}/api/userdata/${this.usrHsh}`, {
+            method: "DELETE",
+            headers: { "X-User-Hash": this.usrHsh }
+        });
 
         const rawNewKey = mask.XOR(maskedNewKey);
         SafeSession.SetItem("userHash", newHash);

@@ -92,7 +92,7 @@ export class AdapterService {
         const enc = await sm.EnBin(bin);
         bin.fill(0);
 
-        const headers = {};
+        const headers = { "X-User-Hash": oldHash || userHash };
         if (oldHash) headers["X-Old-Hash"] = oldHash;
 
         const res = await fetch(`${this.serverUrl}/api/userdata/${userHash}`, {
@@ -193,7 +193,7 @@ export class AdapterService {
 
     // Download and decrypt media payload to blob URL
     async LoadMediaBlob(folderId, filePid, maskedFileKey, origSize = 0, mimeType = "application/octet-stream") {
-        const res = await fetch(`${this.serverUrl}/api/media/${folderId}/${filePid}`);
+        const res = await fetch(`${this.serverUrl}/api/media/${folderId}/${filePid}/dat`);
         if (!res.ok) throw new Error(`Failed to download media (HTTP ${res.status})`);
 
         const rawFk = mask.XOR(maskedFileKey);
@@ -213,7 +213,7 @@ export class AdapterService {
         const headers = {};
         if (userHash) headers["X-User-Hash"] = userHash;
 
-        await fetch(`${this.serverUrl}/api/media/${folderId}/${filePid}`, {
+        await fetch(`${this.serverUrl}/api/media/${folderId}/${filePid}/dat`, {
             method: "DELETE",
             headers
         });
