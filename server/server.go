@@ -38,6 +38,7 @@ type Config struct {
 	HttpMode     bool   `json:"http"`
 	LoopbackOnly bool   `json:"loopback"`
 
+	AcmeDir  string `json:"acme"`
 	CertFile string `json:"cert"`
 	KeyFile  string `json:"key"`
 }
@@ -62,6 +63,7 @@ func initEnv() {
 		HttpMode:     false,
 		LoopbackOnly: false,
 
+		AcmeDir:  "",
 		CertFile: "./certs/cert.pem",
 		KeyFile:  "./certs/key.pem",
 	}
@@ -83,6 +85,9 @@ func initEnv() {
 	// make directories
 	os.MkdirAll(filepath.Join(cfg.StorageDir, "users"), 0755)
 	os.MkdirAll(filepath.Join(cfg.StorageDir, "data"), 0755)
+	if cfg.AcmeDir != "" {
+		os.MkdirAll(cfg.AcmeDir, 0755)
+	}
 
 	// make certificate if not exists (TLS mode only)
 	if !cfg.HttpMode {
@@ -370,6 +375,29 @@ func serveNotice(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"notice": cfg.Notice})
 }
 
+// handles ACME challenge
+func serveACME(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		postError(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	token := strings.TrimPrefix(r.URL.Path, "/.well-known/acme-challenge/") // API: /.well-known/acme-challenge/{token}
+	if token == "" || strings.Contains(token, "/") || strings.Contains(token, "\\") || strings.Contains(token, "..") {
+		postError(w, "Invalid Token", http.StatusBadRequest)
+		return
+	}
+
+	// respond with token file
+	path := filepath.Join(cfg.AcmeDir, filepath.Clean(token))
+	info, err := os.Stat(path)
+	if os.IsNotExist(err) || info.IsDir() {
+		postError(w, "Token Not Found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain")
+	http.ServeFile(w, r, path)
+}
+
 // return error with 0.5s delay
 func postError(w http.ResponseWriter, error string, code int) {
 	time.Sleep(500 * time.Millisecond)
@@ -502,6 +530,9 @@ func main() {
 	mux.HandleFunc("/api/media/", serveMedia)
 	mux.HandleFunc("/api/notice", serveNotice)
 	mux.HandleFunc("/api/trim/", serveTrim)
+	if cfg.AcmeDir != "" {
+		mux.HandleFunc("/.well-known/acme-challenge/", serveACME)
+	}
 	mux.Handle("/", serveFrontend())
 
 	// determine mode and bind address
