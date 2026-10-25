@@ -5,6 +5,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"embed"
@@ -22,6 +23,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -44,6 +46,17 @@ type Config struct {
 }
 
 var cfg Config
+var memCert atomic.Pointer[tls.Certificate]
+
+func loadCert() {
+	cert, err := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
+	if err == nil {
+		memCert.Store(&cert)
+		log.Println("TLS certificate loaded from disk")
+	} else {
+		log.Printf("Failed to load TLS certificate: %v", err)
+	}
+}
 
 // init environment
 func initEnv() {
@@ -555,7 +568,27 @@ func main() {
 	if cfg.HttpMode {
 		err = http.ListenAndServe(addr, cors(mux))
 	} else {
-		err = http.ListenAndServeTLS(addr, cfg.CertFile, cfg.KeyFile, cors(mux))
+		loadCert()
+		go func() {
+			for range time.Tick(24 * time.Hour) {
+				loadCert()
+			}
+		}()
+
+		server := &http.Server{
+			Addr:    addr,
+			Handler: cors(mux),
+			TLSConfig: &tls.Config{
+				GetCertificate: func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+					cert := memCert.Load()
+					if cert == nil {
+						return nil, fmt.Errorf("no TLS certificate in memory")
+					}
+					return cert, nil
+				},
+			},
+		}
+		err = server.ListenAndServeTLS("", "")
 	}
 
 	if err != nil {
