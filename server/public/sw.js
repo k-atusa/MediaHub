@@ -98,7 +98,12 @@ self.addEventListener('message', async (e) => {
             mime: getVideoMime(data.fileName)
         });
 
-        if (e.source) e.source.postMessage({ action: 'REGISTERED', filePid: data.filePid });
+        if (e.ports && e.ports[0]) {
+            e.ports[0].postMessage({ action: 'REGISTERED', filePid: data.filePid });
+        }
+        if (e.source) {
+            e.source.postMessage({ action: 'REGISTERED', filePid: data.filePid });
+        }
     } else if (data.action === 'UNREGISTER') {
         const info = registryMap.get(data.filePid);
         if (info?.globalIv) info.globalIv.fill(0);
@@ -251,7 +256,9 @@ const handleStream = async (req, folderId, filePid) => {
                 'Content-Length': len.toString(),
                 'Content-Range': `bytes ${rangeStart}-${rangeEnd}/${origSize}`,
                 'Accept-Ranges': 'bytes',
-                'Cache-Control': 'no-cache'
+                'Cache-Control': 'no-cache',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Expose-Headers': 'Content-Range, Content-Length, Accept-Ranges'
             }
         });
     } catch (err) {
@@ -260,7 +267,9 @@ const handleStream = async (req, folderId, filePid) => {
             status: 416,
             headers: {
                 'Content-Range': `bytes */${origSize || 0}`,
-                'Accept-Ranges': 'bytes'
+                'Accept-Ranges': 'bytes',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Expose-Headers': 'Content-Range, Content-Length, Accept-Ranges'
             }
         });
     }
@@ -268,15 +277,25 @@ const handleStream = async (req, folderId, filePid) => {
 
 // Fetch global IV from the first 12 bytes of file
 const ensureGlobalIv = async (info, folderId, filePid) => {
-    if (info.globalIv) return info.globalIv;
+    if (info.globalIv && info.globalIv.length === 12) return info.globalIv;
     if (!info.globalIvPromise) {
         info.globalIvPromise = (async () => {
             const res = await fetch(`/api/media/${folderId}/${filePid}/dat`, {
                 headers: { 'Range': 'bytes=0-11' }
             });
-            info.globalIv = new Uint8Array(await res.arrayBuffer());
+            if (!res.ok && res.status !== 206) {
+                throw new Error(`Failed to fetch global IV: HTTP ${res.status}`);
+            }
+            const buf = await res.arrayBuffer();
+            if (buf.byteLength !== 12) {
+                throw new Error(`Invalid global IV length: ${buf.byteLength}`);
+            }
+            info.globalIv = new Uint8Array(buf);
             return info.globalIv;
-        })();
+        })().catch(err => {
+            info.globalIvPromise = null;
+            throw err;
+        });
     }
     return info.globalIvPromise;
 };

@@ -171,7 +171,12 @@ body {
     flex-direction: column;
     overflow: hidden;
     -webkit-font-smoothing: antialiased;
-    transition: background-color 0.2s ease, color 0.2s ease;
+    transition: background-color 0.2s ease, color 0.2s ease, opacity 0.12s ease;
+    opacity: 0;
+}
+
+body.app-ready {
+    opacity: 1;
 }
 
 .hidden {
@@ -188,6 +193,20 @@ body {
 
 .view-container.active {
     display: flex !important;
+}
+
+#view-login {
+    position: relative;
+}
+
+.view-login-topbar {
+    position: absolute;
+    top: 16px;
+    right: 20px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    z-index: 10;
 }
 
 #view-login.active {
@@ -777,9 +796,70 @@ dialog::backdrop {
 
 
 /* Sign-in View Styles */
+.signin-card {
+    background-color: var(--g-surface);
+    border: 1px solid var(--g-border);
+    border-radius: 28px;
+    padding: 36px 40px;
+    width: 100%;
+    max-width: 440px;
+    box-shadow: 0 1px 3px rgba(60, 64, 67, 0.15), 0 4px 8px 3px rgba(60, 64, 67, 0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+[data-theme="dark"] .signin-card,
+:root:not([data-theme="light"]) .signin-card {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.drive-logo-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    margin-bottom: 2px;
+}
+
+.drive-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.header-icon-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: var(--g-text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.15s, color 0.15s;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.header-icon-btn:hover {
+    background-color: var(--g-hover-bg);
+    color: var(--g-text-main);
+}
+
+.header-icon-btn .material-symbols-outlined {
+    font-size: 22px;
+}
+
 .drive-logo-img {
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
     border-radius: 6px;
     display: block;
+    flex-shrink: 0;
 }
 
 .drive-title {
@@ -812,8 +892,9 @@ dialog::backdrop {
     flex-direction: column;
 }
 
-input[type="text"],
-input[type="password"] {
+/* Login Card Inputs - scoped to avoid breaking drive search and other inputs */
+.signin-card input[type="text"],
+.signin-card input[type="password"] {
     width: 100%;
     height: 54px;
     padding: 0 16px;
@@ -827,14 +908,14 @@ input[type="password"] {
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-input[type="text"]::placeholder,
-input[type="password"]::placeholder {
-    color: var(--g-text-sub);
+.signin-card input[type="text"]::placeholder,
+.signin-card input[type="password"]::placeholder {
+    color: var(--g-text-muted);
     font-size: 14px;
 }
 
-input[type="text"]:focus,
-input[type="password"]:focus {
+.signin-card input[type="text"]:focus,
+.signin-card input[type="password"]:focus {
     border-color: var(--g-primary-blue);
     box-shadow: 0 0 0 1px var(--g-primary-blue);
 }
@@ -1003,4 +1084,105 @@ dialog::backdrop {
         padding: 28px 20px;
         border-radius: 20px;
     }
+
+    .view-login-topbar {
+        top: 12px;
+        right: 12px;
+    }
+}
+
+/* Floating Download Progress Toast (Google Drive Style) */
+.download-progress-toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 3000;
+    background-color: var(--g-surface, #ffffff);
+    color: var(--g-text-main, #1f1f1f);
+    border: 1px solid var(--g-border, #dadce0);
+    border-radius: 12px;
+    padding: 8px 14px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2), 0 1px 3px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 360px;
+    max-width: calc(100vw - 32px);
+    box-sizing: border-box;
+    transition: transform 0.25s cubic-bezier(0, 0, 0.2, 1), opacity 0.2s ease;
+    animation: gDriveSlideUp 0.25s cubic-bezier(0, 0, 0.2, 1);
+}
+
+.download-toast-icon-wrap {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background-color: var(--g-hover-bg, rgba(0, 0, 0, 0.05));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.download-toast-icon {
+    font-size: 18px;
+    color: var(--g-primary-blue, #0b57d0);
+}
+
+.download-toast-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.download-toast-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    line-height: 1.2;
+}
+
+.download-toast-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--g-text-main, #1f1f1f);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.download-toast-percent {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--g-primary-blue, #0b57d0);
+    flex-shrink: 0;
+}
+
+.download-toast-meta {
+    font-size: 11.5px;
+    color: var(--g-text-muted, #5f6368);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+}
+
+.download-toast-bar-track {
+    width: 100%;
+    height: 3px;
+    border-radius: 2px;
+    background-color: var(--g-border-subtle, rgba(0, 0, 0, 0.08));
+    overflow: hidden;
+    margin-top: 3px;
+}
+
+.download-toast-bar-fill {
+    height: 100%;
+    background-color: var(--g-primary-blue, #0b57d0);
+    border-radius: 2px;
+    transition: width 0.15s ease-out;
 }

@@ -41,6 +41,21 @@ class LoginViewService {
                 if (e.key === "Enter") btnLogin?.click();
             });
         }
+
+        const btnLoginNotice = document.getElementById("btnLoginNotice");
+        if (btnLoginNotice) {
+            btnLoginNotice.addEventListener("click", () => this.showNoticePopup());
+        }
+
+        const btnAppInfo = document.getElementById("btnAppInfo");
+        if (btnAppInfo) {
+            btnAppInfo.addEventListener("click", () => Adapter.ShowAppInfo());
+        }
+
+        const btnThemeToggle = document.getElementById("btnThemeToggle");
+        if (btnThemeToggle) {
+            btnThemeToggle.addEventListener("click", () => this.toggleTheme());
+        }
     }
 
     // Persist session tokens and redirect to target route
@@ -157,22 +172,56 @@ class LoginViewService {
         }
     }
 
-    // Check server notification and show modal if unread
-    async checkNotice() {
+    // Display server notice dialog manually when notice button is clicked
+    async showNoticePopup() {
         try {
             const notice = await Adapter.FetchNotice();
-            if (notice && notice.trim() !== "" && !SafeSession.GetItem("noticeShown")) {
+            if (notice && notice.trim() !== "") {
                 await ShowNotice(notice, "Notice", "campaign");
-                SafeSession.SetItem("noticeShown", "true");
+            } else {
+                await ShowNotice("There are no active notices.", "Notice", "campaign");
             }
         } catch (err) {
             console.error("Failed to load notice:", err);
+            await ShowNotice("Failed to load notice.", "Notice", "campaign");
+        }
+    }
+
+    // Toggle theme mode from login view
+    toggleTheme() {
+        const current = localStorage.getItem("theme") || "system";
+        const next = current === "system" ? "dark" : (current === "dark" ? "light" : "system");
+        if (next === "system") {
+            localStorage.setItem("theme", "system");
+            document.documentElement.removeAttribute("data-theme");
+        } else {
+            localStorage.setItem("theme", next);
+            document.documentElement.setAttribute("data-theme", next);
+        }
+        this.UpdateThemeUI();
+    }
+
+    // Synchronize login view theme toggle icon
+    UpdateThemeUI() {
+        const mode = localStorage.getItem("theme") || "system";
+        const iconEl = document.getElementById("themeToggleIcon");
+        if (!iconEl) return;
+        if (mode === "dark") {
+            iconEl.textContent = "dark_mode";
+            iconEl.parentElement?.setAttribute("title", "Theme: Dark");
+        } else if (mode === "light") {
+            iconEl.textContent = "light_mode";
+            iconEl.parentElement?.setAttribute("title", "Theme: Light");
+        } else {
+            iconEl.textContent = "brightness_auto";
+            iconEl.parentElement?.setAttribute("title", "Theme: System (Auto)");
         }
     }
 
     // Mount view and restore saved credentials
     async Mount() {
         this.init();
+        this.UpdateThemeUI();
         const creds = await Adapter.GetSavedCredentials();
         if (creds && creds.username && creds.password) {
             const userInput = document.getElementById("username");
@@ -183,7 +232,7 @@ class LoginViewService {
             const pwdInput = document.getElementById("password");
             if (pwdInput) pwdInput.value = "";
         }
-        this.checkNotice();
+        // Notice is now triggered manually via the megaphone icon next to the title
     }
 }
 

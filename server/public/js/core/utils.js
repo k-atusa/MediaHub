@@ -1,4 +1,9 @@
 // Core utility functions, encrypted session storage, and UI dialogs
+// NOTE: Adapter is NOT imported here to avoid circular dependency (utils <-> adapter).
+// Call setSessionAdapter(adapterInstance) from app.js after both modules are loaded.
+
+let _sessionAdapter = null;
+export function setSessionAdapter(adapter) { _sessionAdapter = adapter; }
 
 // Convert Uint8Array buffer to lowercase hexadecimal string
 export const ToHex = (buf) => {
@@ -123,74 +128,7 @@ export const GetGoogleFileIcon = (filename) => {
     return { icon: 'description', color: '#4285f4' };
 };
 
-const storageKey = '__mh_enc_session__';
-const kekHexRegex = /^[0-9a-fA-F]{64}$/;
-
-// Get or generate ephemeral window key encryption key
-const getOrGenerateKek = () => {
-    let hex = window.name;
-    if (typeof hex === 'string' && kekHexRegex.test(hex)) {
-        return hex;
-    }
-    const rand = new Uint8Array(32);
-    crypto.getRandomValues(rand);
-    hex = ToHex(rand);
-    rand.fill(0);
-    window.name = hex;
-    return hex;
-};
-
-// Import raw key for AES-GCM subtle crypto
-const importKek = async (hexKey) => {
-    const raw = FromHex(hexKey);
-    const key = await crypto.subtle.importKey(
-        'raw',
-        raw,
-        { name: 'AES-GCM' },
-        false,
-        ['encrypt', 'decrypt']
-    );
-    raw.fill(0);
-    return key;
-};
-
-// Encrypt plain session data with AES-GCM
-const encryptSession = async (data, hexKey) => {
-    const key = await importKek(hexKey);
-    const iv = new Uint8Array(12);
-    crypto.getRandomValues(iv);
-
-    const plain = new TextEncoder().encode(JSON.stringify(data));
-    const cipherBuf = await crypto.subtle.encrypt(
-        { name: 'AES-GCM', iv },
-        key,
-        plain
-    );
-
-    const cipherBytes = new Uint8Array(cipherBuf);
-    const res = ToHex(iv) + ToHex(cipherBytes);
-    iv.fill(0);
-    return res;
-};
-
-// Decrypt encrypted session payload
-const decryptSession = async (payload, hexKey) => {
-    if (!payload || payload.length < 24) return null;
-    const iv = FromHex(payload.slice(0, 24));
-    const cipher = FromHex(payload.slice(24));
-    const key = await importKek(hexKey);
-
-    const buf = await crypto.subtle.decrypt(
-        { name: 'AES-GCM', iv },
-        key,
-        cipher
-    );
-
-    iv.fill(0);
-    return JSON.parse(new TextDecoder().decode(buf));
-};
-
-// In-memory encrypted session storage manager
+// In-memory session state manager backed by Adapter secure session vault
 export class SafeSessionManager {
     constructor() {
         this.ram = {};
@@ -199,23 +137,25 @@ export class SafeSessionManager {
         this.saveTimer = null;
     }
 
-    // Initialize and decrypt session from storage
+    // Initialize session by loading and decoding decrypted bytes from adapter vault
     async Init() {
         if (this.initPromise) return this.initPromise;
 
         this.initPromise = (async () => {
-            const kek = getOrGenerateKek();
-            const payload = sessionStorage.getItem(storageKey);
-            if (payload) {
-                try {
-                    const decrypted = await decryptSession(payload, kek);
-                    if (decrypted && typeof decrypted === 'object') {
-                        this.ram = decrypted;
+            try {
+                if (_sessionAdapter) {
+                    const bytes = await _sessionAdapter.LoadSessionBytes();
+                    if (bytes && bytes.length > 0) {
+                        const text = new TextDecoder().decode(bytes);
+                        const parsed = JSON.parse(text);
+                        if (parsed && typeof parsed === 'object') {
+                            this.ram = parsed;
+                        }
                     }
-                } catch (err) {
-                    console.warn('[SafeSession] Decryption failed:', err);
-                    this.ram = {};
                 }
+            } catch (err) {
+                console.warn('[SafeSession] Failed to load session from vault:', err);
+                this.ram = {};
             }
             this.isInitialized = true;
             return this.ram;
@@ -231,14 +171,14 @@ export class SafeSessionManager {
         return val !== undefined ? val : null;
     }
 
-    // Store item in RAM cache and schedule disk save
+    // Store item in RAM cache and schedule vault persist
     SetItem(key, value) {
         if (!this.ram) this.ram = {};
         this.ram[key] = String(value);
         this.scheduleSave();
     }
 
-    // Delete item from RAM cache and schedule disk save
+    // Delete item from RAM cache and schedule vault persist
     RemoveItem(key) {
         if (this.ram && key in this.ram) {
             delete this.ram[key];
@@ -246,16 +186,15 @@ export class SafeSessionManager {
         }
     }
 
-    // Wipe session from RAM and storage
+    // Wipe session from RAM and purge adapter vault
     Clear() {
         this.ram = {};
-        try {
-            sessionStorage.clear();
-            window.name = '';
-        } catch { }
+        if (_sessionAdapter) {
+            _sessionAdapter.ClearSessionBytes().catch(() => {});
+        }
     }
 
-    // Schedule debounced disk flush
+    // Schedule debounced vault flush
     scheduleSave() {
         if (this.saveTimer) clearTimeout(this.saveTimer);
         this.saveTimer = setTimeout(() => {
@@ -263,16 +202,17 @@ export class SafeSessionManager {
         }, 50);
     }
 
-    // Encrypt and persist RAM state to storage
+    // Serialize RAM state to bytes and persist via adapter vault
     async Save() {
         if (this.saveTimer) {
             clearTimeout(this.saveTimer);
             this.saveTimer = null;
         }
+        if (!_sessionAdapter) return;
         try {
-            const kek = getOrGenerateKek();
-            const payload = await encryptSession(this.ram, kek);
-            sessionStorage.setItem(storageKey, payload);
+            const jsonStr = JSON.stringify(this.ram);
+            const bytes = new TextEncoder().encode(jsonStr);
+            await _sessionAdapter.SaveSessionBytes(bytes);
         } catch (err) {
             console.error('[SafeSession] Persist failed:', err);
         }
@@ -405,3 +345,102 @@ export const DisableAllAutocomplete = () => {
         input.setAttribute('data-lpignore', 'true');
     });
 };
+
+// Floating download progress toast manager
+export class DownloadProgressController {
+    constructor(fileName) {
+        this.fileName = fileName;
+        this.el = null;
+        this.iconEl = null;
+        this.percentText = null;
+        this.statusText = null;
+        this.progressBar = null;
+        this.create();
+    }
+
+    create() {
+        const existing = document.getElementById("mhDownloadToast");
+        if (existing) existing.remove();
+
+        const toast = document.createElement("div");
+        toast.id = "mhDownloadToast";
+        toast.className = "download-progress-toast";
+        toast.innerHTML = `
+            <div class="download-toast-icon-wrap">
+                <span class="material-symbols-outlined download-toast-icon" id="mhDownloadToastIcon">downloading</span>
+            </div>
+            <div class="download-toast-body">
+                <div class="download-toast-header">
+                    <span class="download-toast-name" title="${EscapeHtml(this.fileName)}">${EscapeHtml(this.fileName)}</span>
+                    <span class="download-toast-percent" id="mhDownloadToastPercent">0%</span>
+                </div>
+                <div class="download-toast-meta" id="mhDownloadToastMeta">Preparing download…</div>
+                <div class="download-toast-bar-track">
+                    <div class="download-toast-bar-fill" id="mhDownloadToastFill" style="width: 0%;"></div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(toast);
+
+        this.el = toast;
+        this.iconEl = document.getElementById("mhDownloadToastIcon");
+        this.percentText = document.getElementById("mhDownloadToastPercent");
+        this.statusText = document.getElementById("mhDownloadToastMeta");
+        this.progressBar = document.getElementById("mhDownloadToastFill");
+    }
+
+    update(progress) {
+        if (!this.el) return;
+        const { phase, loaded, total, percent } = progress;
+        if (phase === 'downloading') {
+            const p = Math.max(0, Math.min(100, percent || 0));
+            if (this.percentText) this.percentText.textContent = `${p}%`;
+            if (this.progressBar) this.progressBar.style.width = `${p}%`;
+            if (this.statusText) {
+                if (total > 0) {
+                    this.statusText.textContent = `Downloading • ${FormatBytes(loaded)} / ${FormatBytes(total)}`;
+                } else {
+                    this.statusText.textContent = `Downloading • ${FormatBytes(loaded)}`;
+                }
+            }
+        } else if (phase === 'decrypting') {
+            if (this.iconEl) {
+                this.iconEl.textContent = 'lock_open';
+            }
+            if (this.percentText) this.percentText.textContent = '100%';
+            if (this.progressBar) this.progressBar.style.width = '100%';
+            if (this.statusText) this.statusText.textContent = 'Decrypting file…';
+        } else if (phase === 'complete') {
+            if (this.iconEl) {
+                this.iconEl.textContent = 'check_circle';
+                this.iconEl.style.color = '#137333';
+            }
+            if (this.percentText) this.percentText.textContent = 'Done';
+            if (this.progressBar) this.progressBar.style.width = '100%';
+            if (this.statusText) this.statusText.textContent = 'Download ready!';
+            setTimeout(() => this.dismiss(), 2000);
+        }
+    }
+
+    fail(err) {
+        if (!this.el) return;
+        if (this.iconEl) {
+            this.iconEl.textContent = 'error';
+            this.iconEl.style.color = 'var(--g-danger, #b3261e)';
+        }
+        if (this.percentText) this.percentText.textContent = 'Failed';
+        if (this.statusText) this.statusText.textContent = (err?.message || 'Download failed');
+        setTimeout(() => this.dismiss(), 4000);
+    }
+
+    dismiss() {
+        if (this.el) {
+            this.el.style.opacity = '0';
+            this.el.style.transform = 'translate(-50%, 12px)';
+            setTimeout(() => {
+                this.el?.remove();
+                this.el = null;
+            }, 300);
+        }
+    }
+}

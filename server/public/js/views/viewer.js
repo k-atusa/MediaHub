@@ -30,9 +30,19 @@ class ViewerViewService {
         const btnBack = document.getElementById("btnViewerBack");
         if (btnBack) {
             btnBack.addEventListener("click", () => {
+                this.CleanupCurrentMedia();
                 AppRouter.Navigate('/drive');
             });
         }
+
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && AppRouter.currentPath === '/viewer') {
+                const renameModal = document.getElementById("renameFileModal");
+                if (renameModal && renameModal.open) return;
+                this.CleanupCurrentMedia();
+                AppRouter.Navigate('/drive');
+            }
+        });
 
         const btnShare = document.getElementById("btnViewerShare");
         const btnEdit = document.getElementById("btnViewerEdit");
@@ -139,7 +149,7 @@ class ViewerViewService {
 
         if (rawFileKeyHex) {
             const rawFileKey = FromHex(rawFileKeyHex);
-            this.origSize = Drive.GetEntrySize(rawFileKey);
+            this.origSize = Drive.GetEntrySize(rawFileKey, true);
             this.fileKey = Drive.MaskKey(rawFileKey);
             rawFileKey.fill(0);
         } else {
@@ -171,6 +181,8 @@ class ViewerViewService {
             return this.Mount();
         }
 
+        await Drive.LoadUser();
+
         let targetFolderName = "";
         let targetFolderKey = null;
         for (const [name, key] of Object.entries(Drive.fldMap)) {
@@ -188,6 +200,8 @@ class ViewerViewService {
             await ShowNotice("Folder not found or you lack permission to access it.", "Access Denied", "error");
             return AppRouter.Navigate('/drive', true);
         }
+
+        await Drive.SelectFolder(targetFolderName);
 
         const filesMap = await Adapter.LoadFolderMeta(folderPid, targetFolderKey);
         let foundFileName = "";
@@ -222,6 +236,18 @@ class ViewerViewService {
 
     // Clean up active player instance and revoke blob URL
     CleanupCurrentMedia() {
+        const body = document.getElementById("viewBody");
+        if (body) {
+            const mediaEls = body.querySelectorAll("video, audio");
+            mediaEls.forEach(el => {
+                try {
+                    el.pause();
+                    el.removeAttribute('src');
+                    el.load();
+                } catch { }
+            });
+            body.innerHTML = "";
+        }
         if (window.currentViewer) {
             try { window.currentViewer.destroy(); } catch { }
             window.currentViewer = null;
@@ -229,6 +255,17 @@ class ViewerViewService {
         if (this.currentBlobUrl) {
             try { URL.revokeObjectURL(this.currentBlobUrl); } catch { }
             this.currentBlobUrl = null;
+        }
+        if (this.folderId && this.fileKey && 'serviceWorker' in navigator && navigator.serviceWorker.controller) {
+            try {
+                const rawKey = Drive.UnmaskKey(this.fileKey);
+                const filePid = GetObjPid(rawKey.slice(0, 44));
+                rawKey.fill(0);
+                navigator.serviceWorker.controller.postMessage({
+                    action: 'UNREGISTER',
+                    filePid: filePid
+                });
+            } catch { }
         }
     }
 
@@ -262,7 +299,6 @@ class ViewerViewService {
                 } else {
                     const video = document.createElement('video');
                     video.controls = true;
-                    video.crossOrigin = 'anonymous';
                     video.playsInline = true;
                     video.preload = 'metadata';
                     video.style.width = '100%';
@@ -324,13 +360,16 @@ class ViewerViewService {
 
     // Download entire ciphertext and decrypt in memory
     async fullDownloadAndRender(filePid, body) {
-        const prog = document.createElement("div");
-        prog.style.position = "fixed";
-        prog.style.top = "50%";
-        prog.style.width = "100%";
-        prog.style.textAlign = "center";
-        prog.textContent = "🔒 Loading & Decrypting…";
-        body.appendChild(prog);
+        body.innerHTML = `
+            <div class="full-download-loading" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 20px;color:var(--preview-text);">
+                <div class="m3-circular-progress" style="width:36px;height:36px;margin-bottom:14px;border-width:3px;"></div>
+                <div id="fullDownloadStatus" style="font-size:14.5px;font-weight:500;margin-bottom:4px;">Preparing download…</div>
+                <div id="fullDownloadMeta" style="font-size:12.5px;color:var(--preview-subtext);">0%</div>
+            </div>
+        `;
+
+        const statusEl = document.getElementById("fullDownloadStatus");
+        const metaEl = document.getElementById("fullDownloadMeta");
 
         try {
             const blobUrl = await Adapter.LoadMediaBlob(
@@ -338,13 +377,20 @@ class ViewerViewService {
                 filePid,
                 this.fileKey,
                 this.origSize,
-                GetMime(this.fileName)
+                GetMime(this.fileName),
+                (p) => {
+                    if (p.phase === 'downloading') {
+                        if (statusEl) statusEl.textContent = `Downloading ${p.percent}%`;
+                        if (metaEl) metaEl.textContent = p.total > 0 ? `${FormatBytes(p.loaded)} / ${FormatBytes(p.total)}` : `${FormatBytes(p.loaded)}`;
+                    } else if (p.phase === 'decrypting') {
+                        if (statusEl) statusEl.textContent = `Decrypting file…`;
+                        if (metaEl) metaEl.textContent = `Almost ready`;
+                    }
+                }
             );
             this.currentBlobUrl = blobUrl;
-            body.removeChild(prog);
             this.renderDecryptedMedia(blobUrl, body);
         } catch (err) {
-            if (prog.parentNode) body.removeChild(prog);
             body.innerHTML = `
                 <div style="text-align: center; padding: 40px 20px; color: var(--preview-subtext);">
                     <span class="material-symbols-outlined" style="font-size: 48px; color: var(--preview-danger); margin-bottom: 12px; display: block;">error_outline</span>
@@ -451,7 +497,7 @@ class ViewerViewService {
         const filePid = GetObjPid(rawKey.slice(0, 44));
         rawKey.fill(0);
 
-        const url = `${window.location.origin}/drive?f=${encodeURIComponent(this.folderId)}&p=${encodeURIComponent(filePid)}`;
+        const url = await Adapter.CreateShareLink(this.folderId, filePid, this.fileKey);
         try {
             await navigator.clipboard.writeText(url);
             ShowNotice("Deep link copied to clipboard.", "Share", "check_circle");
@@ -500,7 +546,9 @@ class ViewerViewService {
             const a = document.createElement('a');
             a.href = this.currentBlobUrl;
             a.download = this.fileName;
+            document.body.appendChild(a);
             a.click();
+            a.remove();
             return;
         }
 
@@ -508,22 +556,16 @@ class ViewerViewService {
         const filePid = GetObjPid(rawKey.slice(0, 44));
         rawKey.fill(0);
 
-        ShowNotice(`Preparing download for "${this.fileName}"...`, "Downloading", "download");
         try {
-            const blobUrl = await Adapter.LoadMediaBlob(
+            await Adapter.DownloadFile(
                 this.folderId,
                 filePid,
                 this.fileKey,
-                this.origSize,
-                GetMime(this.fileName)
+                this.fileName,
+                this.origSize
             );
-            const a = document.createElement('a');
-            a.href = blobUrl;
-            a.download = this.fileName;
-            a.click();
-            URL.revokeObjectURL(blobUrl);
         } catch (err) {
-            ShowNotice("Download failed: " + err.message, "Error", "error");
+            console.error("Download failed:", err);
         }
     }
 
@@ -541,6 +583,7 @@ class ViewerViewService {
         try {
             await Drive.DeleteFile(this.fileName);
             ShowNotice(`Deleted "${this.fileName}"`, "Success", "check_circle");
+            this.CleanupCurrentMedia();
             AppRouter.Navigate('/drive');
         } catch (err) {
             ShowNotice("Delete failed: " + err.message, "Error", "error");

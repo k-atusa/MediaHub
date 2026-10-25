@@ -4,7 +4,8 @@ import { Drive } from './core/drive.js';
 import { LoginView } from './views/login.js';
 import { DriveView } from './views/drive.js';
 import { ViewerView } from './views/viewer.js';
-import { SafeSession, ShowNotice, ShowAlert, DisableAllAutocomplete, GetObjPid } from './core/utils.js';
+import { SafeSession, ShowNotice, ShowAlert, DisableAllAutocomplete, GetObjPid, setSessionAdapter } from './core/utils.js';
+import { Adapter } from './core/adapter.js';
 
 window.alert = ShowAlert;
 window.cancelUpload = (idx) => Drive.CancelUpload(idx);
@@ -22,6 +23,9 @@ function activateView(viewId) {
 
 // Bootstrap application, session state, and route handlers
 async function bootstrap() {
+    // Inject adapter into session manager (breaks circular dependency)
+    setSessionAdapter(Adapter);
+
     await SafeSession.Init();
     await Drive.InitSession();
 
@@ -35,13 +39,30 @@ async function bootstrap() {
     window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
         if ((localStorage.getItem("theme") || "system") === "system") {
             DriveView.UpdateThemeUI();
+            LoginView.UpdateThemeUI();
         }
     });
 
-    AppRouter.BeforeEach(async (path) => {
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(err => {
+            console.warn('[App] ServiceWorker registration failed:', err);
+        });
+    }
+
+    AppRouter.BeforeEach(async (path, query) => {
+        // Stop audio/video playback and release media resources whenever navigating away from viewer
+        if (AppRouter.currentPath === '/viewer' && path !== '/viewer') {
+            ViewerView.CleanupCurrentMedia();
+        }
+
         const isAuth = Boolean(SafeSession.GetItem("userHash") && SafeSession.GetItem("userKey"));
 
-        if (!isAuth && path !== '/login') {
+        // Allow public access if Adapter or route allows (e.g. shared session token query)
+        const isPublic = (typeof Adapter.IsPublicRoute === 'function')
+            ? await Adapter.IsPublicRoute(path, query)
+            : Boolean(query?.s);
+
+        if (!isAuth && !isPublic && path !== '/login') {
             const redirectUrl = window.location.pathname + window.location.search;
             SafeSession.SetItem("redirectAfterLogin", redirectUrl);
             return '/login';
@@ -60,13 +81,20 @@ async function bootstrap() {
     });
 
     AppRouter.On('/drive', async ({ query }) => {
-        activateView('view-drive');
-
-        let targetFolderName = "";
         const fldPid = query.f;
         const filePid = query.p;
 
+        if (filePid && fldPid) {
+            await AppRouter.Replace(`/viewer?f=${encodeURIComponent(fldPid)}&p=${encodeURIComponent(filePid)}`);
+            return;
+        }
+
+        activateView('view-drive');
+
+        let targetFolderName = "";
+
         if (fldPid) {
+            await Drive.LoadUser();
             for (const [name, key] of Object.entries(Drive.fldMap)) {
                 const raw = Drive.UnmaskKey(key);
                 if (GetObjPid(raw) === fldPid) {
@@ -75,6 +103,13 @@ async function bootstrap() {
                     break;
                 }
                 raw.fill(0);
+            }
+        } else if (Drive.currentFolderName) {
+            targetFolderName = Drive.currentFolderName;
+        } else {
+            const savedFold = SafeSession.GetItem("oldFold");
+            if (savedFold) {
+                targetFolderName = savedFold;
             }
         }
 
@@ -96,7 +131,7 @@ async function bootstrap() {
     AppRouter.On('/viewer', async ({ query }) => {
         activateView('view-viewer');
 
-        if (query.f || query.p) {
+        if (query.f || query.p || query.s) {
             await ViewerView.MountWithQuery(query);
             window.history.replaceState(null, '', '/viewer');
             return;
@@ -107,6 +142,7 @@ async function bootstrap() {
 
     DisableAllAutocomplete();
     await AppRouter.Init();
+    document.body.classList.add('app-ready');
 }
 
 if (document.readyState === 'loading') {

@@ -31,11 +31,15 @@ var publicFS embed.FS
 // server config
 type Config struct {
 	StorageDir string `json:"storage"`
-	Port       string `json:"port"`
-	CertFile   string `json:"cert"`
-	KeyFile    string `json:"key"`
 	InviteCode string `json:"invite"`
 	Notice     string `json:"notice"`
+
+	Port         string `json:"port"`
+	HttpMode     bool   `json:"http"`
+	LoopbackOnly bool   `json:"loopback"`
+
+	CertFile string `json:"cert"`
+	KeyFile  string `json:"key"`
 }
 
 var cfg Config
@@ -51,11 +55,15 @@ func initEnv() {
 	configPath := "./config/config.json"
 	cfg = Config{
 		StorageDir: "./",
-		Port:       "443",
-		CertFile:   "./certs/cert.pem",
-		KeyFile:    "./certs/key.pem",
 		InviteCode: "",
 		Notice:     "",
+
+		Port:         "8443",
+		HttpMode:     false,
+		LoopbackOnly: false,
+
+		CertFile: "./certs/cert.pem",
+		KeyFile:  "./certs/key.pem",
 	}
 
 	// load config, make new if not exists
@@ -76,14 +84,16 @@ func initEnv() {
 	os.MkdirAll(filepath.Join(cfg.StorageDir, "users"), 0755)
 	os.MkdirAll(filepath.Join(cfg.StorageDir, "data"), 0755)
 
-	// make certificate if not exists
-	certDir := filepath.Dir(cfg.CertFile)
-	if err := os.MkdirAll(certDir, 0755); err != nil {
-		log.Printf("failed to create certs directory: %v", err)
-	}
-	if _, err := os.Stat(cfg.CertFile); os.IsNotExist(err) {
-		log.Println("making self-signed certificate")
-		makeCert(cfg.CertFile, cfg.KeyFile)
+	// make certificate if not exists (TLS mode only)
+	if !cfg.HttpMode {
+		certDir := filepath.Dir(cfg.CertFile)
+		if err := os.MkdirAll(certDir, 0755); err != nil {
+			log.Printf("failed to create certs directory: %v", err)
+		}
+		if _, err := os.Stat(cfg.CertFile); os.IsNotExist(err) {
+			log.Println("making self-signed certificate")
+			makeCert(cfg.CertFile, cfg.KeyFile)
+		}
 	}
 }
 
@@ -494,10 +504,36 @@ func main() {
 	mux.HandleFunc("/api/trim/", serveTrim)
 	mux.Handle("/", serveFrontend())
 
-	// start server with TLS
-	log.Printf("Server is running on port %s", cfg.Port)
-	err := http.ListenAndServeTLS(":"+cfg.Port, cfg.CertFile, cfg.KeyFile, cors(mux))
+	// determine mode and bind address
+	modeStr := "TLS"
+	if cfg.HttpMode {
+		modeStr = "HTTP"
+	}
+
+	bindStr := "All"
+	host := ""
+	if cfg.LoopbackOnly {
+		bindStr = "Loopback"
+		host = "127.0.0.1"
+	}
+	addr := host + ":" + cfg.Port
+
+	log.Printf("Server is running on port %s (%s, %s)", cfg.Port, modeStr, bindStr)
+
+	var err error
+	if cfg.HttpMode {
+		err = http.ListenAndServe(addr, cors(mux))
+	} else {
+		err = http.ListenAndServeTLS(addr, cfg.CertFile, cfg.KeyFile, cors(mux))
+	}
+
 	if err != nil {
 		log.Fatalf("Server startup error: %v", err)
 	}
 }
+
+/*
+** 직접 최적화하고 정리좀 해야함
+** 지금은 그냥 기능 추가한거 동작은 하고 돌아만 가고 있음
+** 에이전트가 막 싸놓은 코드들이 많음
+ */

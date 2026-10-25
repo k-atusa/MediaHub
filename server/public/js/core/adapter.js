@@ -1,8 +1,9 @@
+// !! CHANGE ADAPTER FOR OTHER VERSIONS !!
 // Backend network communication and client-side encryption adapter
 import { SHA3256, SymMaster, Random, Masker, HashMaster } from '../engine/Bencrypt.js';
 import { EncodeCfg, DecodeCfg, EncodeInt, DecodeInt, PadLen, Opsec } from '../engine/Opsec.js';
 import { NormPW, Encode64, Decode64 } from '../engine/Bencode.js';
-import { ToHex, FromHex, GetObjPid } from './utils.js';
+import { ToHex, FromHex, GetObjPid, ShowNotice, DownloadProgressController } from './utils.js';
 
 // Derive 16-byte user public identifier from store key
 const getUserPid = (key) => {
@@ -12,6 +13,36 @@ const getUserPid = (key) => {
 
 const mask = new Masker();
 const secretPepper = "_PROJECT_WHY_MEDIAHUB_PEPPER_2026_!@#$";
+
+// Ephemeral session storage encryption helpers (Web implementation)
+const sessionVaultKey = '__mh_enc_session__';
+const kekHexRegex = /^[0-9a-fA-F]{64}$/;
+
+const getOrGenerateSessionKek = () => {
+    let hex = window.name;
+    if (typeof hex === 'string' && kekHexRegex.test(hex)) {
+        return hex;
+    }
+    const rand = new Uint8Array(32);
+    crypto.getRandomValues(rand);
+    hex = ToHex(rand);
+    rand.fill(0);
+    window.name = hex;
+    return hex;
+};
+
+const importSessionKek = async (hexKey) => {
+    const raw = FromHex(hexKey);
+    const key = await crypto.subtle.importKey(
+        'raw',
+        raw,
+        { name: 'AES-GCM' },
+        false,
+        ['encrypt', 'decrypt']
+    );
+    raw.fill(0);
+    return key;
+};
 
 // Web platform backend adapter service
 export class AdapterService {
@@ -185,14 +216,20 @@ export class AdapterService {
         rawFk.fill(0);
 
         const enc = new Uint8Array(await res.arrayBuffer());
-        const dec = await sm.DeBin(enc);
-        const blob = new Blob([dec], { type: "image/webp" });
-        dec.fill(0);
-        return URL.createObjectURL(blob);
+        if (enc.length === 0) return null;
+        try {
+            const dec = await sm.DeBin(enc);
+            const blob = new Blob([dec], { type: "image/jpeg" });
+            dec.fill(0);
+            return URL.createObjectURL(blob);
+        } catch (err) {
+            console.warn("[Adapter] Failed to decrypt thumbnail:", err);
+            return null;
+        }
     }
 
-    // Download and decrypt media payload to blob URL
-    async LoadMediaBlob(folderId, filePid, maskedFileKey, origSize = 0, mimeType = "application/octet-stream") {
+    // Download and decrypt media payload to blob URL with live progress tracking
+    async LoadMediaBlob(folderId, filePid, maskedFileKey, origSize = 0, mimeType = "application/octet-stream", onProgress = null) {
         const downloadChunkSize = 16 * 1024 * 1024;
         const url = `${this.serverUrl}/api/media/${folderId}/${filePid}/dat`;
 
@@ -204,14 +241,40 @@ export class AdapterService {
             throw new Error(`Failed to download media (HTTP ${firstRes.status})`);
         }
 
-        const firstChunk = new Uint8Array(await firstRes.arrayBuffer());
-
-        // Parse total size from Content-Range header or use first chunk length
-        let totalSize = firstChunk.length;
+        let totalSize = 0;
         const contentRange = firstRes.headers.get('Content-Range');
         if (contentRange) {
             const sizeMatch = contentRange.match(/\/(\d+)/);
             if (sizeMatch) totalSize = parseInt(sizeMatch[1], 10);
+        }
+
+        let firstChunk;
+        const firstReader = firstRes.body ? firstRes.body.getReader() : null;
+        if (firstReader) {
+            const chunks = [];
+            let loaded = 0;
+            while (true) {
+                const { done, value } = await firstReader.read();
+                if (done) break;
+                chunks.push(value);
+                loaded += value.length;
+                if (onProgress && totalSize > 0) {
+                    onProgress({ phase: 'downloading', loaded, total: totalSize, percent: Math.round((loaded / totalSize) * 100) });
+                }
+            }
+            if (!totalSize) totalSize = loaded;
+            firstChunk = new Uint8Array(loaded);
+            let off = 0;
+            for (const c of chunks) {
+                firstChunk.set(c, off);
+                off += c.length;
+            }
+        } else {
+            firstChunk = new Uint8Array(await firstRes.arrayBuffer());
+            if (!totalSize) totalSize = firstChunk.length;
+            if (onProgress) {
+                onProgress({ phase: 'downloading', loaded: firstChunk.length, total: totalSize, percent: Math.round((firstChunk.length / totalSize) * 100) });
+            }
         }
 
         // Assemble full ciphertext buffer from range chunks
@@ -227,21 +290,80 @@ export class AdapterService {
             if (!chunkRes.ok && chunkRes.status !== 206) {
                 throw new Error(`Failed to download media chunk (HTTP ${chunkRes.status})`);
             }
-            const chunk = new Uint8Array(await chunkRes.arrayBuffer());
-            enc.set(chunk, downloaded);
-            downloaded += chunk.length;
+
+            const reader = chunkRes.body ? chunkRes.body.getReader() : null;
+            if (reader) {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    enc.set(value, downloaded);
+                    downloaded += value.length;
+                    if (onProgress) {
+                        onProgress({ phase: 'downloading', loaded: downloaded, total: totalSize, percent: Math.round((downloaded / totalSize) * 100) });
+                    }
+                }
+            } else {
+                const chunk = new Uint8Array(await chunkRes.arrayBuffer());
+                enc.set(chunk, downloaded);
+                downloaded += chunk.length;
+                if (onProgress) {
+                    onProgress({ phase: 'downloading', loaded: downloaded, total: totalSize, percent: Math.round((downloaded / totalSize) * 100) });
+                }
+            }
         }
 
-        // Decrypt assembled ciphertext
+        // Decrypt assembled ciphertext using gcmx1 chunked stream decryption
+        if (onProgress) {
+            onProgress({ phase: 'decrypting', loaded: totalSize, total: totalSize, percent: 100 });
+        }
         const rawFk = mask.XOR(maskedFileKey);
-        const sm = new SymMaster("gcm1", rawFk.slice(0, 32));
+        const sm = new SymMaster("gcmx1", rawFk.slice(0, 32));
         rawFk.fill(0);
 
-        const dec = await sm.DeBin(enc);
+        // Strip random padding added during upload using AfterSize(origSize)
+        let expectedEncSize = enc.length;
+        if (typeof origSize === 'number' && origSize >= 0) {
+            const calculated = sm.AfterSize(origSize);
+            if (calculated > 0 && calculated <= enc.length) {
+                expectedEncSize = calculated;
+            }
+        }
+        const cipherData = enc.subarray(0, expectedEncSize);
+
+        const dec = await sm.DeBin(cipherData);
         const unpadded = (origSize > 0 && dec.length >= origSize) ? dec.slice(0, origSize) : dec;
         const blob = new Blob([unpadded], { type: mimeType });
         dec.fill(0);
+
+        if (onProgress) {
+            onProgress({ phase: 'complete', loaded: totalSize, total: totalSize, percent: 100 });
+        }
         return URL.createObjectURL(blob);
+    }
+
+    // Download, decrypt, and trigger browser file save with live progress toast
+    async DownloadFile(folderId, filePid, maskedFileKey, fileName, origSize = 0) {
+        const toast = new DownloadProgressController(fileName);
+        try {
+            const blobUrl = await this.LoadMediaBlob(
+                folderId,
+                filePid,
+                maskedFileKey,
+                origSize,
+                "application/octet-stream",
+                (p) => toast.update(p)
+            );
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+        } catch (err) {
+            toast.fail(err);
+            throw err;
+        }
     }
 
     // Delete media binary and thumbnail from server
@@ -261,7 +383,25 @@ export class AdapterService {
 
     // Register video streaming credentials with Service Worker
     async RegisterStreaming(folderId, filePid, maskedFileKey, origSize, fileName) {
-        if (!navigator.serviceWorker || !navigator.serviceWorker.controller) {
+        if (!('serviceWorker' in navigator)) {
+            return false;
+        }
+
+        // Wait for active service worker controller if not immediately claimed
+        if (!navigator.serviceWorker.controller) {
+            try {
+                await Promise.race([
+                    navigator.serviceWorker.ready,
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('SW ready timeout')), 2500))
+                ]);
+            } catch (err) {
+                console.warn('[Adapter] SW ready wait warning:', err);
+            }
+        }
+
+        const controller = navigator.serviceWorker.controller;
+        if (!controller) {
+            console.warn('[Adapter] No ServiceWorker controller available for streaming');
             return false;
         }
 
@@ -271,10 +411,14 @@ export class AdapterService {
 
         return new Promise((resolve) => {
             const channel = new MessageChannel();
+            let resolved = false;
             channel.port1.onmessage = (e) => {
-                if (e.data?.action === 'REGISTERED') resolve(true);
+                if (e.data?.action === 'REGISTERED') {
+                    resolved = true;
+                    resolve(true);
+                }
             };
-            navigator.serviceWorker.controller.postMessage({
+            controller.postMessage({
                 action: 'REGISTER',
                 filePid,
                 folderId,
@@ -283,13 +427,18 @@ export class AdapterService {
                 fileName
             }, [channel.port2]);
 
-            setTimeout(() => resolve(true), 500);
+            setTimeout(() => {
+                if (!resolved) resolve(true);
+            }, 800);
         });
     }
 
     // Register streaming credentials and return SW stream endpoint URL
     async GetStreamUrl(folderId, filePid, maskedFileKey, origSize, fileName) {
-        await this.RegisterStreaming(folderId, filePid, maskedFileKey, origSize, fileName);
+        const ok = await this.RegisterStreaming(folderId, filePid, maskedFileKey, origSize, fileName);
+        if (!ok) {
+            throw new Error('Service Worker streaming is unavailable');
+        }
         return `/sw-stream/${folderId}/${filePid}`;
     }
 
@@ -390,6 +539,105 @@ export class AdapterService {
                 resolve(null);
             };
         });
+    }
+
+    // ==========================================
+    // Session Byte Storage (Secure Vault)
+    // ==========================================
+    // Securely encrypt and persist session bytes (Web: AES-GCM + sessionStorage; Desktop: backed by backend/keychain)
+    async SaveSessionBytes(plainBytes) {
+        if (!plainBytes || plainBytes.length === 0) {
+            await this.ClearSessionBytes();
+            return;
+        }
+        const kek = getOrGenerateSessionKek();
+        const key = await importSessionKek(kek);
+        const iv = new Uint8Array(12);
+        crypto.getRandomValues(iv);
+
+        const cipherBuf = await crypto.subtle.encrypt(
+            { name: 'AES-GCM', iv },
+            key,
+            plainBytes
+        );
+
+        const cipherBytes = new Uint8Array(cipherBuf);
+        const payload = ToHex(iv) + ToHex(cipherBytes);
+        iv.fill(0);
+        sessionStorage.setItem(sessionVaultKey, payload);
+    }
+
+    // Retrieve and decrypt persisted session bytes
+    async LoadSessionBytes() {
+        const payload = sessionStorage.getItem(sessionVaultKey);
+        if (!payload || payload.length < 24) return null;
+
+        try {
+            const kek = getOrGenerateSessionKek();
+            const iv = FromHex(payload.slice(0, 24));
+            const cipher = FromHex(payload.slice(24));
+            const key = await importSessionKek(kek);
+
+            const buf = await crypto.subtle.decrypt(
+                { name: 'AES-GCM', iv },
+                key,
+                cipher
+            );
+            iv.fill(0);
+            return new Uint8Array(buf);
+        } catch (err) {
+            console.warn('[Adapter] Failed to decrypt session bytes:', err);
+            return null;
+        }
+    }
+
+    // Clear persisted session bytes and ephemeral key
+    async ClearSessionBytes() {
+        try {
+            sessionStorage.removeItem(sessionVaultKey);
+            sessionStorage.clear();
+            window.name = '';
+        } catch { }
+    }
+
+    // ==========================================
+    // Share Link Generation
+    // ==========================================
+    // Generate shareable file link (Web: uses folderId and filePid; Desktop/Session variants can create server session)
+    async CreateShareLink(folderId, filePid, maskedFileKey = null) {
+        return `${this.serverUrl || window.location.origin}/viewer?f=${encodeURIComponent(folderId)}&p=${encodeURIComponent(filePid)}`;
+    }
+
+    // ==========================================
+    // Application Info (for multi-platform app identification)
+    // ==========================================
+    // Retrieve application descriptor
+    GetAppInfo() {
+        return {
+            name: "MediaHub Web",
+            version: "1.0.0",
+            platform: "Web Browser",
+            description: "Zero-Knowledge End-to-End Encrypted Cloud Storage & Media Hub",
+            build: "Vanilla Web Client"
+        };
+    }
+
+    // Display application information dialog
+    async ShowAppInfo() {
+        const info = this.GetAppInfo();
+        const lines = [
+            `${info.name} v${info.version}`,
+            `Platform: ${info.platform}`,
+            `Build: ${info.build || 'Standard'}`,
+            '',
+            info.description
+        ];
+        await ShowNotice(lines.join('\n'), "About MediaHub", "info");
+    }
+
+    // Verify public route and restore share session context
+    async IsPublicRoute(path, query) {
+        return Boolean(query?.s);
     }
 }
 

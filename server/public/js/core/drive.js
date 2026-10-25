@@ -1,3 +1,4 @@
+// !! CHANGE DRIVE FOR OTHER VERSIONS !!
 // Drive domain service for state management, folder catalog, and upload pipeline
 import { Masker, Random, SymMaster } from '../engine/Bencrypt.js';
 import { DecodeInt, EncodeInt, PadLen } from '../engine/Opsec.js';
@@ -320,11 +321,16 @@ export class DriveService {
         this.keywordsBuilt = false;
         this.selectKeywords.clear();
 
-        const map = await Adapter.LoadFolderMeta(this.currentFolderId, this.currentFolderKey);
-        this.flsMap = {};
-        for (const [k, v] of Object.entries(map)) {
-            this.flsMap[k] = mask.XOR(v);
-            v.fill(0);
+        try {
+            const map = await Adapter.LoadFolderMeta(this.currentFolderId, this.currentFolderKey);
+            this.flsMap = {};
+            for (const [k, v] of Object.entries(map || {})) {
+                this.flsMap[k] = mask.XOR(v);
+                v.fill(0);
+            }
+        } catch (err) {
+            console.warn("Could not load folder meta (treated as empty folder):", err);
+            this.flsMap = {};
         }
         this.BuildKeywords();
     }
@@ -397,31 +403,29 @@ export class DriveService {
     }
 
     // Fetch and render thumbnail for file item
-    async LoadThumbnail(folderId, filePid, ext, imgEl, fileKeyRaw) {
+    async LoadThumbnail(folderId, filePid, ext, imgEl, maskedFileKey) {
         try {
-            const maskedFk = mask.XOR(fileKeyRaw);
-            const thumbUrl = await Adapter.LoadThumbnailUrl(folderId, filePid, maskedFk);
-            fileKeyRaw.fill(0);
+            const thumbUrl = await Adapter.LoadThumbnailUrl(folderId, filePid, maskedFileKey);
             if (thumbUrl) {
                 imgEl.src = thumbUrl;
             } else {
                 imgEl.src = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='%23333'><rect width='24' height='24' rx='2'/><text x='50%' y='60%' font-family='sans-serif' font-size='5' font-weight='bold' fill='%23aaa' text-anchor='middle'>${ext}</text></svg>`;
             }
-        } catch {
-            fileKeyRaw.fill(0);
+        } catch (err) {
+            console.warn("Failed to load thumbnail:", err);
             imgEl.src = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='%23333'><rect width='24' height='24' rx='2'/><text x='50%' y='60%' font-family='sans-serif' font-size='5' font-weight='bold' fill='%23aaa' text-anchor='middle'>${ext}</text></svg>`;
         }
     }
 
-    // Extract file size integer from masked key metadata
-    GetEntrySize(flKeyMasked) {
-        if (!flKeyMasked) return 0;
-        const raw = mask.XOR(flKeyMasked);
+    // Extract file size integer from key metadata (masked by default, or raw if isRaw is true)
+    GetEntrySize(flKey, isRaw = false) {
+        if (!flKey) return 0;
+        const raw = isRaw ? flKey : mask.XOR(flKey);
         let sz = 0;
         if (raw.length >= 52) {
             sz = DecodeInt(raw.slice(44, 52));
         }
-        raw.fill(0);
+        if (!isRaw) raw.fill(0);
         return sz;
     }
 
@@ -554,7 +558,7 @@ export class DriveService {
                             folderKey: fldKey,
                             folderId: fldId,
                             fileName: flName,
-                            fileKey: flKey,
+                            fileKey: mask.XOR(flKey),
                             size: size
                         });
                     }
@@ -729,9 +733,13 @@ export class DriveService {
                 const filePid = GetObjPid(fileKey);
 
                 let thumb = null;
-                if (file.type.startsWith("image/") || file.name.toLowerCase().endsWith(".svg")) {
+                const lowerName = file.name.toLowerCase();
+                const isImage = (file.type && file.type.startsWith("image/")) || /\.(jpe?g|png|gif|webp|bmp|ico|svg|avif|heic)$/i.test(lowerName);
+                const isVideo = (file.type && file.type.startsWith("video/")) || /\.(mp4|webm|mov|mkv|avi|ts|m4v|3gp|flv)$/i.test(lowerName);
+
+                if (isImage) {
                     thumb = await Adapter.MakeImageThumb(file);
-                } else if (file.type.startsWith("video/")) {
+                } else if (isVideo) {
                     thumb = await Adapter.MakeVideoThumb(file);
                 }
 
@@ -841,8 +849,15 @@ export class DriveService {
                 for (const [k, v] of Object.entries(this.flsMap)) {
                     rawMap[k] = mask.XOR(v);
                 }
-                await Adapter.SaveFolderMeta(folderId, rawMap, this.currentFolderKey, userHash);
-                for (const v of Object.values(rawMap)) if (v?.fill) v.fill(0);
+                try {
+                    await Adapter.SaveFolderMeta(folderId, rawMap, this.currentFolderKey, userHash);
+                } catch (saveErr) {
+                    // SaveFolderMeta may fail on first upload if folder doesn't exist yet on server.
+                    // flsMap is already updated in memory; UI will reflect correctly.
+                    console.warn('[Drive] SaveFolderMeta failed (may be first upload):', saveErr);
+                } finally {
+                    for (const v of Object.values(rawMap)) if (v?.fill) v.fill(0);
+                }
 
                 this.keywordsBuilt = false;
                 this.BuildKeywords();

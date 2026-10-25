@@ -40,15 +40,29 @@
     <!-- 1. VIEW: LOGIN & REGISTRATION              -->
     <!-- ========================================== -->
     <div id="view-login" class="view-container">
+        <!-- Login Topbar Controls (App Info & Theme Toggle) -->
+        <div class="view-login-topbar">
+            <button class="header-icon-btn" id="btnAppInfo" type="button" title="App Info" aria-label="App Info">
+                <span class="material-symbols-outlined">info</span>
+            </button>
+            <button class="header-icon-btn" id="btnThemeToggle" type="button" title="Toggle theme" aria-label="Toggle theme">
+                <span class="material-symbols-outlined" id="themeToggleIcon">dark_mode</span>
+            </button>
+        </div>
+
         <div class="signin-card">
             <div class="header-section">
-                <div class="drive-logo">
-                    <img src="icons/icon.png" alt="MediaHub Logo" class="drive-logo-img">
-                    <span class="drive-title">MediaHub</span>
+                <div class="drive-logo-row">
+                    <div class="drive-logo">
+                        <img src="icons/icon.png" alt="MediaHub Logo" class="drive-logo-img">
+                        <span class="drive-title">MediaHub</span>
+                    </div>
+                    <button class="header-icon-btn" id="btnLoginNotice" type="button" title="Notice" aria-label="Notice">
+                        <span class="material-symbols-outlined">campaign</span>
+                    </button>
                 </div>
                 <div class="sub-header">
                     <h2>Sign in</h2>
-                    <p style="color: var(--g-text-sub); font-size: 14px; margin-top: 4px;">to continue to MediaHub</p>
                 </div>
             </div>
 
@@ -111,6 +125,14 @@
                 <button class="header-icon-btn mobile-search-toggle" id="btnMobileSearchToggle" type="button"
                     title="Search">
                     <span class="material-symbols-outlined">search</span>
+                </button>
+                <!-- Application Info Button -->
+                <button class="header-icon-btn" id="btnDriveAppInfo" type="button" title="App Info" aria-label="App Info">
+                    <span class="material-symbols-outlined">info</span>
+                </button>
+                <!-- Direct Theme Toggle Button -->
+                <button class="header-icon-btn" id="btnDriveThemeToggle" type="button" title="Toggle theme" aria-label="Toggle theme">
+                    <span class="material-symbols-outlined" id="driveThemeToggleIcon">dark_mode</span>
                 </button>
                 <!-- Account Menu Dropdown -->
                 <div class="account-menu-wrapper" id="accountMenuWrapper">

@@ -1,5 +1,6 @@
 // Drive workspace UI view controller
 import { Drive } from '../core/drive.js';
+import { Adapter } from '../core/adapter.js';
 import { AppRouter } from '../core/router.js';
 import {
     SafeSession, ShowNotice, ShowConfirmModal, FormatBytes, EscapeHtml,
@@ -186,6 +187,20 @@ class DriveViewService {
             });
         }
 
+        const btnDriveAppInfo = document.getElementById("btnDriveAppInfo");
+        if (btnDriveAppInfo) {
+            btnDriveAppInfo.addEventListener("click", () => Adapter.ShowAppInfo());
+        }
+
+        const btnDriveThemeToggle = document.getElementById("btnDriveThemeToggle");
+        if (btnDriveThemeToggle) {
+            btnDriveThemeToggle.addEventListener("click", () => {
+                const current = localStorage.getItem("theme") || "system";
+                const next = current === "system" ? "dark" : current === "dark" ? "light" : "system";
+                this.setTheme(next);
+            });
+        }
+
         if (accountMenuItemPassword) {
             accountMenuItemPassword.addEventListener("click", () => {
                 accountDropdownMenu?.classList.remove("open");
@@ -233,6 +248,20 @@ class DriveViewService {
         } else {
             if (accountMenuThemeIcon) accountMenuThemeIcon.textContent = "brightness_auto";
             if (accountMenuThemeLabel) accountMenuThemeLabel.textContent = "Theme: System (Auto)";
+        }
+
+        const driveThemeToggleIcon = document.getElementById("driveThemeToggleIcon");
+        if (driveThemeToggleIcon) {
+            if (mode === "dark") {
+                driveThemeToggleIcon.textContent = "dark_mode";
+                driveThemeToggleIcon.parentElement?.setAttribute("title", "Theme: Dark");
+            } else if (mode === "light") {
+                driveThemeToggleIcon.textContent = "light_mode";
+                driveThemeToggleIcon.parentElement?.setAttribute("title", "Theme: Light");
+            } else {
+                driveThemeToggleIcon.textContent = "brightness_auto";
+                driveThemeToggleIcon.parentElement?.setAttribute("title", "Theme: System (Auto)");
+            }
         }
     }
 
@@ -284,7 +313,6 @@ class DriveViewService {
 
         const navRoot = async () => {
             await this.Mount("");
-            await AppRouter.Navigate('/drive');
         };
         if (sidebarMyDriveHeader) sidebarMyDriveHeader.addEventListener("click", navRoot);
         if (logoWrap) logoWrap.addEventListener("click", navRoot);
@@ -716,8 +744,9 @@ class DriveViewService {
             try {
                 await Drive.CreateFolder(name);
                 newFolderModal?.close();
+                if (modalFolderNameInput) modalFolderNameInput.value = "";
                 this.renderSidebarFolderList();
-                this.renderRootFolderGrid();
+                await this.Mount(name);
                 ShowNotice(`Folder "${name}" created successfully.`, "Success", "check_circle");
             } catch (err) {
                 ShowNotice("Failed to create folder: " + err.message, "Error", "error");
@@ -1078,7 +1107,6 @@ class DriveViewService {
             this.renderSidebarFolderList();
             if (Drive.currentFolderName === folderName) {
                 await this.Mount("");
-                await AppRouter.Navigate('/drive');
             } else {
                 this.renderRootFolderGrid();
             }
@@ -1103,7 +1131,6 @@ class DriveViewService {
             this.renderSidebarFolderList();
             if (Drive.currentFolderName === folderName) {
                 await this.Mount("");
-                await AppRouter.Navigate('/drive');
             } else {
                 this.renderRootFolderGrid();
             }
@@ -1441,7 +1468,7 @@ class DriveViewService {
             const ok = await Drive.SelectFolder(folderName);
             if (!ok) {
                 ShowNotice("Folder not found", "Notice", "warning");
-                return AppRouter.Navigate('/drive');
+                return this.Mount("");
             }
             this.updateFolderHeader(folderName);
             this.page = 1;
@@ -1538,7 +1565,6 @@ class DriveViewService {
                     document.getElementById("sidebarBackdrop")?.classList.remove("active");
                 }
                 await this.Mount(name);
-                await AppRouter.Navigate('/drive');
             });
             moreBtn.addEventListener("click", (e) => {
                 e.stopPropagation();
@@ -1596,7 +1622,6 @@ class DriveViewService {
 
                 card.addEventListener("click", async () => {
                     await this.Mount(name);
-                    await AppRouter.Navigate('/drive');
                 });
                 moreBtn.addEventListener("click", (e) => {
                     e.stopPropagation();
@@ -1666,8 +1691,9 @@ class DriveViewService {
                 card.appendChild(moreBtn);
 
                 card.addEventListener("click", async () => {
+                    const searchInput = document.getElementById("topSearchInput");
+                    if (searchInput) searchInput.value = "";
                     await this.Mount(name);
-                    await AppRouter.Navigate('/drive');
                 });
                 moreBtn.addEventListener("click", (e) => { e.stopPropagation(); this.openFolderContextMenu(e, name, moreBtn); });
                 rootFolderGrid.appendChild(card);
@@ -1694,10 +1720,11 @@ class DriveViewService {
                 img.className = "thumb-img";
                 img.alt = "Loading...";
 
-                const rawFK = file.fileKey.slice();
-                const fkSlice = rawFK.slice(0, 44);
+                const rawFK = Drive.UnmaskKey(file.fileKey);
+                const filePid = GetObjPid(rawFK.slice(0, 44));
+                rawFK.fill(0);
                 const ext = file.fileName.split('.').pop().toUpperCase();
-                Drive.LoadThumbnail(file.folderId, GetObjPid(fkSlice), ext, img, fkSlice);
+                Drive.LoadThumbnail(file.folderId, filePid, ext, img, file.fileKey);
 
                 const title = document.createElement("div");
                 title.className = "file-title";
@@ -1816,10 +1843,11 @@ class DriveViewService {
             img.className = "thumb-img";
             img.alt = "Loading...";
 
-            const rawFK = fileKey.slice();
-            const fkSlice = rawFK.slice(0, 44);
+            const rawFK = Drive.UnmaskKey(fileKey);
+            const filePid = GetObjPid(rawFK.slice(0, 44));
+            rawFK.fill(0);
             const ext = name.split('.').pop().toUpperCase();
-            Drive.LoadThumbnail(Drive.currentFolderId, GetObjPid(fkSlice), ext, img, fkSlice);
+            Drive.LoadThumbnail(Drive.currentFolderId, filePid, ext, img, fileKey);
 
             const title = document.createElement("div");
             title.className = "file-title";
@@ -2071,7 +2099,7 @@ class DriveViewService {
         const pid = GetObjPid(rawFK.slice(0, 44));
         rawFK.fill(0);
 
-        const url = `${window.location.origin}/drive?f=${encodeURIComponent(Drive.currentFolderId)}&p=${encodeURIComponent(pid)}`;
+        const url = await Adapter.CreateShareLink(Drive.currentFolderId, pid, fileKey);
         try {
             await navigator.clipboard.writeText(url);
             ShowNotice("Deep link copied to clipboard.", "Share", "check_circle");
@@ -2080,12 +2108,27 @@ class DriveViewService {
         }
     }
 
-    // Trigger file download via viewer helper
+    // Trigger direct file download with live progress toast
     async downloadFile(name) {
-        ShowNotice(`Preparing download for "${name}"...`, "Downloading", "download");
         const fileKey = Drive.flsMap[name];
-        if (!fileKey) return;
-        this.openFileInViewer(name);
+        if (!fileKey || !Drive.currentFolderId) return;
+
+        const rawFK = Drive.UnmaskKey(fileKey);
+        const pid = GetObjPid(rawFK.slice(0, 44));
+        rawFK.fill(0);
+        const origSize = Drive.GetEntrySize(fileKey);
+
+        try {
+            await Adapter.DownloadFile(
+                Drive.currentFolderId,
+                pid,
+                fileKey,
+                name,
+                origSize
+            );
+        } catch (err) {
+            console.error("Download failed:", err);
+        }
     }
 
     // Delete file and refresh grid
