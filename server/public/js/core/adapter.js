@@ -233,82 +233,53 @@ export class AdapterService {
         const downloadChunkSize = 16 * 1024 * 1024;
         const url = `${this.serverUrl}/api/media/${folderId}/${filePid}/dat`;
 
-        // Fetch first chunk to determine total file size from Content-Range
-        const firstRes = await fetch(url, {
-            headers: { 'Range': `bytes=0-${downloadChunkSize - 1}` }
-        });
-        if (!firstRes.ok && firstRes.status !== 206) {
-            throw new Error(`Failed to download media (HTTP ${firstRes.status})`);
-        }
-
-        let totalSize = 0;
-        const contentRange = firstRes.headers.get('Content-Range');
-        if (contentRange) {
-            const sizeMatch = contentRange.match(/\/(\d+)/);
-            if (sizeMatch) totalSize = parseInt(sizeMatch[1], 10);
-        }
-
-        let firstChunk;
-        const firstReader = firstRes.body ? firstRes.body.getReader() : null;
-        if (firstReader) {
-            const chunks = [];
-            let loaded = 0;
-            while (true) {
-                const { done, value } = await firstReader.read();
-                if (done) break;
-                chunks.push(value);
-                loaded += value.length;
-                if (onProgress && totalSize > 0) {
-                    onProgress({ phase: 'downloading', loaded, total: totalSize, percent: Math.round((loaded / totalSize) * 100) });
+        // Fetch a range with up to 3 attempts from the same offset
+        const fetchChunk = async (start, end, allowFull = false) => {
+            let lastErr;
+            for (let attempt = 1; attempt <= 3; attempt++) {
+                try {
+                    const res = await fetch(url, {
+                        headers: { 'Range': `bytes=${start}-${end}` }
+                    });
+                    if (res.status !== 206 && !(allowFull && res.status === 200)) {
+                        throw new Error(`Failed to download media chunk (HTTP ${res.status})`);
+                    }
+                    const chunk = new Uint8Array(await res.arrayBuffer());
+                    const contentRange = res.headers.get('Content-Range');
+                    if (res.status === 206) {
+                        const match = contentRange?.match(/^bytes (\d+)-(\d+)\/(\d+)$/);
+                        if (!match || Number(match[1]) !== start || Number(match[2]) !== start + chunk.length - 1 || chunk.length !== Math.min(end - start + 1, Number(match[3]) - start)) {
+                            throw new Error(`Invalid media chunk at offset ${start}`);
+                        }
+                    }
+                    return { chunk, totalSize: contentRange ? Number(contentRange.split('/')[1]) : chunk.length };
+                } catch (err) {
+                    lastErr = err;
+                    console.warn(`Download chunk at offset ${start} attempt ${attempt} failed:`, err);
+                    if (attempt < 3) await new Promise(r => setTimeout(r, 300 * attempt));
                 }
             }
-            if (!totalSize) totalSize = loaded;
-            firstChunk = new Uint8Array(loaded);
-            let off = 0;
-            for (const c of chunks) {
-                firstChunk.set(c, off);
-                off += c.length;
-            }
-        } else {
-            firstChunk = new Uint8Array(await firstRes.arrayBuffer());
-            if (!totalSize) totalSize = firstChunk.length;
-            if (onProgress) {
-                onProgress({ phase: 'downloading', loaded: firstChunk.length, total: totalSize, percent: Math.round((firstChunk.length / totalSize) * 100) });
-            }
+            throw lastErr;
+        };
+
+        // Fetch first chunk to determine total file size from Content-Range
+        const first = await fetchChunk(0, downloadChunkSize - 1, true);
+        const totalSize = first.totalSize;
+        const enc = new Uint8Array(totalSize);
+        enc.set(first.chunk, 0);
+        let downloaded = first.chunk.length;
+        if (onProgress) {
+            onProgress({ phase: 'downloading', loaded: downloaded, total: totalSize, percent: Math.round((downloaded / totalSize) * 100) });
         }
 
         // Assemble full ciphertext buffer from range chunks
-        const enc = new Uint8Array(totalSize);
-        enc.set(firstChunk, 0);
-        let downloaded = firstChunk.length;
-
         while (downloaded < totalSize) {
             const rangeEnd = Math.min(downloaded + downloadChunkSize, totalSize) - 1;
-            const chunkRes = await fetch(url, {
-                headers: { 'Range': `bytes=${downloaded}-${rangeEnd}` }
-            });
-            if (!chunkRes.ok && chunkRes.status !== 206) {
-                throw new Error(`Failed to download media chunk (HTTP ${chunkRes.status})`);
-            }
-
-            const reader = chunkRes.body ? chunkRes.body.getReader() : null;
-            if (reader) {
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    enc.set(value, downloaded);
-                    downloaded += value.length;
-                    if (onProgress) {
-                        onProgress({ phase: 'downloading', loaded: downloaded, total: totalSize, percent: Math.round((downloaded / totalSize) * 100) });
-                    }
-                }
-            } else {
-                const chunk = new Uint8Array(await chunkRes.arrayBuffer());
-                enc.set(chunk, downloaded);
-                downloaded += chunk.length;
-                if (onProgress) {
-                    onProgress({ phase: 'downloading', loaded: downloaded, total: totalSize, percent: Math.round((downloaded / totalSize) * 100) });
-                }
+            const { chunk } = await fetchChunk(downloaded, rangeEnd);
+            enc.set(chunk, downloaded);
+            downloaded += chunk.length;
+            if (onProgress) {
+                onProgress({ phase: 'downloading', loaded: downloaded, total: totalSize, percent: Math.round((downloaded / totalSize) * 100) });
             }
         }
 

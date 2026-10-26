@@ -20,6 +20,7 @@ class ViewerViewService {
         this.fileName = null;
         this.origSize = 0;
         this.currentBlobUrl = null;
+        this.neighborKeys = [];
     }
 
     // Attach toolbar and menu action listeners
@@ -236,6 +237,12 @@ class ViewerViewService {
 
     // Clean up active player instance and revoke blob URL
     CleanupCurrentMedia() {
+        for (const key of this.neighborKeys) key.fill(0);
+        this.neighborKeys = [];
+        const btnPrev = document.getElementById("btnPrevFile");
+        const btnNext = document.getElementById("btnNextFile");
+        if (btnPrev) btnPrev.onclick = null;
+        if (btnNext) btnNext.onclick = null;
         const body = document.getElementById("viewBody");
         if (body) {
             const mediaEls = body.querySelectorAll("video, audio");
@@ -449,44 +456,45 @@ class ViewerViewService {
     async setupNeighborNavigation() {
         const btnPrev = document.getElementById("btnPrevFile");
         const btnNext = document.getElementById("btnNextFile");
-        if (btnPrev) btnPrev.classList.add("hidden");
-        if (btnNext) btnNext.classList.add("hidden");
+        if (btnPrev) { btnPrev.classList.add("hidden"); btnPrev.onclick = null; }
+        if (btnNext) { btnNext.classList.add("hidden"); btnNext.onclick = null; }
 
+        for (const key of this.neighborKeys) key.fill(0);
+        this.neighborKeys = [];
+
+        let entries = [];
         try {
             const filesMap = await Adapter.LoadFolderMeta(this.folderId, this.folderKey);
-            const entries = Object.entries(filesMap).sort((a, b) => a[0].localeCompare(b[0]));
+            entries = Object.entries(filesMap).sort((a, b) => a[0].localeCompare(b[0]));
             const idx = entries.findIndex(([name]) => name === this.fileName);
+            if (idx === -1) return;
 
-            if (idx === -1) {
-                for (const [, v] of entries) if (v?.fill) v.fill(0);
-                return;
-            }
-
-            if (idx > 0 && btnPrev) {
-                const [prevName, prevKey] = entries[idx - 1];
-                btnPrev.classList.remove("hidden");
-                btnPrev.onclick = () => {
-                    SafeSession.SetItem("currentFileName", prevName);
-                    SafeSession.SetItem("currentFileKey", ToHex(prevKey));
-                    SafeSession.Save();
-                    this.Mount();
+            const setNeighbor = (button, entry) => {
+                if (!button || !entry) return;
+                const [name, rawKey] = entry;
+                const maskedKey = Drive.MaskKey(rawKey);
+                this.neighborKeys.push(maskedKey);
+                button.classList.remove("hidden");
+                button.onclick = async () => {
+                    if (!maskedKey.some(v => v !== 0)) return;
+                    const key = Drive.UnmaskKey(maskedKey);
+                    try {
+                        SafeSession.SetItem("currentFileName", name);
+                        SafeSession.SetItem("currentFileKey", ToHex(key));
+                        await SafeSession.Save();
+                    } finally {
+                        key.fill(0);
+                    }
+                    await this.Mount();
                 };
-            }
+            };
 
-            if (idx < entries.length - 1 && btnNext) {
-                const [nextName, nextKey] = entries[idx + 1];
-                btnNext.classList.remove("hidden");
-                btnNext.onclick = () => {
-                    SafeSession.SetItem("currentFileName", nextName);
-                    SafeSession.SetItem("currentFileKey", ToHex(nextKey));
-                    SafeSession.Save();
-                    this.Mount();
-                };
-            }
-
-            for (const [, v] of entries) if (v?.fill) v.fill(0);
+            if (idx > 0) setNeighbor(btnPrev, entries[idx - 1]);
+            if (idx < entries.length - 1) setNeighbor(btnNext, entries[idx + 1]);
         } catch (err) {
             console.error("Neighbor navigation error:", err);
+        } finally {
+            for (const [, key] of entries) if (key?.fill) key.fill(0);
         }
     }
 

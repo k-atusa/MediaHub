@@ -796,28 +796,44 @@ export class DriveService {
                     const chunkData = medBuf.subarray(uploadOffset, nextOffset);
                     const curOffset = uploadOffset;
 
-                    await new Promise((resolve, reject) => {
-                        const xhr = new XMLHttpRequest();
-                        this.currentUploadXhr = xhr;
-                        xhr.open("POST", `${this.serverUrl}/api/media/${folderId}/${filePid}/dat`);
-                        xhr.setRequestHeader("X-User-Hash", userHash);
-                        xhr.setRequestHeader("X-Upload-Offset", curOffset.toString());
-                        xhr.upload.onprogress = (e) => {
-                            if (e.lengthComputable && onFileProgress) {
-                                const loadedBytes = curOffset + e.loaded;
-                                const uploadPercent = 50 + Math.min(45, Math.round((loadedBytes / (totSize || 1)) * 45));
-                                onFileProgress(i, uploadPercent, files.length);
-                            }
-                        };
-                        xhr.onload = () => {
-                            if (xhr.status >= 200 && xhr.status < 300) resolve();
-                            else reject(new Error(`Upload failed with status ${xhr.status}`));
-                        };
-                        xhr.onabort = () => reject(new Error("UPLOAD_CANCELLED"));
-                        xhr.onerror = () => reject(new Error("Network upload failed"));
-                        xhr.send(chunkData);
-                    });
-                    this.currentUploadXhr = null;
+                    let lastErr;
+                    for (let attempt = 1; attempt <= 3; attempt++) {
+                        if (this.isUploadCancelled) throw new Error("UPLOAD_CANCELLED");
+
+                        try {
+                            await new Promise((resolve, reject) => {
+                                const xhr = new XMLHttpRequest();
+                                this.currentUploadXhr = xhr;
+                                xhr.open("POST", `${this.serverUrl}/api/media/${folderId}/${filePid}/dat`);
+                                xhr.setRequestHeader("X-User-Hash", userHash);
+                                xhr.setRequestHeader("X-Upload-Offset", curOffset.toString());
+                                xhr.upload.onprogress = (e) => {
+                                    if (e.lengthComputable && onFileProgress) {
+                                        const loadedBytes = curOffset + e.loaded;
+                                        const uploadPercent = 50 + Math.min(45, Math.round((loadedBytes / (totSize || 1)) * 45));
+                                        onFileProgress(i, uploadPercent, files.length);
+                                    }
+                                };
+                                xhr.onload = () => {
+                                    if (xhr.status >= 200 && xhr.status < 300) resolve();
+                                    else reject(new Error(`Upload failed with status ${xhr.status}`));
+                                };
+                                xhr.onabort = () => reject(new Error("UPLOAD_CANCELLED"));
+                                xhr.onerror = () => reject(new Error("Network upload failed"));
+                                xhr.send(chunkData);
+                            });
+                            lastErr = null;
+                            break;
+                        } catch (err) {
+                            if (this.isUploadCancelled || err.message === "UPLOAD_CANCELLED") throw err;
+                            lastErr = err;
+                            console.warn(`Upload chunk at offset ${curOffset} attempt ${attempt} failed:`, err);
+                            if (attempt < 3) await new Promise(r => setTimeout(r, 300 * attempt));
+                        } finally {
+                            this.currentUploadXhr = null;
+                        }
+                    }
+                    if (lastErr) throw lastErr;
 
                     uploadOffset = nextOffset;
                 } while (uploadOffset < totSize);
