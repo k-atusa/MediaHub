@@ -887,45 +887,67 @@ class DriveViewService {
                 const folderName = trimFolderModal?.dataset.folderName;
                 if (!folderName) return;
 
+                if (trimFolderModal.dataset.state === "result") {
+                    trimFolderModal.close();
+                    return;
+                }
+                if (trimFolderModal.dataset.state === "running") return;
+
                 const statusArea = document.getElementById("trimFolderStatusArea");
                 const resultText = document.getElementById("trimFolderResultText");
                 const desc = document.getElementById("trimFolderDesc");
                 const actions = document.getElementById("trimFolderActions");
 
+                trimFolderModal.dataset.state = "running";
                 if (statusArea) statusArea.style.display = "block";
                 if (desc) desc.style.display = "none";
                 if (actions) actions.style.display = "none";
 
                 try {
                     const res = await Drive.TrimFolder(folderName);
-                    if (statusArea) statusArea.style.display = "none";
-                    if (resultText) {
-                        resultText.style.display = "block";
-                        resultText.textContent = res.text || "Trim completed successfully.";
-                    }
-                    setTimeout(() => {
-                        trimFolderModal?.close();
-                        if (actions) actions.style.display = "flex";
-                        if (desc) desc.style.display = "block";
-                        if (resultText) resultText.style.display = "none";
-                        if (Drive.currentFolderName === folderName) {
-                            this.renderFiles(false);
-                        }
-                    }, 1200);
+                    if (resultText) resultText.textContent = res.text || "Trim completed successfully.";
+                    if (Drive.currentFolderName === folderName) this.renderFiles(false);
                 } catch (err) {
+                    if (resultText) resultText.textContent = "Error: " + err.message;
+                } finally {
+                    trimFolderModal.dataset.state = "result";
                     if (statusArea) statusArea.style.display = "none";
-                    if (resultText) {
-                        resultText.style.display = "block";
-                        resultText.textContent = "Error: " + err.message;
-                    }
+                    if (resultText) resultText.style.display = "block";
                     if (actions) actions.style.display = "flex";
+                    if (btnCancelTrimFolder) btnCancelTrimFolder.style.display = "none";
+                    btnConfirmTrimFolder.textContent = "OK";
                 }
             });
         }
         if (btnCancelTrimFolder) btnCancelTrimFolder.addEventListener("click", () => trimFolderModal?.close());
 
+        if (trimFolderModal) {
+            trimFolderModal.addEventListener("cancel", (e) => {
+                if (trimFolderModal.dataset.state) e.preventDefault();
+            });
+
+            trimFolderModal.addEventListener("close", () => {
+                trimFolderModal.dataset.state = "";
+                const statusArea = document.getElementById("trimFolderStatusArea");
+                const resultText = document.getElementById("trimFolderResultText");
+                const desc = document.getElementById("trimFolderDesc");
+                const actions = document.getElementById("trimFolderActions");
+
+                if (statusArea) statusArea.style.display = "none";
+                if (resultText) {
+                    resultText.style.display = "none";
+                    resultText.textContent = "";
+                }
+                if (desc) desc.style.display = "block";
+                if (actions) actions.style.display = "flex";
+                if (btnCancelTrimFolder) btnCancelTrimFolder.style.display = "";
+                if (btnConfirmTrimFolder) btnConfirmTrimFolder.textContent = "Trim";
+            });
+        }
+
         document.querySelectorAll("dialog").forEach(dialog => {
             dialog.addEventListener("click", (e) => {
+                if (dialog.id === "trimFolderModal" && dialog.dataset.state) return;
                 const rect = dialog.getBoundingClientRect();
                 const inDialog = (rect.top <= e.clientY && e.clientY <= rect.top + rect.height && rect.left <= e.clientX && e.clientX <= rect.left + rect.width);
                 if (!inDialog) dialog.close();
@@ -1089,6 +1111,7 @@ class DriveViewService {
         const modal = document.getElementById("trimFolderModal");
         if (modal) {
             modal.dataset.folderName = folderName;
+            modal.dataset.state = "";
             modal.showModal();
         }
     }

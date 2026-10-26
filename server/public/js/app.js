@@ -143,6 +143,7 @@ async function bootstrap() {
     DisableAllAutocomplete();
     await AppRouter.Init();
     document.body.classList.add('app-ready');
+    document.documentElement.classList.remove('boot-pending');
 }
 
 if (document.readyState === 'loading') {

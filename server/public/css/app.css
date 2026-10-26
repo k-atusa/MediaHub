@@ -179,6 +179,10 @@ body.app-ready {
     opacity: 1;
 }
 
+html.boot-pending body {
+    opacity: 1;
+}
+
 .hidden {
     display: none !important;
 }
@@ -192,6 +196,10 @@ body.app-ready {
 }
 
 .view-container.active {
+    display: flex !important;
+}
+
+html.boot-pending #view-login {
     display: flex !important;
 }
 
