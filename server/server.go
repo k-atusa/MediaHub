@@ -46,17 +46,6 @@ type Config struct {
 }
 
 var cfg Config
-var memCert atomic.Pointer[tls.Certificate]
-
-func loadCert() {
-	cert, err := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
-	if err == nil {
-		memCert.Store(&cert)
-		log.Println("TLS certificate loaded from disk")
-	} else {
-		log.Printf("Failed to load TLS certificate: %v", err)
-	}
-}
 
 // init environment
 func initEnv() {
@@ -115,13 +104,26 @@ func initEnv() {
 	}
 }
 
+// TLS certificate
+var memCert atomic.Pointer[tls.Certificate]
+
+func loadCert() {
+	cert, err := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
+	if err == nil {
+		memCert.Store(&cert)
+		log.Println("TLS certificate loaded from disk")
+	} else {
+		log.Printf("Failed to load TLS certificate: %v", err)
+	}
+}
+
 // serve static files in public or embeddedFS with SPA fallback
 func serveFrontend() http.Handler {
 	var fsys http.FileSystem
 	if info, err := os.Stat("./public"); err == nil && info.IsDir() {
-		fsys = http.Dir("./public")
+		fsys = http.Dir("./public") // serve local public if exists
 	} else {
-		sub, err := fs.Sub(publicFS, "public")
+		sub, err := fs.Sub(publicFS, "public") // use embeded public
 		if err != nil {
 			log.Fatalf("failed to initialize embedded filesystem: %v", err)
 		}
@@ -129,6 +131,7 @@ func serveFrontend() http.Handler {
 	}
 	fileServer := http.FileServer(fsys)
 
+	// with SPA fallback
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := strings.TrimPrefix(r.URL.Path, "/")
 		if path != "" {
@@ -553,7 +556,6 @@ func main() {
 	if cfg.HttpMode {
 		modeStr = "HTTP"
 	}
-
 	bindStr := "All"
 	host := ""
 	if cfg.LoopbackOnly {
@@ -561,13 +563,14 @@ func main() {
 		host = "127.0.0.1"
 	}
 	addr := host + ":" + cfg.Port
-
 	log.Printf("Server is running on port %s (%s, %s)", cfg.Port, modeStr, bindStr)
 
+	// run server
 	var err error
 	if cfg.HttpMode {
-		err = http.ListenAndServe(addr, cors(mux))
+		err = http.ListenAndServe(addr, cors(mux)) // normal HTTP
 	} else {
+		// load certificate every 24h
 		loadCert()
 		go func() {
 			for range time.Tick(24 * time.Hour) {
@@ -575,6 +578,7 @@ func main() {
 			}
 		}()
 
+		// use certificate in memory
 		server := &http.Server{
 			Addr:    addr,
 			Handler: cors(mux),
@@ -590,14 +594,7 @@ func main() {
 		}
 		err = server.ListenAndServeTLS("", "")
 	}
-
 	if err != nil {
 		log.Fatalf("Server startup error: %v", err)
 	}
 }
-
-/*
-** 직접 최적화하고 정리좀 해야함
-** 지금은 그냥 기능 추가한거 동작은 하고 돌아만 가고 있음
-** 에이전트가 막 싸놓은 코드들이 많음
- */

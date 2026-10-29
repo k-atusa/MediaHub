@@ -7,7 +7,7 @@ ROOT_DIR="$(cd "${SERVER_DIR}/.." && pwd)"
 VERSION="${1:-${VERSION:-}}"
 
 if [ -n "${VERSION}" ]; then
-  # Strip leading 'v' if present (e.g. v1.5.2 -> 1.5.2)
+  # Strip leading 'v' if present (e.g. v1.2.3 -> 1.2.3)
   VERSION="${VERSION#v}"
   OUTPUT_DIR="${ROOT_DIR}/build"
   mkdir -p "${OUTPUT_DIR}"
