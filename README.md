@@ -1,4 +1,4 @@
-# MediaHub v1.5.2
+# MediaHub v1.6.0
 
 project WHY(Web Hub Yard): Media Hub
 
@@ -48,66 +48,104 @@ To prevent premature data destruction in a decentralized trust environment, all 
 2. **Peers Must Only `Unlink`**: When a peer no longer needs access to a shared folder, they must exclusively use **Unlink**. This cleanly drops the cryptographic key from their personal `userdata` without mutating backend storage or disrupting other peers.
 3. **Hard Deletion (`Delete`) by Owner Only**: The **Delete** operation permanently wipes physical encrypted blobs and directory structures on the host server. The designated owner should execute `Delete` only after verifying that all shared participants have unlinked and the folder has reached its final retirement.
 
----
-
-## Architecture
+## Server API
 
 - All cryptographic works on client browser memory, based on project USAG.
 - Server holds userdata, filenames, thumbnails, media encrypted.
 - userdata is Map[folderName]folderKey, and filenames is Map[fileName]fileKey.
 - userdata is encrypted with userKey. filenames is encrypted with folderKey. Thumbnails and media are encrypted with fileKey.
 
-```python
-server
-config/
-  config.json
-certs/
-  cert.pem
-  key.pem
-users/
-  ...
-data/
-  ...
-public/
-  ...
-```
+- **GET** `/api/userdata/{user_hash}`
+  - Header: -
+  - Returns: `200` Binary
+  - Returns userdata.
 
-| Option | Type | Info | 정보 |
-| :-- | :-- | :-- | :-- |
-| storage | string | data storage path | 데이터 저장폴더 경로 |
-| port | int | HTTPS server port | HTTPS 서버 포트 |
-| cert | string | TLS certificate path | TLS 인증서 파일 경로 |
-| key | string | TLS keyfile path | TLS 키 파일 경로 |
-| invite | string | invitation auth code | 가입 권한 코드 |
-| notice | string | public notification | 접속 시 보이는 공지 |
+- **POST** `/api/userdata/{user_hash}`
+  - Header: `X-User-Hash` (required for existing users), `X-Old-Hash` (optional), `X-Invite-Code` (required for new users), `X-Upload-Offset` (optional, default: 0)
+  - Body: Binary
+  - Returns: `200` Success
+  - Create or update userdata. Existing users require authentication. New users require an invite code if configured. `X-Old-Hash` verifies the existence of a previous user file.
+
+- **DELETE** `/api/userdata/{user_hash}`
+  - Header: `X-User-Hash`
+  - Returns: `200` OK
+  - Delete userdata. Returns 200 even if the target file does not exist.
+
+- **GET** `/api/storage/{folder_pid}/names`
+  - Header: -
+  - Returns: `200` Binary
+  - Returns folder metadata (names).
+
+- **POST** `/api/storage/{folder_pid}/names`
+  - Header: `X-User-Hash`, `X-Upload-Offset` (optional, default: 0)
+  - Body: Binary
+  - Returns: `200` Success
+  - Create or update folder metadata.
+
+- **DELETE** `/api/storage/{folder_pid}/names`
+  - Header: `X-User-Hash`
+  - Returns: `200` OK
+  - Recursively delete the entire folder and its contents.
+
+- **GET** `/api/media/{folder_pid}/{file_pid}/{type}`
+  - Header: `Range` (optional)
+  - Returns: `200` Binary / `206` Partial Content
+  - Download media data. `type`: `dat` or `thumb`. Supports HTTP byte-range requests.
+
+- **POST** `/api/media/{folder_pid}/{file_pid}/{type}`
+  - Header: `X-User-Hash`, `X-Upload-Offset` (optional, default: 0)
+  - Body: Binary
+  - Returns: `200` Success
+  - Create or update a media file. Automatically creates the folder if missing.
+
+- **DELETE** `/api/media/{folder_pid}/{file_pid}/{type}`
+  - Header: `X-User-Hash`
+  - Returns: `200` OK
+  - Delete the specified `dat` or `thumb` file. Returns 200 even if the target file does not exist.
+
+- **POST** `/api/trim/{folder_pid}`
+  - Header: `X-User-Hash`, `Content-Type: application/json`
+  - Body: JSON `{"pids":["aabb","ccdd"]}`
+  - Returns: `200` Text / `409` Conflict
+  - Delete orphan media files whose PIDs are not included in the provided list. At least 50% of existing unique PIDs must be retained.
+
+- **GET** `/api/notice`
+  - Header: -
+  - Returns: `200` JSON `{"notice":"..."}`
+  - Returns the server notice.
+
+- **GET, HEAD** `/.well-known/acme-challenge/{token}`
+  - Header: -
+  - Returns: `200` Text
+  - Returns the ACME challenge token file. Available only when `acme` is configured.
 
 ---
 
 ## Build & Run
 
-### Prerequisites
-- [Go](https://go.dev/) 1.22 or higher
+MediaHub requires [Go](https://go.dev/) 1.22 or higher
 
 ### Quick Build (Recommended)
-Run the server build script. It automatically detects your current operating system and CPU architecture, compiling a single standalone Go binary with the embedded Web client (`server/public`):
+
+Run the build script. It automatically detects your OS and CPU, compiling a single standalone Go binary with the embedded Web client (`server/public`).
+
+The compiled binary is saved to `server/mediahub-server-{version}-{os}-{arch}` and copied to `server/server`.
 
 ```bash
 cd server
 ./build.sh
 ```
 
-- The compiled binary is saved to `server/mediahub-server-{version}-{os}-{arch}` and copied to `server/server`.
-
 ### Manual Build
-You can also compile directly within the `server` directory using the standard Go toolchain:
+
+Compile directly within the `server` directory.
 
 ```bash
 cd server
 go build -ldflags="-s -w" -trimpath -o server server.go
 ```
 
-### Cross-Compilation (Multi-Platform)
-Cross-compile for any target platform without external C dependencies:
+Cross-compile builds without external C dependencies are also available.
 
 ```bash
 cd server
@@ -129,9 +167,33 @@ CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -trimpath -o med
 ```
 
 ### Running the Server
-Place your TLS certificates (`certs/cert.pem`, `certs/key.pem`) and configuration (`config/config.json`) in the `server` directory, then start the server:
+
+The server automatically generates required files and directories. Edit configuration, then start the server.
+
+```
+server
+config/
+  config.json
+certs/
+  cert.pem
+  key.pem
+users/
+data/
+```
 
 ```bash
 cd server
 ./server
 ```
+
+| Option | Type | Info | 정보 |
+| :-- | :-- | :-- | :-- |
+| storage | string | data storage path | 데이터 저장폴더 경로 |
+| invite | string | invitation auth code | 가입 권한 코드 |
+| notice | string | public notification | 접속 시 보이는 공지 |
+| port | int | server port | 서버 포트 |
+| http | bool | enables HTTP mode | HTTP 모드 사용 |
+| loopback | bool | allows only loopback ip to connect | 루프백 IP만 연결 허용 |
+| acme | string | ACME token respond path | ACME 인증토큰 응답 경로 |
+| cert | string | TLS certificate path | TLS 인증서 파일 경로 |
+| key | string | TLS keyfile path | TLS 키 파일 경로 |

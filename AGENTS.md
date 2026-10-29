@@ -64,8 +64,8 @@ Vanilla Web 클라이언트(`server/public`)가 임베딩(`//go:embed all:public
    - **브라우저 서브에이전트 제어 금지**: `browser_subagent` 도구를 사용하지 않으며, 사용자가 직접 브라우저에서 확인하도록 안내합니다.
 2. **빌드 명령**:
    - `server/build.sh` (또는 `cd server && ./build.sh`)를 실행하여 Go 바이너리(`server/server`) 컴파일을 수행합니다. Node.js 의존성 없이 순수 Go 툴체인만으로 빌드됩니다.
-3. **암호화 라이브러리 보존**:
-   - `Bencrypt.js`, `Bencode.js`, `Opsec.js`는 MediaHub의 핵심 암호 엔진이므로 임의로 내부 로직을 변형하지 않습니다.
+3. **엔진 라이브러리 보존**:
+   - `public/js/engine` 내부 코드는 MediaHub의 핵심 엔진이므로 임의로 내부 로직을 변형하지 않습니다.
 4. **종단간 암호화(E2EE) 및 스트리밍 파이프라인**:
    - 백엔드는 서비스 제공자가 악의적 스니퍼라는 상황을 가정한 Zero-Knowledge 모델을 따르므로, 암호화 키를 절대 수신하지 않고 복호화를 수행하지 않습니다.
    - 비디오 스트리밍은 브라우저 클라이언트 사이드 Service Worker(`sw.js`의 `/sw-stream/`)에서 암호화된 청크를 온더플라이(HTTP 206 Range)로 복호화하여 스트리밍하며, SW 미지원/장애 시 브라우저 내 인메모리 복호화(`fullDown`)로 폴백합니다.
