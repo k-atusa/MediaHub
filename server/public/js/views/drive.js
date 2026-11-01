@@ -1598,7 +1598,7 @@ class DriveViewService {
                 const effectiveName = info.name;
                 if (Drive.fldMap[effectiveName]) {
                     const overwrite = await ShowConfirmModal(
-                        `A folder named "${effectiveName}" already exists. Overwrite?`,
+                        `A folder named "${EscapeHtml(effectiveName)}" already exists. Overwrite?`,
                         "Overwrite Folder?",
                         "warning",
                         "Overwrite",
@@ -1794,7 +1794,7 @@ class DriveViewService {
         for (const file of files) {
             if (Drive.flsMap[file.name]) {
                 const overwrite = await ShowConfirmModal(
-                    `File "${file.name}" already exists. Overwrite?`,
+                    `File "${EscapeHtml(file.name)}" already exists. Overwrite?`,
                     "File Exists",
                     "warning",
                     "Overwrite",

@@ -391,9 +391,11 @@ class ViewerViewService {
                 </div>
                 <div class="audio-title" title="${EscapeHtml(this.fileName)}">${EscapeHtml(this.fileName)}</div>
                 <div class="audio-meta">${sizeStr}</div>
-                <audio controls autoplay class="audio-element" id="audioPlayer" src="${srcUrl}"></audio>
+                <audio controls autoplay class="audio-element" id="audioPlayer"></audio>
             </div>
         `;
+        const audio = body.querySelector('#audioPlayer');
+        if (audio) audio.src = srcUrl;
         if (onError) {
             body.querySelector('#audioPlayer')?.addEventListener('error', () => onError('Audio playback error'));
         }
