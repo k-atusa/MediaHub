@@ -10,24 +10,13 @@
     <!-- Google Fonts & Material Symbols -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@400;500&family=Roboto+Mono:wght@400;500&display=swap"
-        rel="stylesheet" media="print" onload="this.media='all'">
     <link rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
-        media="print" onload="this.media='all'" />
+        href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Roboto:wght@400;500&family=Roboto+Mono:wght@400;500&display=swap">
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
 
     <!-- Theme Initialization Script (Prevents FOUC) -->
-    <script>
-        (function () {
-            const saved = localStorage.getItem('theme') || 'system';
-            if (saved === 'dark' || saved === 'light') {
-                document.documentElement.setAttribute('data-theme', saved);
-            } else {
-                document.documentElement.removeAttribute('data-theme');
-            }
-        })();
-    </script>
+    <script src="./js/init.js"></script>
 
     <!-- Stylesheets -->
     <link rel="stylesheet" href="./js/engine/viewerjs.min.css">
@@ -138,7 +127,7 @@
                     <span class="material-symbols-outlined" id="driveThemeToggleIcon">dark_mode</span>
                 </button>
                 <!-- Account Menu Dropdown -->
-                <div class="account-menu-wrapper" id="accountMenuWrapper">accountme
+                <div class="account-menu-wrapper" id="accountMenuWrapper">
                     <button class="profile-avatar-btn" id="btnAccountMenu" type="button" aria-haspopup="true"
                         aria-expanded="false" title="Account profile">
                         <div class="profile-avatar" id="headerAvatar">TE</div>
@@ -600,7 +589,7 @@
         </div>
         <div class="dialog-body">
             <div style="margin-bottom: 12px; line-height: 1.5; color: var(--g-text-sub);">
-                This permanently deletes your account. This cannot be undone.<br>
+                This permanently deletes your account.<br>
                 Type your username <b id="deleteAccountUsername"></b> to continue.
             </div>
             <input type="text" id="deleteAccountInput" class="dialog-input" placeholder="Username" autocomplete="off"
@@ -716,8 +705,9 @@
             <span>Invite Code Required</span>
         </div>
         <div class="dialog-body">
-            <div style="margin-bottom: 16px; line-height: 1.5; color: var(--g-text-sub);">This MediaHub instance
-                requires an invite code for new registrations. Please enter your invite code below:</div>
+            <div style="margin-bottom: 16px; line-height: 1.5; color: var(--g-text-sub);">
+                MediaHub requires an invite code for new registrations.<br>
+                Please enter the invite code below:</div>
             <input type="text" id="inviteCodeInput" class="dialog-input" placeholder="Enter invite code"
                 autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
         </div>

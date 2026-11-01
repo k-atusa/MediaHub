@@ -159,6 +159,7 @@ func serveUser(w http.ResponseWriter, r *http.Request) {
 	path := filepath.Join(cfg.StorageDir, "users", filepath.Clean(userHash))
 	switch r.Method {
 	case http.MethodGet: // read userdata
+		w.Header().Set("Content-Type", "application/octet-stream")
 		http.ServeFile(w, r, path)
 	case http.MethodPost: // create/update userdata
 		isNewUser := false
@@ -232,6 +233,7 @@ func serveMeta(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet: // read metadata
+		w.Header().Set("Content-Type", "application/octet-stream")
 		http.ServeFile(w, r, path)
 	case http.MethodPost: // create/update metadata
 		os.MkdirAll(filepath.Dir(path), 0755)
@@ -493,6 +495,27 @@ func cors(next http.Handler) http.Handler {
 	})
 }
 
+// security content middleware
+func csp(next http.Handler) http.Handler {
+	cdn := []string{"https://cdnjs.cloudflare.com", "https://cdn.jsdelivr.net", "https://esm.sh"}
+	cdnstr := strings.Join(cdn, " ")
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("Content-Security-Policy", // add '-Report-Only' while debug
+			"default-src 'self'; "+
+				"script-src 'self' 'wasm-unsafe-eval' "+cdnstr+"; "+
+				"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com "+cdnstr+"; "+
+				"font-src 'self' https://fonts.gstatic.com "+cdnstr+"; "+
+				"img-src 'self' blob: data: "+cdnstr+"; "+
+				"media-src 'self' blob:; object-src 'self' blob:; "+
+				"connect-src 'self' blob: "+cdnstr+"; "+
+				"worker-src 'self' blob:; base-uri 'none'; frame-ancestors 'none'")
+		next.ServeHTTP(w, r)
+	})
+}
+
 // ECDSA P-256 self-signed certificate helper
 func makeCert(certOut string, keyOut string) {
 	// generate private key
@@ -568,7 +591,7 @@ func main() {
 	// run server
 	var err error
 	if cfg.HttpMode {
-		err = http.ListenAndServe(addr, cors(mux)) // normal HTTP
+		err = http.ListenAndServe(addr, csp(cors(mux))) // normal HTTP
 	} else {
 		// load certificate every 24h
 		loadCert()
@@ -581,7 +604,7 @@ func main() {
 		// use certificate in memory
 		server := &http.Server{
 			Addr:    addr,
-			Handler: cors(mux),
+			Handler: csp(cors(mux)),
 			TLSConfig: &tls.Config{
 				GetCertificate: func(*tls.ClientHelloInfo) (*tls.Certificate, error) {
 					cert := memCert.Load()
