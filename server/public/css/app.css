@@ -665,6 +665,13 @@ dialog::backdrop {
     background-color: #f9dedc;
 }
 
+/* Style the corresponding interactive or UI state. */
+.btn-dialog-danger:disabled {
+    opacity: 0.38;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
 /* ===== Trim Folder Dialog Custom UI ===== */
 /* Style shared dialog structure, inputs, and actions. */
 #trimFolderModal {

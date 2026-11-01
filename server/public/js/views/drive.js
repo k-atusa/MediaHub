@@ -415,6 +415,26 @@ class DriveViewService {
             });
         }
 
+        // Bind account delete button
+        const accountMenuItemDelete = document.getElementById("accountMenuItemDelete");
+        const deleteAccountModal = document.getElementById("deleteAccountModal");
+        if (accountMenuItemDelete) {
+            accountMenuItemDelete.addEventListener("click", async () => {
+                accountDropdownMenu?.classList.remove("open");
+                try { await Drive.LoadUser(); } catch { } // refresh folder map
+                if (Object.keys(Drive.fldMap).length > 0) {
+                    return ShowNotice("Please delete all folders before deleting your account.", "Notice", "warning");
+                }
+                const input = document.getElementById("deleteAccountInput");
+                const btn = document.getElementById("btnConfirmDeleteAccount");
+                document.getElementById("deleteAccountUsername").textContent = SafeSession.GetItem("username") || "";
+                if (input) input.value = "";
+                if (btn) btn.disabled = true;
+                deleteAccountModal?.showModal();
+                input?.focus();
+            });
+        }
+
         // Bind account logout button
         if (accountMenuItemLogout) {
             accountMenuItemLogout.addEventListener("click", () => {
@@ -1329,6 +1349,38 @@ class DriveViewService {
             });
         }
         if (btnCancelPw) btnCancelPw.addEventListener("click", () => pwModal?.close());
+
+        const deleteAccountModal = document.getElementById("deleteAccountModal");
+        const deleteAccountInput = document.getElementById("deleteAccountInput");
+        const btnConfirmDeleteAccount = document.getElementById("btnConfirmDeleteAccount");
+        const btnCancelDeleteAccount = document.getElementById("btnCancelDeleteAccount");
+
+        // Handle delete account confirmation
+        if (deleteAccountInput) {
+            deleteAccountInput.addEventListener("input", () => {
+                btnConfirmDeleteAccount.disabled = deleteAccountInput.value.trim() !== (SafeSession.GetItem("username") || "\0");
+            }); // 1st confirm: username check
+            deleteAccountInput.addEventListener("keydown", (e) => {
+                if (e.key === "Enter" && !btnConfirmDeleteAccount.disabled) btnConfirmDeleteAccount.click();
+            });
+        }
+        if (btnCancelDeleteAccount) btnCancelDeleteAccount.addEventListener("click", () => deleteAccountModal?.close());
+        if (btnConfirmDeleteAccount) {
+            btnConfirmDeleteAccount.addEventListener("click", async () => {
+                deleteAccountModal?.close();
+                const ok = await ShowConfirmModal(
+                    "Your account will be permanently deleted. This action cannot be undone.",
+                    "Delete account?", "delete_forever", "Delete", true
+                ); // 2nd confirm
+                if (!ok) return;
+                try { // delete userdata on server
+                    await Drive.DeleteAccount();
+                    AppRouter.Navigate('/login'); // redirect to login
+                } catch (err) {
+                    ShowNotice("Failed to delete account: " + err.message, "Error", "error");
+                }
+            });
+        }
 
         const trimFolderModal = document.getElementById("trimFolderModal");
         const btnConfirmTrimFolder = document.getElementById("btnConfirmTrimFolder");

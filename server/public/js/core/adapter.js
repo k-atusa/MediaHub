@@ -114,6 +114,15 @@ export class AdapterService {
         }
     }
 
+    // Delete user account data on server
+    async DeleteUserData(userHash) {
+        const res = await fetch(`${this.serverUrl}/api/userdata/${userHash}`, {
+            method: "DELETE",
+            headers: { "X-User-Hash": userHash }
+        });
+        if (!res.ok) throw new Error(`Failed to delete account (HTTP ${res.status})`);
+    }
+
     // ===== Metadata Operations =====
     // Fetch and decrypt folder map
     async LoadUserData(userHash, maskedUserKey) {

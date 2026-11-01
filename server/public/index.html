@@ -138,7 +138,7 @@
                     <span class="material-symbols-outlined" id="driveThemeToggleIcon">dark_mode</span>
                 </button>
                 <!-- Account Menu Dropdown -->
-                <div class="account-menu-wrapper" id="accountMenuWrapper">
+                <div class="account-menu-wrapper" id="accountMenuWrapper">accountme
                     <button class="profile-avatar-btn" id="btnAccountMenu" type="button" aria-haspopup="true"
                         aria-expanded="false" title="Account profile">
                         <div class="profile-avatar" id="headerAvatar">TE</div>
@@ -160,6 +160,11 @@
                         <div class="drive-menu-item" id="accountMenuItemPassword">
                             <span class="material-symbols-outlined menu-icon">lock_reset</span>
                             <span class="menu-label">Change password</span>
+                        </div>
+                        <div class="drive-menu-item" id="accountMenuItemDelete">
+                            <span class="material-symbols-outlined menu-icon"
+                                style="color: var(--g-danger, #b3261e);">person_remove</span>
+                            <span class="menu-label" style="color: var(--g-danger, #b3261e);">Delete account</span>
                         </div>
                         <div class="drive-menu-divider"></div>
                         <div class="drive-menu-item" id="accountMenuItemLogout">
@@ -584,6 +589,26 @@
         <div class="dialog-btn-group">
             <button id="btnCancelPw" class="btn-dialog-cancel" type="button">Cancel</button>
             <button id="btnConfirmPw" class="btn-dialog-confirm" type="button">Save</button>
+        </div>
+    </dialog>
+
+    <!-- Delete Account Dialog -->
+    <dialog id="deleteAccountModal">
+        <div class="dialog-title">
+            <span class="material-symbols-outlined" style="color: var(--g-danger, #b3261e);">warning</span>
+            <span>Danger Zone</span>
+        </div>
+        <div class="dialog-body">
+            <div style="margin-bottom: 12px; line-height: 1.5; color: var(--g-text-sub);">
+                This permanently deletes your account. This cannot be undone.<br>
+                Type your username <b id="deleteAccountUsername"></b> to continue.
+            </div>
+            <input type="text" id="deleteAccountInput" class="dialog-input" placeholder="Username" autocomplete="off"
+                autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
+        </div>
+        <div class="dialog-actions">
+            <button id="btnCancelDeleteAccount" class="btn-dialog-text" type="button">Cancel</button>
+            <button id="btnConfirmDeleteAccount" class="btn-dialog-danger" type="button" disabled>Continue</button>
         </div>
     </dialog>
 

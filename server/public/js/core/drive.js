@@ -198,6 +198,14 @@ export class DriveService {
         this.usrKey = maskedNewKey;
     }
 
+    // Delete account
+    async DeleteAccount() {
+        if (!this.usrHsh) throw new Error("Session invalid. Please login again.");
+        if (Object.keys(this.fldMap).length > 0) throw new Error("Delete all folders first."); // only allowed when foldermap is empty
+        await Adapter.DeleteUserData(this.usrHsh);
+        this.ClearSession();
+    }
+
     // ===== Folder Management =====
     // Create a new empty folder entry
     async CreateFolder(name) {
