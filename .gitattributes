@@ -1,0 +1,3 @@
+# GitHub Linguist Language Statistics Overrides
+server/public/js/engine/** linguist-vendored
+server/public/js/engine/** linguist-detectable=false
