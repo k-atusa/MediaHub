@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko" class="boot-pending">
+<html lang="en" class="boot-pending">
 
 <head>
     <meta charset="UTF-8">
@@ -46,7 +46,8 @@
             <button class="header-icon-btn" id="btnAppInfo" type="button" title="App Info" aria-label="App Info">
                 <span class="material-symbols-outlined">info</span>
             </button>
-            <button class="header-icon-btn" id="btnThemeToggle" type="button" title="Toggle theme" aria-label="Toggle theme">
+            <button class="header-icon-btn" id="btnThemeToggle" type="button" title="Toggle theme"
+                aria-label="Toggle theme">
                 <span class="material-symbols-outlined" id="themeToggleIcon">dark_mode</span>
             </button>
         </div>
@@ -58,7 +59,8 @@
                         <img src="icons/icon.png" alt="MediaHub Logo" class="drive-logo-img">
                         <span class="drive-title">MediaHub</span>
                     </div>
-                    <button class="header-icon-btn" id="btnLoginNotice" type="button" title="Notice" aria-label="Notice">
+                    <button class="header-icon-btn" id="btnLoginNotice" type="button" title="Notice"
+                        aria-label="Notice">
                         <span class="material-symbols-outlined">campaign</span>
                     </button>
                 </div>
@@ -69,14 +71,12 @@
 
             <div class="input-fields">
                 <div class="input-wrapper">
-                    <label class="input-label" for="username">Username</label>
-                    <input type="text" id="username" class="google-input" placeholder="Enter your username"
-                        autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
+                    <input type="text" id="username" class="google-input" placeholder="Username" autocomplete="off"
+                        autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
                 </div>
 
                 <div class="input-wrapper">
-                    <label class="input-label" for="password">Password</label>
-                    <input type="password" id="password" class="google-input" placeholder="Enter your password"
+                    <input type="password" id="password" class="google-input" placeholder="Password"
                         autocomplete="current-password" autocorrect="off" autocapitalize="off" spellcheck="false"
                         data-lpignore="true">
                 </div>
@@ -128,11 +128,13 @@
                     <span class="material-symbols-outlined">search</span>
                 </button>
                 <!-- Application Info Button -->
-                <button class="header-icon-btn" id="btnDriveAppInfo" type="button" title="App Info" aria-label="App Info">
+                <button class="header-icon-btn" id="btnDriveAppInfo" type="button" title="App Info"
+                    aria-label="App Info">
                     <span class="material-symbols-outlined">info</span>
                 </button>
                 <!-- Direct Theme Toggle Button -->
-                <button class="header-icon-btn" id="btnDriveThemeToggle" type="button" title="Toggle theme" aria-label="Toggle theme">
+                <button class="header-icon-btn" id="btnDriveThemeToggle" type="button" title="Toggle theme"
+                    aria-label="Toggle theme">
                     <span class="material-symbols-outlined" id="driveThemeToggleIcon">dark_mode</span>
                 </button>
                 <!-- Account Menu Dropdown -->
@@ -341,7 +343,8 @@
                                 <div id="keywordEmptyMessage" class="filter-empty-message" style="display: none;">
                                     <span class="material-symbols-outlined"
                                         style="font-size: 26px; margin-bottom: 4px; display: block; opacity: 0.6;">search_off</span>
-                                    <div style="font-size: 13px; font-weight: 500; color: var(--g-text-main);">No keywords found</div>
+                                    <div style="font-size: 13px; font-weight: 500; color: var(--g-text-main);">No
+                                        keywords found</div>
                                 </div>
                             </div>
                         </div>
@@ -376,7 +379,8 @@
 
                     <div id="infiniteScrollLoader" class="infinite-scroll-loader">
                         <svg class="m3-circular-spinner" viewBox="0 0 48 48">
-                            <circle class="m3-circular-track" cx="24" cy="24" r="18" fill="none" stroke-width="4"></circle>
+                            <circle class="m3-circular-track" cx="24" cy="24" r="18" fill="none" stroke-width="4">
+                            </circle>
                             <circle class="m3-circular-indicator" cx="24" cy="24" r="18" fill="none" stroke-width="4"
                                 stroke-linecap="round"></circle>
                         </svg>
@@ -386,7 +390,8 @@
                     <div class="empty-state-view" id="emptyStateContainer">
                         <span class="material-symbols-outlined empty-cloud-icon" id="emptyStateIcon">cloud_upload</span>
                         <div class="empty-title" id="emptyStateTitle">This folder is empty</div>
-                        <div class="empty-subtitle" id="emptyStateSubtitle">Drag and drop files anywhere on the page, or use the upload button.</div>
+                        <div class="empty-subtitle" id="emptyStateSubtitle">Drag and drop files anywhere on the page, or
+                            use the upload button.</div>
                         <button class="btn-empty-upload" id="btnEmptyUploadAction">
                             <span class="material-symbols-outlined">add</span>
                             <span>Upload</span>
@@ -408,7 +413,8 @@
                     <span class="material-symbols-outlined">arrow_back</span>
                 </button>
                 <span id="txName" class="topbar-filename"></span>
-                <button id="btnViewerMore" class="icon-btn viewer-more-btn" title="More options" aria-label="More options">
+                <button id="btnViewerMore" class="icon-btn viewer-more-btn" title="More options"
+                    aria-label="More options">
                     <span class="material-symbols-outlined">more_vert</span>
                 </button>
             </div>
@@ -466,13 +472,7 @@
     </div>
 
     <!-- ========================================== -->
-    <!-- 4. COMMON HIDDEN CONTROLS & INPUTS         -->
-    <!-- ========================================== -->
-    <input type="file" id="fileInput" multiple style="display: none;">
-    <input type="file" id="folderInput" webkitdirectory directory multiple style="display: none;">
-
-    <!-- ========================================== -->
-    <!-- 5. CONTEXT MENUS                           -->
+    <!-- 4. CONTEXT MENUS                           -->
     <!-- ========================================== -->
     <!-- Folder Context Menu -->
     <div class="new-drive-menu folder-action-menu" id="folderActionMenu">
@@ -521,7 +521,7 @@
     </div>
 
     <!-- ========================================== -->
-    <!-- 6. COMMON MATERIAL YOU DIALOGS             -->
+    <!-- 5. COMMON MATERIAL YOU DIALOGS             -->
     <!-- ========================================== -->
     <!-- New Folder Dialog -->
     <dialog id="newFolderModal">
@@ -590,20 +590,24 @@
     <!-- Trim Folder Dialog -->
     <dialog id="trimFolderModal">
         <div class="dialog-title">
-            <span class="material-symbols-outlined" style="color: var(--g-primary-blue, #0b57d0);">cleaning_services</span>
+            <span class="material-symbols-outlined"
+                style="color: var(--g-primary-blue, #0b57d0);">cleaning_services</span>
             <span>Trim orphan files?</span>
         </div>
         <div class="dialog-body">
             <div id="trimFolderDesc" style="margin-bottom: 12px; line-height: 1.5; color: var(--g-text-sub);">
-                Scan this folder on the server and remove unreferenced orphan files that are not mapped in your folder. Active files will remain completely untouched.
+                Scan this folder on the server and remove unreferenced orphan files that are not mapped in your folder.
+                Active files will remain completely untouched.
             </div>
             <div id="trimFolderStatusArea" style="display: none; margin-bottom: 12px;">
-                <div id="trimFolderStatusText" style="font-size: 13.5px; color: var(--g-text-main); margin-bottom: 8px;">Scanning files...</div>
+                <div id="trimFolderStatusText"
+                    style="font-size: 13.5px; color: var(--g-text-main); margin-bottom: 8px;">Scanning files...</div>
                 <div class="m3-linear-progress">
                     <div id="trimFolderProgressBar" class="m3-linear-bar indeterminate"></div>
                 </div>
             </div>
-            <div id="trimFolderResultText" style="font-size: 13.5px; color: var(--g-text-main); display: none; line-height: 1.5;"></div>
+            <div id="trimFolderResultText"
+                style="font-size: 13.5px; color: var(--g-text-main); display: none; line-height: 1.5;"></div>
         </div>
         <div class="dialog-actions" id="trimFolderActions">
             <button id="btnCancelTrimFolder" class="btn-dialog-text" type="button">Cancel</button>
@@ -618,7 +622,8 @@
             <span>Share Folder</span>
         </div>
         <div class="dialog-body">
-            <div id="shareModalDesc" style="margin-bottom: 16px;">Set a password to encrypt this folder's share token. Anyone with the token file and password can access the folder.</div>
+            <div id="shareModalDesc" style="margin-bottom: 16px;">Set a password to encrypt this folder's share token.
+                Anyone with the token file and password can access the folder.</div>
             <input type="password" id="sharePasswordInput" class="dialog-input" placeholder="Set share password"
                 autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false"
                 data-lpignore="true">
@@ -686,7 +691,8 @@
             <span>Invite Code Required</span>
         </div>
         <div class="dialog-body">
-            <div style="margin-bottom: 16px; line-height: 1.5; color: var(--g-text-sub);">This MediaHub instance requires an invite code for new registrations. Please enter your invite code below:</div>
+            <div style="margin-bottom: 16px; line-height: 1.5; color: var(--g-text-sub);">This MediaHub instance
+                requires an invite code for new registrations. Please enter your invite code below:</div>
             <input type="text" id="inviteCodeInput" class="dialog-input" placeholder="Enter invite code"
                 autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true">
         </div>
@@ -695,6 +701,12 @@
             <button id="btnConfirmInvite" class="btn-dialog-primary" type="button">Register</button>
         </div>
     </dialog>
+
+    <!-- ========================================== -->
+    <!-- 6. COMMON HIDDEN CONTROLS & INPUTS         -->
+    <!-- ========================================== -->
+    <input type="file" id="fileInput" multiple style="display: none;">
+    <input type="file" id="folderInput" webkitdirectory directory multiple style="display: none;">
 
     <!-- ========================================== -->
     <!-- 7. DRAG & DROP OVERLAY & UPLOAD WIDGET     -->

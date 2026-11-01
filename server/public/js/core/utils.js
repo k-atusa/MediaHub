@@ -1,17 +1,15 @@
-// Core utility functions, encrypted session storage, and UI dialogs
-// NOTE: Adapter is NOT imported here to avoid circular dependency (utils <-> adapter).
-// Call setSessionAdapter(adapterInstance) from app.js after both modules are loaded.
+// Core utility functions and session storage
+let _sessionAdapter = null; // Adapter is NOT imported here to avoid circular dependency
+export function setSessionAdapter(adapter) { _sessionAdapter = adapter; } // Call setSessionAdapter(adapterInstance) from app.js after both modules are loaded
 
-let _sessionAdapter = null;
-export function setSessionAdapter(adapter) { _sessionAdapter = adapter; }
-
-// Convert Uint8Array buffer to lowercase hexadecimal string
+// ===== Common Helpers =====
+// Convert Uint8Array buffer to lowercase hex-string
 export const ToHex = (buf) => {
     if (!buf) return '';
     return Array.from(buf).map(b => b.toString(16).padStart(2, '0')).join('');
 };
 
-// Convert hexadecimal string to Uint8Array buffer
+// Convert hex-string to Uint8Array buffer
 export const FromHex = (hex) => {
     if (!hex || hex.length % 2 !== 0) return new Uint8Array(0);
     const matches = hex.match(/.{1,2}/g);
@@ -19,12 +17,12 @@ export const FromHex = (hex) => {
     return new Uint8Array(matches.map(b => parseInt(b, 16)));
 };
 
-// Format byte count to human-readable size string
+// Format byte size count
 export const FormatBytes = (bytes) => {
     if (bytes === undefined || bytes === null || isNaN(bytes)) return '-';
     if (bytes === 0) return '0 B';
     const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const sizes = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     const val = parseFloat((bytes / Math.pow(k, i)).toFixed(i === 0 ? 0 : 1));
     return `${val} ${sizes[i]}`;
@@ -40,10 +38,44 @@ export const EscapeHtml = (str) => {
         .replace(/'/g, '&#39;');
 };
 
-// Extract 24-byte object PID from key slice
+// Get PID from key slice (pos 32 to 44, 12B)
 export const GetObjPid = (key) => {
     if (!key || key.length < 44) return '';
     return ToHex(key.slice(32, 44));
+};
+
+// Disable browser autocomplete on text input elements
+export const DisableAllAutocomplete = () => {
+    document.querySelectorAll('input:not([type="checkbox"]):not([type="file"]):not([type="radio"])').forEach(input => {
+        if (!input.hasAttribute('autocomplete') || input.getAttribute('autocomplete') !== 'new-password') {
+            input.setAttribute('autocomplete', 'off');
+        }
+        input.setAttribute('autocorrect', 'off');
+        input.setAttribute('autocapitalize', 'off');
+        input.setAttribute('spellcheck', 'false');
+        input.setAttribute('data-lpignore', 'true');
+    });
+};
+
+// Ordering and filtering file names. Entries are [fileName, maskedKey] in Drive, [fileName, rawKey] in Viewer
+export const OrderFileEntries = (entries, { query = '', keywords = null, tokenCache = null, sortMode = 'name-asc', getSize = () => 0 } = {}) => {
+    const normalizedQuery = String(query || '').normalize('NFC').trim().toLowerCase();
+    let result = entries.filter(([name]) => !normalizedQuery || name.normalize('NFC').toLowerCase().includes(normalizedQuery)); // filter by query
+    if (keywords?.size) { // filter by keywords
+        result = result.filter(([name]) => {
+            const tokens = tokenCache?.get(name);
+            if (!tokens) return false;
+            for (const keyword of keywords) if (!tokens.has(keyword)) return false;
+            return true;
+        });
+    }
+    const compareName = (a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+    const size = (entry) => Number(getSize(entry[1])) || 0;
+    if (sortMode === 'name-desc') result.sort((a, b) => compareName(b[0], a[0])); // sort by name descending
+    else if (sortMode === 'size-asc') result.sort((a, b) => size(a) - size(b) || compareName(a[0], b[0])); // sort by size ascending
+    else if (sortMode === 'size-desc') result.sort((a, b) => size(b) - size(a) || compareName(a[0], b[0])); // sort by size descending
+    else result.sort((a, b) => compareName(a[0], b[0])); // sort by name ascending
+    return result;
 };
 
 const videoExts = ['mp4', 'webm', 'mov', 'mkv', 'avi', 'ts', 'm4v', '3gp', 'flv'];
@@ -108,7 +140,7 @@ export const GetMime = (name) => {
 };
 
 // Get file type icon and theme color
-export const GetGoogleFileIcon = (filename) => {
+export const GetFileIcon = (filename) => {
     const ext = (filename.split('.').pop() || '').toLowerCase();
     if (['mp4', 'mkv', 'avi', 'mov', 'webm', 'ts', 'm4v', '3gp', 'flv'].includes(ext)) {
         return { icon: 'movie', color: '#e06d53' };
@@ -128,7 +160,7 @@ export const GetGoogleFileIcon = (filename) => {
     return { icon: 'description', color: '#4285f4' };
 };
 
-// In-memory session state manager backed by Adapter secure session vault
+// ===== Session Manager =====
 export class SafeSessionManager {
     constructor() {
         this.ram = {};
@@ -140,9 +172,8 @@ export class SafeSessionManager {
     // Initialize session by loading and decoding decrypted bytes from adapter vault
     async Init() {
         if (this.initPromise) return this.initPromise;
-
         this.initPromise = (async () => {
-            try {
+            try { // load session from vault
                 if (_sessionAdapter) {
                     const bytes = await _sessionAdapter.LoadSessionBytes();
                     if (bytes && bytes.length > 0) {
@@ -153,8 +184,8 @@ export class SafeSessionManager {
                         }
                     }
                 }
-            } catch (err) {
-                console.warn('[SafeSession] Failed to load session from vault:', err);
+            } catch (err) { // session load failed
+                console.warn('Failed to load session from vault:', err);
                 this.ram = {};
             }
             this.isInitialized = true;
@@ -164,33 +195,33 @@ export class SafeSessionManager {
         return this.initPromise;
     }
 
-    // Read item from RAM cache
+    // Read item
     GetItem(key) {
         if (!this.ram) return null;
         const val = this.ram[key];
         return val !== undefined ? val : null;
     }
 
-    // Store item in RAM cache and schedule vault persist
+    // Store item
     SetItem(key, value) {
         if (!this.ram) this.ram = {};
         this.ram[key] = String(value);
-        this.scheduleSave();
+        this.scheduleSave(); // schedule save to vault
     }
 
-    // Delete item from RAM cache and schedule vault persist
+    // Delete item
     RemoveItem(key) {
         if (this.ram && key in this.ram) {
             delete this.ram[key];
-            this.scheduleSave();
+            this.scheduleSave(); // schedule save to vault
         }
     }
 
-    // Wipe session from RAM and purge adapter vault
+    // Wipe session and purge adapter vault
     Clear() {
         this.ram = {};
         if (_sessionAdapter) {
-            _sessionAdapter.ClearSessionBytes().catch(() => {});
+            _sessionAdapter.ClearSessionBytes().catch(() => { });
         }
     }
 
@@ -198,7 +229,7 @@ export class SafeSessionManager {
     scheduleSave() {
         if (this.saveTimer) clearTimeout(this.saveTimer);
         this.saveTimer = setTimeout(() => {
-            this.Save().catch(err => console.error('[SafeSession] Save error:', err));
+            this.Save().catch(err => console.error('Session save error:', err));
         }, 50);
     }
 
@@ -214,7 +245,7 @@ export class SafeSessionManager {
             const bytes = new TextEncoder().encode(jsonStr);
             await _sessionAdapter.SaveSessionBytes(bytes);
         } catch (err) {
-            console.error('[SafeSession] Persist failed:', err);
+            console.error('Session data persist error:', err);
         }
     }
 }
@@ -222,7 +253,8 @@ export class SafeSessionManager {
 // Global SafeSession instance
 export const SafeSession = new SafeSessionManager();
 
-// Show alert notice dialog modal
+// ===== Alert UI Modals =====
+// Show notice with text and icon
 export const ShowNotice = (msg, title = 'Notice', icon = 'campaign') => {
     const modal = document.getElementById('noticeModal');
     if (!modal) {
@@ -234,6 +266,7 @@ export const ShowNotice = (msg, title = 'Notice', icon = 'campaign') => {
     const iconEl = document.getElementById('noticeIcon');
     const btn = document.getElementById('btnConfirmNotice');
 
+    // update text, title, icon
     if (textEl) textEl.textContent = msg;
     if (titleEl) titleEl.textContent = title;
     if (iconEl) {
@@ -249,6 +282,7 @@ export const ShowNotice = (msg, title = 'Notice', icon = 'campaign') => {
         }
     }
 
+    // show modal and return promise
     modal.showModal();
     return new Promise(resolve => {
         const handler = () => {
@@ -264,7 +298,7 @@ export const ShowNotice = (msg, title = 'Notice', icon = 'campaign') => {
     });
 };
 
-// Show notice dialog with dynamic severity icon
+// Show alert with icon based on message content
 export const ShowAlert = (msg) => {
     let title = 'Notice';
     let icon = 'campaign';
@@ -284,7 +318,7 @@ export const ShowAlert = (msg) => {
     return ShowNotice(msg, title, icon);
 };
 
-// Show confirmation modal dialog
+// Show confirmation dialog with icon and text
 export const ShowConfirmModal = (msg, title = 'Confirm', icon = 'help', confirmText = 'Confirm', isDanger = false) => {
     return new Promise((resolve) => {
         const modal = document.getElementById('confirmModal');
@@ -297,6 +331,7 @@ export const ShowConfirmModal = (msg, title = 'Confirm', icon = 'help', confirmT
         const btnCancel = document.getElementById('btnCancelConfirmModal');
         const btnConfirm = document.getElementById('btnActionConfirmModal');
 
+        // update text, title, icon
         if (textEl) textEl.innerHTML = msg;
         if (titleEl) titleEl.textContent = title;
         if (iconEl) {
@@ -308,19 +343,18 @@ export const ShowConfirmModal = (msg, title = 'Confirm', icon = 'help', confirmT
             btnConfirm.className = isDanger ? 'btn-dialog-danger' : 'btn-dialog-primary';
         }
 
+        // show modal and return promise
         modal.showModal();
 
         const cleanup = () => {
             btnConfirm.removeEventListener('click', onConfirm);
             btnCancel.removeEventListener('click', onCancel);
         };
-
         const onCancel = () => {
             cleanup();
             modal.close();
             resolve(false);
         };
-
         const onConfirm = () => {
             cleanup();
             modal.close();
@@ -330,19 +364,6 @@ export const ShowConfirmModal = (msg, title = 'Confirm', icon = 'help', confirmT
         modal.addEventListener('close', () => { cleanup(); resolve(false); }, { once: true });
         btnConfirm.addEventListener('click', onConfirm);
         btnCancel.addEventListener('click', onCancel);
-    });
-};
-
-// Disable browser autocomplete on text input elements
-export const DisableAllAutocomplete = () => {
-    document.querySelectorAll('input:not([type="checkbox"]):not([type="file"]):not([type="radio"])').forEach(input => {
-        if (!input.hasAttribute('autocomplete') || input.getAttribute('autocomplete') !== 'new-password') {
-            input.setAttribute('autocomplete', 'off');
-        }
-        input.setAttribute('autocorrect', 'off');
-        input.setAttribute('autocapitalize', 'off');
-        input.setAttribute('spellcheck', 'false');
-        input.setAttribute('data-lpignore', 'true');
     });
 };
 
@@ -358,7 +379,7 @@ export class DownloadProgressController {
         this.create();
     }
 
-    create() {
+    create() { // create toast
         const existing = document.getElementById("mhDownloadToast");
         if (existing) existing.remove();
 
@@ -389,10 +410,11 @@ export class DownloadProgressController {
         this.progressBar = document.getElementById("mhDownloadToastFill");
     }
 
-    update(progress) {
+    update(progress) { // update progress bar and text
         if (!this.el) return;
         const { phase, loaded, total, percent } = progress;
-        if (phase === 'downloading') {
+
+        if (phase === 'downloading') { // downloading phase
             const p = Math.max(0, Math.min(100, percent || 0));
             if (this.percentText) this.percentText.textContent = `${p}%`;
             if (this.progressBar) this.progressBar.style.width = `${p}%`;
@@ -403,14 +425,16 @@ export class DownloadProgressController {
                     this.statusText.textContent = `Downloading • ${FormatBytes(loaded)}`;
                 }
             }
-        } else if (phase === 'decrypting') {
+
+        } else if (phase === 'decrypting') { // decrypting phase
             if (this.iconEl) {
                 this.iconEl.textContent = 'lock_open';
             }
             if (this.percentText) this.percentText.textContent = '100%';
             if (this.progressBar) this.progressBar.style.width = '100%';
             if (this.statusText) this.statusText.textContent = 'Decrypting file…';
-        } else if (phase === 'complete') {
+
+        } else if (phase === 'complete') { // complete phase
             if (this.iconEl) {
                 this.iconEl.textContent = 'check_circle';
                 this.iconEl.style.color = '#137333';
@@ -422,7 +446,7 @@ export class DownloadProgressController {
         }
     }
 
-    fail(err) {
+    fail(err) { // failed to download
         if (!this.el) return;
         if (this.iconEl) {
             this.iconEl.textContent = 'error';
@@ -433,7 +457,7 @@ export class DownloadProgressController {
         setTimeout(() => this.dismiss(), 4000);
     }
 
-    dismiss() {
+    dismiss() { // dismiss toast
         if (this.el) {
             this.el.style.opacity = '0';
             this.el.style.transform = 'translate(-50%, 12px)';

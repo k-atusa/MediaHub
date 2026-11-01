@@ -1,4 +1,4 @@
-// History API SPA client router
+// SPA client router
 export class Router {
     // Initialize router instance and bind popstate event
     constructor() {
@@ -34,6 +34,7 @@ export class Router {
             path = '/drive';
         }
 
+        // Parse query parameters
         const query = {};
         const search = window.location.search;
         if (search) {
@@ -50,6 +51,7 @@ export class Router {
         if (url.startsWith('#')) url = url.slice(1);
         if (!url.startsWith('/')) url = '/' + url;
 
+        // Check if url is already the current url
         const current = window.location.pathname + window.location.search;
         if (current !== url) {
             if (replace) {
@@ -72,8 +74,8 @@ export class Router {
         this.isNavigating = true;
 
         try {
+            // Parse url
             const { path, query } = this.ParseUrl();
-
             for (const hook of this.beforeHooks) {
                 const redirect = await hook(path, query);
                 if (redirect && redirect !== path) {
@@ -82,22 +84,21 @@ export class Router {
                 }
             }
 
+            // Match route
             this.currentPath = path;
-
             let matched = false;
             for (const route of this.routes) {
                 const match = path.match(route.regex);
                 if (match) {
                     matched = true;
                     const params = {};
-                    route.paramNames.forEach((name, idx) => {
-                        params[name] = decodeURIComponent(match[idx + 1] || '');
-                    });
+                    route.paramNames.forEach((name, idx) => { params[name] = decodeURIComponent(match[idx + 1] || ''); });
                     await route.handler({ params, query, path });
                     break;
                 }
             }
 
+            // Fallback to drive if no route matches
             if (!matched && path !== '/drive') {
                 return this.Navigate('/drive', true);
             }
@@ -112,5 +113,5 @@ export class Router {
     }
 }
 
-// Global router singleton instance
+// Global router instance
 export const AppRouter = new Router();
